@@ -1,0 +1,51 @@
+{
+  "sources": [
+    {
+      "id": "rrfs",
+      "label": "RRFS",
+      "catalogUrl": "data/catalog.json"
+    }
+  ],
+  "primarySource": "rrfs",
+  "panels": [
+    {
+      "id": "rrfs-main",
+      "source": "rrfs",
+      "label": "RRFS"
+    }
+  ],
+  "layout": {
+    "columns": "auto",
+    "maxPanels": 20
+  },
+  "defaultField": "refc",
+  "defaultForecastHour": 0,
+  "loopOnlyAvailableHours": true,
+  "display": {
+    "maxConcurrentFetches": 3,
+    "mapInitTimeoutSeconds": 90,
+    "decodedCacheMB": 96,
+    "showCountryBoundaries": true,
+    "showStateBoundaries": true,
+    "showCoastlines": true,
+    "showCountiesOnZoom": true,
+    "showLandFill": true,
+    "mapProjection": "lambert",
+    "fieldRendering": "raster",
+    "globeCountyMinZoom": 5.05,
+    "countyMinZoom": 4.85,
+    "maxActiveMaps": 7,
+    "maxZoom": 12,
+    "syncMaps": true,
+    "earthRadiusM": 6371229.0,
+    "limitFlatZoomOut": true,
+    "limitFlatPan": false,
+    "dataExtentPaddingPx": 40,
+    "gpuInitTimeoutSeconds": 35,
+    "chunkTimeoutSeconds": 150,
+    "globeInitialZoom": 2.6,
+    "modelExtentZoomOutAllowance": 0.7,
+    "legendTickCount": 11
+  },
+  "theme": "dark"
+}

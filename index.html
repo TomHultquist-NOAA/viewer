@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#09111f">
+<title>OMD EVU Model Viewer | autumnplot-gl</title>
+<link rel="stylesheet" href="css/styles.css?v=7.10">
+<!-- WebGL comes from the browser. MapLibre uses a separately hosted worker for CSP-safe startup. -->
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<script src="vendor/maplibre-gl-csp.js"></script>
+<script src="vendor/autumnplot-gl.js"></script>
+<script src="js/viewer.js?v=7.10.1" defer></script>
+</head>
+<body>
+<header class="toolbar">
+<div class="brand"><div class="brandmark">EVU</div><div><strong>OMD EVU Model Viewer</strong><small>Evaluation and Verification Unit</small></div></div>
+<div class="control field-control"><label for="fieldSelect">Field</label><select id="fieldSelect" disabled><option>Loading…</option></select></div>
+<div class="control cycle-control"><label for="cycleSelect">Reference cycle</label><select id="cycleSelect" disabled></select></div>
+<div class="control"><label for="fcstSelect">Forecast hour</label><select id="fcstSelect" disabled></select></div>
+<div class="control"><label>Reference valid time (UTC)</label><div class="display-box" id="validDisplay">—</div></div>
+<div class="transport" aria-label="Forecast navigation"><button id="stepBackBtn" class="round" disabled title="Previous hour">◀◀</button><button id="playBtn" class="round" disabled title="Play">▶</button><button id="pauseBtn" class="round active" disabled title="Pause">Ⅱ</button><button id="stepForwardBtn" class="round" disabled title="Next hour">▶▶</button></div>
+<div class="control speed-control"><label for="loopSpeedSelect">Loop speed</label><select id="loopSpeedSelect"><option value="1700">Slower</option><option value="1200">Slow</option><option value="850" selected>Normal</option><option value="500">Fast</option></select></div>
+<div class="spacer"></div>
+<div class="control map-view-control"><label for="mapViewSelect">Map view</label><select id="mapViewSelect"><option value="lambert">2-Dimensional</option><option value="globe">Globe</option></select></div>
+<button id="resetViewBtn" class="utility">Reset view</button><button id="saveAllPngBtn" class="utility" disabled>Save all panels PNG</button><button id="themeToggleBtn" class="utility theme-toggle">☀ Light</button><button id="copyLinkBtn" class="utility">Copy link</button>
+</header>
+<div class="helper"><span>wheel zoom · drag pan / rotate globe · county lines on close zoom · save per-panel or all-panel PNG · ← / → forecast hours · space play/pause</span><span class="catalog-badge" id="catalogBadge">Loading</span></div>
+<main id="viewerGrid" class="viewer-grid" aria-label="Model comparison plots"><div class="startup">Initializing rendering engine…</div></main>
+<footer class="plot-footer"><span id="dataStatus" role="status" aria-live="polite">Starting…</span><span>GPU field shading powered by <a href="https://github.com/tsupinie/autumnplot-gl" target="_blank" rel="noopener noreferrer">autumnplot-gl</a> · boundary layers from local geography files</span></footer>
+</body></html>

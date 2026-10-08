@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OMD EVU Map and GPU Diagnostics</title>
+<link rel="stylesheet" href="vendor/maplibre-gl.css"><style>body{font:15px system-ui,sans-serif;background:#101b2e;color:#eef5ff;margin:2rem auto;padding:0 1rem;max-width:850px}a{color:#8accff}pre{white-space:pre-wrap;background:#061020;padding:1rem;border-radius:8px}.pass{color:#85e69c}.fail{color:#ff9c9c}#map{height:290px;border:1px solid #4a667b;border-radius:9px}</style>
+<script src="vendor/maplibre-gl-csp.js"></script><script src="vendor/autumnplot-gl.js"></script></head>
+<body><h1>OMD EVU — Rendering diagnostics</h1><p>This page does not load RRFS data, geography, or the catalog. It checks WebGL, MapLibre, and the installed autumnplot-gl worker assets.</p><p><a href="index.html">← Return to viewer</a></p><pre id="log">Starting checks…</pre><div id="map"></div>
+<script>
+const log=document.getElementById('log');log.textContent='';let finished=false;
+function say(kind,message){const p=document.createElement('div');p.className=kind;p.textContent=kind.toUpperCase()+' — '+message;log.append(p);console.log(kind,message)}
+(async()=>{
+ try{const c=document.createElement('canvas');const gl=c.getContext('webgl2')||c.getContext('webgl');say(gl?'pass':'fail','Browser WebGL context: '+(gl?'available':'unavailable'));if(gl){say('pass','WebGL version: '+gl.getParameter(gl.VERSION));gl.getExtension('WEBGL_lose_context')?.loseContext();}}
+ catch(e){say('fail','WebGL context error: '+e)}
+ say(window.maplibregl?.Map?'pass':'fail','MapLibre CSP JavaScript loaded');
+ say(window.apgl?.RawScalarField?'pass':'fail','autumnplot-gl JavaScript loaded');
+ try{
+  const manifest=await fetch('vendor/autumnplot-assets.json',{cache:'no-store'});
+  if(!manifest.ok){say('fail','autumnplot-assets.json missing (HTTP '+manifest.status+'). Rerun updated vendor_dependencies.py and upload the whole vendor/ directory.');}
+  else{
+   const info=await manifest.json();
+   const workers=(info.worker_candidates||info.files.filter(x=>x!=='autumnplot-gl.js'&&x.endsWith('.js')));
+   say(workers.length?'pass':'fail','autumnplot-gl worker assets declared: '+(workers.join(', ')||'none'));
+   for(const name of workers){
+    try{const asset=await fetch('vendor/'+name,{method:'HEAD',cache:'no-store'});
+     say(asset.ok?'pass':'fail','autumnplot worker '+name+': HTTP '+asset.status);
+    }catch(e){say('fail','Worker asset '+name+': '+e);}
+   }
+  }
+ }catch(e){say('fail','autumnplot asset check: '+e)}
+ const worker='vendor/maplibre-gl-csp-worker.js';
+ try{const r=await fetch(worker,{cache:'no-store'});const type=r.headers.get('content-type')||'unknown';say(r.ok?'pass':'fail',worker+': HTTP '+r.status+' ('+type+')');if(!r.ok)return;}
+ catch(e){say('fail','Cannot fetch worker: '+e);return;}
+ if(!window.maplibregl?.Map)return;
+ try{
+  maplibregl.setWorkerUrl(new URL(worker,location.href).href);
+  const m=new maplibregl.Map({container:'map',style:{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#163e67'}}]},center:[-97,39],zoom:2,attributionControl:false});
+  m.on('error',e=>say('fail','MapLibre event error: '+(e.error?.message||String(e.error||e))));
+  m.on('load',()=>{finished=true;say('pass','MapLibre load event received; map is ready');});
+  m.on('styledata',()=>say('pass','Map style processed'));
+  setTimeout(()=>{if(!finished)say('fail','Map still not ready after 15 seconds. Open browser DevTools Console for worker/CSP errors.');},15000);
+ }catch(e){say('fail','Map constructor error: '+e)}
+})().catch(e=>say('fail',String(e)));
+</script></body></html>
