@@ -3,28 +3,105 @@
     {
       "id": "rrfs",
       "label": "RRFS",
-      "catalogUrl": "data/catalog.json"
+      "catalogUrl": "data/catalog_rrfs.json"
+    },
+    {
+      "id": "hrrr",
+      "label": "HRRR",
+      "catalogUrl": "data/catalog_hrrr.json"
+    },
+    {
+      "id": "refs_m001",
+      "label": "REFS-1",
+      "catalogUrl": "data/catalog_refs_m001.json"
+    },
+    {
+      "id": "refs_m002",
+      "label": "REFS-2",
+      "catalogUrl": "data/catalog_refs_m002.json"
+    },
+    {
+      "id": "refs_m003",
+      "label": "REFS-3",
+      "catalogUrl": "data/catalog_refs_m003.json"
+    },
+    {
+      "id": "refs_m004",
+      "label": "REFS-4",
+      "catalogUrl": "data/catalog_refs_m004.json"
+    },
+    {
+      "id": "refs_m005",
+      "label": "REFS-5",
+      "catalogUrl": "data/catalog_refs_m005.json"
+    },
+    {
+      "id": "refs_mean",
+      "label": "REFS-mean",
+      "catalogUrl": "data/catalog_refs_mean.json"
     }
   ],
   "primarySource": "rrfs",
   "panels": [
     {
-      "id": "rrfs-main",
+      "id": "rrfs",
       "source": "rrfs",
       "label": "RRFS"
+    },
+    {
+      "id": "hrrr",
+      "source": "hrrr",
+      "label": "HRRR"
+    },
+    {
+      "id": "refs-1",
+      "source": "refs_m001",
+      "label": "REFS-1"
+    },
+    {
+      "id": "refs-2",
+      "source": "refs_m002",
+      "label": "REFS-2"
+    },
+    {
+      "id": "refs-3",
+      "source": "refs_m003",
+      "label": "REFS-3"
+    },
+    {
+      "id": "refs-4",
+      "source": "refs_m004",
+      "label": "REFS-4"
+    },
+    {
+      "id": "refs-5",
+      "source": "refs_m005",
+      "label": "REFS-5"
+    },
+    {
+      "id": "refs-mean",
+      "source": "refs_mean",
+      "label": "REFS-mean"
+    },
+    {
+      "id": "analysis",
+      "source": "analysis",
+      "label": "Analysis",
+      "placeholder": true,
+      "placeholderText": "Verifying analysis \u2014 RAP F000 / MRMS (coming later)"
     }
   ],
   "layout": {
-    "columns": "auto",
+    "columns": 3,
     "maxPanels": 20
   },
   "defaultField": "refc",
   "defaultForecastHour": 0,
   "loopOnlyAvailableHours": true,
   "display": {
-    "maxConcurrentFetches": 3,
+    "maxConcurrentFetches": 4,
     "mapInitTimeoutSeconds": 90,
-    "decodedCacheMB": 96,
+    "decodedCacheMB": 256,
     "showCountryBoundaries": true,
     "showStateBoundaries": true,
     "showCoastlines": true,
@@ -32,9 +109,9 @@
     "showLandFill": true,
     "mapProjection": "lambert",
     "fieldRendering": "raster",
-    "globeCountyMinZoom": 5.05,
-    "countyMinZoom": 4.85,
-    "maxActiveMaps": 7,
+    "globeCountyMinZoom": 4.68,
+    "countyMinZoom": 4.6,
+    "maxActiveMaps": 9,
     "maxZoom": 12,
     "syncMaps": true,
     "earthRadiusM": 6371229.0,
@@ -45,7 +122,22 @@
     "chunkTimeoutSeconds": 150,
     "globeInitialZoom": 2.6,
     "modelExtentZoomOutAllowance": 0.7,
-    "legendTickCount": 11
+    "legendTickCount": 11,
+    "exportPanelWidth": 1920,
+    "exportAllWidth": 2560,
+    "displayReadyCacheMB": 192,
+    "prefetchMaxFields": 16,
+    "loopIntervalMs": 850,
+    "exportPanelWidth43": 1600,
+    "exportAllWidth43": 2048,
+    "prefetchEnabled": true,
+    "prefetchHours": 2,
+    "prefetchDelayMs": 180,
+    "windBarbSizePx": 18,
+    "windBarbMinSpacingPx": 22,
+    "exportMaxPixelRatio": 4,
+    "synchronizedCursors": true,
+    "detailMinZoom": 0
   },
   "theme": "dark"
 }

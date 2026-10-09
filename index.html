@@ -3,27 +3,58 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#09111f">
 <title>OMD EVU Model Viewer | autumnplot-gl</title>
-<link rel="stylesheet" href="css/styles.css?v=7.10">
+<link rel="stylesheet" href="css/styles.css?v=7.28">
 <!-- WebGL comes from the browser. MapLibre uses a separately hosted worker for CSP-safe startup. -->
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <script src="vendor/maplibre-gl-csp.js"></script>
 <script src="vendor/autumnplot-gl.js"></script>
-<script src="js/viewer.js?v=7.10.1" defer></script>
+<script src="js/viewer.js?v=7.28" defer></script>
 </head>
 <body>
 <header class="toolbar">
-<div class="brand"><div class="brandmark">EVU</div><div><strong>OMD EVU Model Viewer</strong><small>Evaluation and Verification Unit</small></div></div>
-<div class="control field-control"><label for="fieldSelect">Field</label><select id="fieldSelect" disabled><option>Loading…</option></select></div>
-<div class="control cycle-control"><label for="cycleSelect">Reference cycle</label><select id="cycleSelect" disabled></select></div>
-<div class="control"><label for="fcstSelect">Forecast hour</label><select id="fcstSelect" disabled></select></div>
-<div class="control"><label>Reference valid time (UTC)</label><div class="display-box" id="validDisplay">—</div></div>
-<div class="transport" aria-label="Forecast navigation"><button id="stepBackBtn" class="round" disabled title="Previous hour">◀◀</button><button id="playBtn" class="round" disabled title="Play">▶</button><button id="pauseBtn" class="round active" disabled title="Pause">Ⅱ</button><button id="stepForwardBtn" class="round" disabled title="Next hour">▶▶</button></div>
-<div class="control speed-control"><label for="loopSpeedSelect">Loop speed</label><select id="loopSpeedSelect"><option value="1700">Slower</option><option value="1200">Slow</option><option value="850" selected>Normal</option><option value="500">Fast</option></select></div>
-<div class="spacer"></div>
-<div class="control map-view-control"><label for="mapViewSelect">Map view</label><select id="mapViewSelect"><option value="lambert">2-Dimensional</option><option value="globe">Globe</option></select></div>
-<button id="resetViewBtn" class="utility">Reset view</button><button id="saveAllPngBtn" class="utility" disabled>Save all panels PNG</button><button id="themeToggleBtn" class="utility theme-toggle">☀ Light</button><button id="copyLinkBtn" class="utility">Copy link</button>
+  <div class="toolbar-brandline">
+    <div class="brand"><div class="brandmark">EVU</div><div><strong>OMD EVU Model Viewer</strong><small>Evaluation and Verification Unit</small></div></div>
+    <div class="toolbar-brand-actions">
+      <button id="mobileControlsBtn" class="utility mobile-controls-btn" aria-controls="viewerControls" aria-expanded="false" title="Show viewer controls">☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span></button>
+      <button id="themeToggleBtn" class="utility theme-toggle" aria-label="Switch to light mode" title="Switch to light mode"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></button>
+    </div>
+  </div>
+  <div id="viewerControls" class="toolbar-controls">
+    <div class="control field-control"><label for="fieldSelect">Field</label><select id="fieldSelect" disabled><option>Loading…</option></select></div>
+    <div class="control cycle-control"><label for="cycleSelect">Cycle (UTC)</label><select id="cycleSelect" disabled></select></div>
+    <div class="control forecast-control"><label for="fcstSelect">F-hour</label><select id="fcstSelect" disabled></select></div>
+    <div class="transport" aria-label="Forecast navigation"><button id="stepBackBtn" class="round" disabled title="Previous hour">◀◀</button><button id="playBtn" class="round" disabled title="Play">▶</button><button id="pauseBtn" class="round active" disabled title="Pause">Ⅱ</button><button id="stepForwardBtn" class="round" disabled title="Next hour">▶▶</button></div>
+    <div class="control speed-control"><label>Speed</label><div class="speed-buttons" role="group" aria-label="Loop playback speed"><button id="speedDownBtn" type="button" title="Slower playback" aria-label="Slower playback">−</button><output id="speedValue" aria-live="polite" title="Playback speed relative to normal">1×</output><button id="speedUpBtn" type="button" title="Faster playback" aria-label="Faster playback">+</button></div></div>
+    <div class="control map-view-control"><label for="mapViewSelect">Map view</label><select id="mapViewSelect"><option value="lambert">2D</option><option value="globe">Globe</option></select></div>
+    <div class="toolbar-utilities"><button id="resetViewBtn" class="utility">Reset view</button><button id="saveAllPngBtn" class="utility" disabled>Save all panels PNG</button><button id="copyLinkBtn" class="utility">Copy link</button></div>
+  </div>
 </header>
-<div class="helper"><span>wheel zoom · drag pan / rotate globe · county lines on close zoom · save per-panel or all-panel PNG · ← / → forecast hours · space play/pause</span><span class="catalog-badge" id="catalogBadge">Loading</span></div>
-<main id="viewerGrid" class="viewer-grid" aria-label="Model comparison plots"><div class="startup">Initializing rendering engine…</div></main>
-<footer class="plot-footer"><span id="dataStatus" role="status" aria-live="polite">Starting…</span><span>GPU field shading powered by <a href="https://github.com/tsupinie/autumnplot-gl" target="_blank" rel="noopener noreferrer">autumnplot-gl</a> · boundary layers from local geography files</span></footer>
+<div class="helper"><span class="helper-instructions">wheel zoom · drag pan / rotate globe · ← / → forecast hours · space play/pause</span><span class="helper-status"><span id="dataStatus" role="status" aria-live="polite">Starting…</span><span class="helper-credit">Plotting powered by <a href="https://github.com/tsupinie/autumnplot-gl" target="_blank" rel="noopener noreferrer">autumnplot-gl</a></span></span></div>
+<div class="viewer-workspace">
+  <main id="viewerGrid" class="viewer-grid" aria-label="Model comparison plots"><div class="startup">Initializing rendering engine…</div></main>
+  <section id="sharedLegend" class="shared-legend" aria-label="Shared field color legend">
+    <div id="sharedLegendTitle" class="shared-legend-title">Field color scale</div>
+    <div class="shared-legend-track">
+      <canvas id="sharedLegendCanvas" class="shared-legend-canvas" width="1024" height="20" aria-hidden="true"></canvas>
+      <div id="sharedLegendLabels" class="shared-legend-labels" aria-label="Color scale values, categorical fields show No and Yes"></div>
+    </div>
+  </section>
+</div>
+
+<dialog id="exportDialog" class="export-dialog" aria-labelledby="exportDialogTitle" aria-describedby="exportDialogHelp">
+  <form id="exportForm">
+    <div class="export-heading"><h2 id="exportDialogTitle">Save PNG</h2><button type="button" id="exportCloseBtn" class="export-close" aria-label="Close export options">×</button></div>
+    <p id="exportDialogHelp">Choose the aspect ratio for your presentation image. Map proportions are preserved. Choose whether to fill the page or expand the map to show the surrounding area.</p>
+    <fieldset class="export-ratios"><legend>Aspect ratio</legend>
+      <label class="export-choice"><input type="radio" name="exportRatio" value="16:9" checked><span><strong>16:9 widescreen</strong><small id="exportSize169">1920 × 1080</small></span></label>
+      <label class="export-choice"><input type="radio" name="exportRatio" value="4:3"><span><strong>4:3 standard</strong><small id="exportSize43">1600 × 1200</small></span></label>
+    </fieldset>
+    <fieldset class="export-framing"><legend>Map framing</legend>
+      <label><input type="radio" name="exportFraming" value="fill" checked> Fill the plot area <small>(may crop map edges)</small></label>
+      <label><input type="radio" name="exportFraming" value="fit"> Fit entire map <small>(show surrounding geography)</small></label>
+    </fieldset>
+    <p id="exportBusyStatus" role="status" aria-live="polite" class="export-busy"></p>
+    <div class="export-actions"><button type="button" id="exportCancelBtn">Cancel</button><button type="submit" id="exportConfirmBtn" class="export-primary">Download PNG</button></div>
+  </form>
+</dialog>
 </body></html>

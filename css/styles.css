@@ -73,3 +73,271 @@ html[data-theme] .panel-viewport .image-layer{image-rendering:auto}
 .panel-footer .legend-tick:first-child{transform:none}
 .panel-footer .legend-tick:last-child{transform:translateX(-100%)}
 @container (max-width:610px){.panel-footer .legend-tick[data-odd="1"]{display:none}}
+
+/* v7.11 compact controls: one efficient row where space permits. */
+body{gap:6px}
+.toolbar{display:flex;align-items:center;gap:9px;padding:7px 10px;flex-wrap:wrap}
+.toolbar-brandline{display:contents}
+.toolbar-brand-actions{display:contents}
+.toolbar .brand{flex:0 0 auto;align-self:center}
+.toolbar .brandmark{width:36px;height:33px}
+.toolbar .brand strong{font-size:14px}
+.toolbar .brand small{font-size:10px}
+.toolbar-controls{display:flex;flex:1 1 900px;align-items:flex-end;gap:6px;flex-wrap:wrap;min-width:0}
+.toolbar-controls .control{gap:3px;min-width:0;flex:0 1 auto}
+.toolbar-controls .control label{font-size:10px}
+.toolbar-controls select{width:100%;font-size:11px;padding:0 6px}
+.toolbar-controls .field-control{width:190px;max-width:220px}
+.toolbar-controls .cycle-control{width:159px}
+.toolbar-controls .forecast-control{width:85px}
+.toolbar-controls .speed-control{width:81px}
+.toolbar-controls .map-view-control{width:121px}
+.toolbar select,.toolbar button,.toolbar .display-box{height:32px;border-radius:8px}
+.toolbar .transport{height:32px;padding:2px;gap:2px;flex:0 0 auto}
+.toolbar .round{height:26px;width:29px;font-size:11px}
+.toolbar .utility{font-size:11px;padding:0 8px}
+.toolbar-utilities{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.toolbar .theme-toggle{min-width:0;width:34px;height:34px;font-size:19px;padding:0;line-height:1;order:4;margin-left:auto;flex:0 0 34px}
+.helper{padding:5px 10px;font-size:11px;min-height:26px}
+.mobile-controls-btn{display:none}
+@media (max-width:800px){
+ body{grid-template-rows:auto auto minmax(65vh,1fr) auto}
+ .toolbar{display:block;padding:7px 9px}
+ .toolbar-brandline{display:flex;justify-content:space-between;gap:8px;align-items:center;min-width:0}
+ .toolbar-brand-actions{display:flex;align-items:center;gap:7px}
+ .mobile-controls-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+ .toolbar .theme-toggle{margin:0;order:initial}
+ .toolbar-controls{display:none;flex:1 1 auto;margin-top:9px;border-top:1px solid var(--border);padding-top:9px;align-items:flex-end;gap:7px}
+ .toolbar-controls.is-open{display:flex}
+ .toolbar-controls .field-control{flex:2 1 180px;width:auto;max-width:none}
+ .toolbar-controls .cycle-control{flex:1 1 140px;width:auto}
+ .toolbar-controls .forecast-control{flex:0 1 88px;width:88px}
+ .toolbar-controls .speed-control{flex:0 1 88px;width:88px}
+ .toolbar-controls .map-view-control{flex:0 1 130px;width:130px}
+ .toolbar-utilities{flex:1 1 100%;}
+ .toolbar .brand small{font-size:9px}
+ .toolbar .brand strong{font-size:13px}
+ .toolbar .transport{margin:0}
+}
+@media (max-width:560px){
+ .toolbar-controls .control,.toolbar-controls .cycle-control,.toolbar-controls .field-control{min-width:0}
+ .toolbar-controls .field-control{flex:1 1 100%}
+ .toolbar-controls .cycle-control{flex:2 1 120px}
+ .toolbar-controls .forecast-control{flex:1 1 77px;width:auto}
+ .toolbar-controls .map-view-control{flex:1 1 115px;width:auto}
+ .toolbar-utilities{justify-content:space-between}
+ .toolbar .brandmark{width:33px;height:32px}
+}
+
+.theme-toggle{display:inline-flex;align-items:center;justify-content:center}
+.theme-toggle svg{display:block;width:19px;height:19px;flex:0 0 auto}
+
+
+/* v7.12: tight speed steppers and slide-export chooser */
+.toolbar-controls .speed-control{width:112px}
+.speed-buttons{display:flex;align-items:center;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--control);overflow:hidden}
+.toolbar .speed-buttons button{height:30px;min-width:28px;padding:0;border:0;border-radius:0;font-size:17px;line-height:1;background:transparent}
+.speed-buttons output{display:inline-flex;flex:1;justify-content:center;align-items:center;min-width:36px;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.export-dialog{position:fixed;inset:auto;max-width:min(430px,calc(100vw - 24px));width:100%;padding:0;border:1px solid var(--border);border-radius:16px;background:var(--panel);color:var(--text);box-shadow:0 30px 90px #0008}
+.export-dialog::backdrop{background:rgba(2,8,18,.74);backdrop-filter:blur(3px)}
+.export-dialog form{padding:20px}
+.export-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.export-heading h2{font-size:18px;margin:0}
+.export-dialog .export-close{height:30px;width:30px;flex:0 0 30px;padding:0;font-size:24px}
+.export-dialog p{font-size:13px;color:var(--muted);line-height:1.5;margin:10px 0 17px}
+.export-ratios{margin:0;border:0;padding:0;display:grid;gap:9px}
+.export-ratios legend{font-size:12px;font-weight:700;padding:0;margin-bottom:10px}
+.export-choice{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer}
+.export-choice:has(input:checked){border-color:var(--highlight);box-shadow:0 0 0 1px var(--highlight)}
+.export-choice input{accent-color:var(--highlight);width:16px;height:16px;flex:none}
+.export-choice span{display:grid;gap:4px;font-size:13px}
+.export-choice small{font-size:11px;color:var(--muted)}
+.export-dialog .export-busy{margin:9px 0;min-height:14px;font-size:12px}
+.export-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
+.export-actions button{height:36px}
+.export-actions .export-primary{background:var(--highlight);color:var(--bg);border-color:var(--highlight);font-weight:700}
+@media(max-width:800px){.toolbar-controls .speed-control{flex:0 0 112px;width:112px}}
+
+/* v7.14: preserve the ninth verifying-analysis slot without initializing WebGL. */
+.panel-card.analysis-placeholder .panel-viewport{background:radial-gradient(ellipse at 50% 28%,rgba(72,111,155,.17),transparent 70%),var(--map-bg);}
+.panel-card.analysis-placeholder .notice{top:50%;left:50%;transform:translate(-50%,-50%);max-width:90%;width:max-content;text-align:center;white-space:normal;}
+.panel-card.analysis-placeholder .panel-footer{min-height:55px;}
+.panel-card.analysis-placeholder .legend-canvas{visibility:hidden;}
+
+/* v7.15: map-aligned 10-m wind barbs. Kept out of WebGL DOM to preserve plot engine. */
+.wind-overlay{position:absolute;inset:0;z-index:2;width:100%;height:100%;pointer-events:none;display:block;}
+.export-framing{border:0;padding:0;margin:16px 0 6px;display:grid;gap:8px;}
+.export-framing legend{font-size:12px;font-weight:700;margin-bottom:7px;}
+.export-framing label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;}
+.export-framing input{accent-color:var(--highlight);}
+.export-framing small{font-size:11px;color:var(--muted);}
+
+
+/* v7.16: plot-first panels and responsive compact legends. */
+/* The model and valid time remain INSIDE the plot, not in a redundant header. */
+.panel-card .panel-header{display:none}
+.panel-viewport{min-height:0}
+.panel-viewport .plot-label{max-width:calc(100% - 55px)}
+.panel-viewport .panel-save{
+ position:absolute;right:7px;top:7px;z-index:7;
+ width:29px;height:29px;min-width:29px;padding:5px;
+ display:flex;align-items:center;justify-content:center;
+ border-radius:8px;border:1px solid var(--border);
+ background:var(--plot-label);color:var(--text);
+ backdrop-filter:blur(4px);opacity:.92;cursor:pointer;
+}
+.panel-viewport .panel-save svg{display:block;width:17px;height:17px;flex:0 0 auto}
+.panel-viewport .panel-save:disabled{opacity:.35;pointer-events:none}
+.panel-viewport .panel-save:hover:not(:disabled){opacity:1}
+/* Smaller horizontal legends: used for single/few panels and narrow screens. */
+.panel-footer{padding:3px 7px 4px}
+.panel-footer .legend-title{margin-bottom:2px;font-size:9px;line-height:11px}
+.panel-footer .legend-canvas{height:10px}
+.panel-footer .legend-labels{height:13px;margin-top:2px}
+.panel-footer .legend-tick{line-height:11px;font-size:8px}
+/* Right-side colorbars for 6+ panels on sufficiently wide 3+ column layouts. */
+.viewer-grid.vertical-legends .panel-card:not(.analysis-placeholder){flex-direction:row}
+.viewer-grid.vertical-legends .panel-card:not(.analysis-placeholder)>.panel-viewport{flex:1 1 auto;min-width:0;min-height:0}
+.viewer-grid.vertical-legends .panel-card:not(.analysis-placeholder)>.panel-footer{
+ flex:0 0 74px;width:74px;min-width:74px;position:relative;
+ border-top:0;border-left:1px solid var(--border);
+ padding:5px 5px;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-title{
+ font-size:9px;line-height:11px;text-align:center;
+ margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-canvas{
+ position:absolute;left:7px;top:23px;bottom:7px;
+ width:13px;height:calc(100% - 30px);border-radius:3px;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-labels{
+ position:absolute;left:24px;right:4px;top:23px;bottom:7px;
+ display:block;height:auto;margin:0;overflow:visible;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-tick{
+ left:0!important;top:auto;transform:translateY(-50%);
+ font-size:9px;line-height:10px;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-tick[data-end="top"]{transform:translateY(0)}
+.viewer-grid.vertical-legends .panel-footer .legend-tick[data-end="bottom"]{transform:translateY(-100%)}
+@container (max-width:610px){.viewer-grid.vertical-legends .panel-footer .legend-tick[data-odd="1"]{display:block}}
+@media(max-width:800px){.panel-viewport{min-height:170px}}
+
+/* Analysis has no colorbar until RAP/MRMS analysis data are available. */
+.panel-card.analysis-placeholder>.panel-footer{display:none}
+
+
+/* v7.17: share one field legend and maximize every panel's map area. */
+.viewer-workspace{display:flex;flex-direction:column;min-width:0;min-height:0;gap:0;overflow:hidden;}
+.viewer-workspace>.viewer-grid{flex:1 1 auto;min-height:0;min-width:0;}
+.viewer-grid{gap:1px;padding:0;grid-auto-rows:minmax(120px,1fr);background:var(--border);}
+.panel-card,html[data-theme] .panel-card{min-height:100px;border:0;border-radius:0;box-shadow:none;}
+.panel-card.selected,html[data-theme] .panel-card.selected{border:0;box-shadow:inset 0 0 0 2px var(--highlight);}
+.panel-card>.panel-footer,.viewer-grid.vertical-legends .panel-card>.panel-footer{display:none;}
+.shared-legend{
+ flex:0 0 auto;min-height:47px;display:flex;align-items:center;gap:15px;
+ padding:4px 11px;background:var(--surface);color:var(--text);
+ border-top:1px solid var(--border);min-width:0;
+}
+.shared-legend-title{font-size:11px;font-weight:700;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;flex:0 1 240px;}
+.shared-legend-track{flex:1 1 auto;min-width:0;max-width:1000px;position:relative;align-self:center;}
+.shared-legend-canvas{display:block;width:100%;height:14px;border:1px solid var(--border);border-radius:2px;}
+.shared-legend-labels{height:16px;position:relative;margin-top:3px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.shared-legend-tick{position:absolute;top:0;font-size:10px;white-space:nowrap;transform:translateX(-50%);}
+.shared-legend-tick[data-end="first"]{transform:none;}
+.shared-legend-tick[data-end="last"]{transform:translateX(-100%);}
+@media(max-width:800px){
+ .viewer-workspace{overflow:visible;}
+ .viewer-workspace>.viewer-grid{overflow-y:visible;flex:0 0 auto;grid-auto-rows:minmax(255px,auto);}
+ .panel-card,html[data-theme] .panel-card{min-height:240px;}
+ .shared-legend{flex-wrap:wrap;gap:1px;min-height:56px;padding:5px 8px;}
+ .shared-legend-title{flex:1 1 100%;max-width:none;font-size:10px;}
+ .shared-legend-track{flex:1 1 100%;max-width:none;}
+ .shared-legend-tick{font-size:9px;}
+}
+
+
+/* v7.19: status and plotting credit share the instructions strip; no footer. */
+body{grid-template-rows:auto auto minmax(0,1fr);}
+.helper{display:flex;align-items:center;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;padding:5px 10px;}
+.helper-instructions{min-width:0;flex:1 1 360px;}
+.helper-status{display:inline-flex;align-items:center;justify-content:flex-end;gap:12px;min-width:0;flex:1 1 330px;text-align:right;font-size:10px;white-space:nowrap;}
+.helper-status #dataStatus{font-variant-numeric:tabular-nums;}
+.helper-credit a{color:inherit;text-decoration:underline;text-underline-offset:2px;}
+@media (max-width:1050px){.helper-status{justify-content:flex-start;text-align:left;flex-wrap:wrap;white-space:normal;}}
+@media (max-width:800px){body{grid-template-rows:auto auto minmax(65vh,1fr);}.helper{display:flex;gap:3px;}.helper-instructions,.helper-status{flex:1 1 100%;}.helper-status{justify-content:flex-start;}}
+
+/* v7.20: projected, noninteractive counterpart cursors. The real OS cursor
+   remains a normal white crosshair/pointer; these never intercept events. */
+.sync-crosshair{position:absolute;z-index:6;width:23px;height:23px;
+ transform:translate(-50%,-50%);pointer-events:none;user-select:none;
+ filter:drop-shadow(0 0 2px #051c2a);}
+.sync-crosshair::before,.sync-crosshair::after{content:'';position:absolute;background:#00f3e3;
+ box-shadow:0 0 0 1px rgba(7,32,42,.4);}
+.sync-crosshair::before{height:2px;width:23px;top:10.5px;left:0;}
+.sync-crosshair::after{width:2px;height:23px;left:10.5px;top:0;}
+.sync-crosshair[hidden]{display:none!important}
+/* Export dialog opens adjacent to the clicked toolbar button or panel icon. */
+.export-dialog{margin:0;inset:auto;max-height:calc(100dvh - 16px);overflow:auto}
+
+/* v7.20: give the common color scale the complete grid width. Keep its
+   field title centered directly above the swatches on desktop and mobile. */
+.shared-legend{flex-direction:column;justify-content:center;align-items:stretch;gap:2px;
+ padding:3px 16px 5px;min-height:49px;}
+.shared-legend-title{flex:0 0 auto;max-width:none;width:100%;font-size:11px;line-height:14px;
+ text-align:center;white-space:nowrap;}
+.shared-legend-track{flex:0 0 auto;width:100%;max-width:none;min-width:0;}
+.shared-legend-canvas{height:13px;}
+.shared-legend-labels{margin-top:1px;height:15px;}
+@media (max-width:800px){.shared-legend{gap:2px;padding:3px 9px 5px;min-height:49px;}
+ .shared-legend-title,.shared-legend-track{flex:0 0 auto;max-width:none;width:100%;}
+}
+
+
+/* v7.22: emphasize the active (real) cursor without affecting map clicks. */
+.sync-crosshair.master-crosshair{width:29px;height:29px;z-index:7;
+ background:radial-gradient(circle,rgba(255,255,255,.92) 0 1.4px,rgba(255,255,255,.24) 2px,transparent 6px);
+ filter:drop-shadow(0 0 3px rgba(255,255,255,.95)) drop-shadow(0 0 9px rgba(78,197,255,.82));}
+.sync-crosshair.master-crosshair::before,.sync-crosshair.master-crosshair::after{background:#fff;
+ box-shadow:0 0 0 1px #072c41,0 0 4px 2px rgba(255,255,255,.8),0 0 12px 3px rgba(57,188,255,.52);}
+.sync-crosshair.master-crosshair::before{top:13.5px;left:0;width:29px;height:2px}
+.sync-crosshair.master-crosshair::after{left:13.5px;top:0;height:29px;width:2px}
+/* The native hand remains the only click target; a halo highlights it. */
+.panel-viewport .panel-save:hover:not(:disabled){
+ box-shadow:0 0 0 1px rgba(255,255,255,.9),0 0 9px 3px rgba(255,255,255,.50),
+ 0 0 21px 6px rgba(60,190,255,.55);
+ cursor:url('cursor-hand-glow.svg') 13 3,pointer;
+}
+
+
+/* v7.28: in-workspace single-panel focus. Keep the shared legend/toolbar.
+   Non-focused maps stay mounted but aren't resized at zero dimensions. */
+.panel-viewport .panel-expand{
+ position:absolute;right:7px;bottom:7px;z-index:9;
+ display:flex;align-items:center;justify-content:center;
+ width:29px;height:29px;min-width:29px;padding:5px;
+ border:1px solid var(--border);border-radius:8px;
+ background:var(--plot-label);color:var(--text);
+ backdrop-filter:blur(4px);opacity:.92;cursor:pointer;
+}
+.panel-viewport .panel-expand svg{width:17px;height:17px;display:block;pointer-events:none}
+.panel-viewport .panel-expand:hover,.panel-viewport .panel-expand:focus-visible{
+ opacity:1;box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 9px rgba(73,174,255,.48);
+}
+.viewer-workspace>.viewer-grid.focus-panel{
+ --cols:1;grid-template-columns:minmax(0,1fr);grid-auto-rows:minmax(0,1fr);
+ overflow:hidden;align-content:stretch;
+}
+.viewer-grid.focus-panel>.panel-card:not(.is-focused){display:none!important}
+.viewer-grid.focus-panel>.panel-card.is-focused{
+ grid-column:1;grid-row:1;width:100%;height:100%;min-width:0;min-height:0;
+}
+@media(max-width:800px){
+ .viewer-workspace>.viewer-grid.focus-panel{
+  flex:0 0 auto;grid-template-columns:minmax(0,1fr);
+  grid-auto-rows:minmax(0,1fr);height:max(340px,65dvh);
+  overflow:hidden;
+ }
+ .viewer-grid.focus-panel>.panel-card.is-focused{min-height:0}
+}
