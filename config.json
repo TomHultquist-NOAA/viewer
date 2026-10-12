@@ -99,7 +99,7 @@
   "defaultForecastHour": 0,
   "loopOnlyAvailableHours": true,
   "display": {
-    "maxConcurrentFetches": 4,
+    "maxConcurrentFetches": 6,
     "mapInitTimeoutSeconds": 90,
     "decodedCacheMB": 256,
     "showCountryBoundaries": true,
@@ -126,18 +126,25 @@
     "exportPanelWidth": 1920,
     "exportAllWidth": 2560,
     "displayReadyCacheMB": 192,
-    "prefetchMaxFields": 16,
     "loopIntervalMs": 850,
     "exportPanelWidth43": 1600,
     "exportAllWidth43": 2048,
     "prefetchEnabled": true,
-    "prefetchHours": 2,
-    "prefetchDelayMs": 180,
+    "prefetchHours": 24,
+    "prefetchDelayMs": 220,
     "windBarbSizePx": 18,
     "windBarbMinSpacingPx": 22,
     "exportMaxPixelRatio": 4,
     "synchronizedCursors": true,
-    "detailMinZoom": 0
+    "detailMinZoom": 0,
+    "prefetchBatchSize": 16,
+    "prefetchIdleAfterMs": 1800,
+    "prefetchIdleConcurrency": 3,
+    "prefetchActiveConcurrency": 1,
+    "prefetchMemoryOnlyHours": 2,
+    "prefetchDiskCacheMB": 512,
+    "prefetchDiskMaxChunks": 350,
+    "prefetchCacheTTLHours": 24
   },
   "theme": "dark"
 }

@@ -1,6 +1,73 @@
+# v7.32 — Keep all configured maps active on mobile (October 12, 2026)
+
+- **No arbitrary four-map phone limit.** The viewer now honors `display.maxActiveMaps` on all screen sizes. With the supplied `config.json` the default is **up to nine live WebGL maps**: the standard 3×3 layout contains eight real maps and one Analysis placeholder, so eight GPU contexts are expected. Changing the configurable limit to 20 is supported but not guaranteed by every device.
+- **Staggered mobile initialization stays in place.** Mobile MapLibre instances are initialized one at a time, avoiding the startup race fixed in v7.31. Existing maps stay active as additional panels come into view rather than being automatically discarded when a fifth becomes visible.
+- **Scroll recovery.** When rapid scrolling makes a queued panel no longer visible when its startup turn arrives, newly visible panels are reconsidered after scrolling settles. No extra tap should normally be necessary.
+- **Hardware-triggered fallback only.** If an actual mobile WebGL context is lost and fails to restore within three seconds, the live-map budget is reduced by one (never below four). Offscreen idle maps are released first; their visual snapshot is retained when available. The browser is allowed to restore the affected WebGL context, and weather layers are rerendered on restoration. This is a safeguard for devices that cannot sustain the desired number of contexts, not a preemptive restriction.
+- **Diagnostics updated** so Viewer-like mode uses the configured limit on mobile rather than an imposed four-map maximum. To test nine real map contexts, choose nine in diagnostics (the standard viewer uses eight real map contexts plus the Analysis placeholder).
+- Prefetch, field rendering, geometry, export, model settings, and styling otherwise remain unchanged. `index.html` references `js/viewer.js?v=7.32` to avoid stale browser code.
+- **Deployment:** Upload on top of the existing viewer. Existing `vendor/` dependencies, Zarr files and model catalogs are not bundled. Back up a customized `config.json` before overwriting.
+
+# v7.31 — Mobile map startup lifecycle fix (October 12, 2026)
+
+- Fixed a mobile startup race in which IntersectionObserver could activate multiple maps at once and the four-active-map cap could *evict a map still initializing*. The evicted instance continued waiting for its original MapLibre `load` event until the 90-second timeout. Tapping the panel worked because it created a new map.
+- Mobile MapLibre initialization is now **serialized**, while subsequent Zarr requests and GPU plotting can continue independently. The initial panel starts before automatic viewport activations.
+- Eviction only considers maps that are not initializing and are not currently rendering. When at capacity, scroll-triggered activations favor evicting offscreen idle maps.
+- Mobile IntersectionObserver uses the document viewport (because the mobile document, not the plotting grid, scrolls). Offscreen queued work is discarded instead of unnecessarily using a WebGL context.
+- If a map is intentionally discarded, its readiness wait is canceled immediately instead of timing out. The readiness probe also checks for nonzero map-host dimensions.
+- Speculative prefetch waits until an initial forecast panel has successfully rendered and no map is still initializing, so disk-cache downloads do not compete with mobile MapLibre startup.
+- No reduction in the number of configurable panels; the phone still keeps a maximum of four live WebGL maps. Prefetching, forecasts, themes and desktop behavior are unchanged.
+- Hard-refresh the phone after uploading `index.html` and `js/viewer.js` so `?v=7.31` loads the revised code. Run the viewer itself; the diagnostics already passed separately.
+
+# v7.30 — Mobile-aware diagnostic mode (October 12, 2026)
+
+The production viewer's rendering, data pipeline, and progressive prefetch scheduler are unchanged from v7.29. This update improves the accuracy of the *diagnostics* on phones.
+
+- The v7.29 diagnostic created all nine WebGL map instances simultaneously and declared failures after 20 seconds. On phones, this can trigger a slow or stalled map initialization even when the normal viewer works.
+- The new default **Viewer-like (recycle on mobile)** mode tests each requested numbered panel in turn, maintaining the same active-map cap as the viewer (four on viewports ≤800 px; otherwise configured maxActiveMaps within the viewer's 12-map cap). It reports both the cumulative number of panels tested and the number of maps currently live. A success of “9/9 verified (4 live)” means *nine individual startups succeeded* under a four-map cap; it does not mean nine simultaneous contexts are supported.
+- **Staged (retain all maps)** initializes maps one by one but keeps them alive, testing the device's sustainable number of simultaneous WebGL contexts without the startup burst.
+- **All at once (stress test)** recreates the aggressive v7.29 diagnostic to compare with the original symptom. It is deliberately tougher than normal mobile operation.
+- Timeouts are now 45 seconds on narrow screens and 30 seconds elsewhere; readiness is checked using both MapLibre's load event and loaded/style-loaded states. Context losses and ordinary MapLibre errors are recorded distinctly. A slow initial load is retried once in viewer-like mode.
+- The optional Zarr + GPU test recycles maps as needed and loads one complete sample at a time to avoid simultaneous large raw-field buffers on phones. Its result counts skipped, unavailable, rendered, and failed panels separately.
+- Note: the default 3×3 layout has **eight** actual model maps and one placeholder Analysis panel. A nine-real-map stress test therefore exceeds the normal layout's actual live-map requirements.
+
+**Deployment:** Deploy this package as usual over the viewer files. `vendor/` libraries, real Zarr catalogs, and data directories are not included and should be left in place. Back up a locally modified `config.json` before installing.
+
+---
+
 # OMD EVU Model Viewer
 
 A responsive, multi-panel numerical weather prediction visualization tool for the NOAA Office of Modeling and Development (OMD), Evaluation and Verification Unit (EVU). Forecast fields are read from static, browser-decodable **Zarr v2** files and displayed using [autumnplot-gl](https://github.com/tsupinie/autumnplot-gl) and MapLibre GL JS. The viewer uses local geography files and does not require a plotting service at request time.
+
+## Version 7.29: Multi-panel diagnostics and adaptive Zarr prefetching
+
+- **Expanded diagnostics** (`diagnostics.html`): Select 1, 4, 9, 16, or 20 independent MapLibre maps to test WebGL / MapLibre CSP workers and browser context limits. After map initialization, choose **Test real Zarr + GPU layers** to download and decode representative chunks from configured model catalogs, initialize separate autumnplot-gl GPU layers and confirm a MapLibre render event on each. A missing model catalog is reported separately from a failed GPU/worker initialization. Worker existence checks remain available.
+- **Progressive forecasting prefetch**: Instead of scheduling at most two forecast hours and one download at a time, the viewer now prefetches **up to 24 hours ahead** incrementally (from the actual available-hour timeline) for all non-placeholder configured panels. Work is ordered nearest-hour first and spread across every model before moving to subsequent hours. Duplicate URLs share a single transfer.
+- **Idle bandwidth**: While the user is interacting, one of six total network slots may be speculative. After 1.8 seconds without active input, up to three may be speculative. All queued foreground requests go first; queued speculative work can be promoted if the same data is needed immediately. Mouse movement alone does not reset the idle timer.
+- **Persistent compressed cache**: On HTTPS or localhost, downloaded compressed Zarr chunks go into browser CacheStorage. Default bound: **512 MiB / 350 chunks**, with **24-hour TTL**. This allows longer read-ahead without evicting decoded forecast hours from the 256 MiB raw and 192 MiB display-value in-memory caches. Plotting does not block on background writes and remains functional if CacheStorage is disabled or full. Without persistent storage, a smaller two-hour window instead warms the decoded in-memory cache; it does not waste bandwidth on chunks that would be discarded.
+- **Self-throttling behavior**: Stops scheduling when the page is hidden or the browser requests reduced data usage (`navigator.connection.saveData`). Model, run and field changes cancel obsolete queued tasks without aborting already useful downloads. Network errors get one retry (except definitive missing/authorization responses) and will not disrupt a foreground plot.
+- **Deployment**: No data conversion or WCOSS2 changes are required. Keep existing `vendor/`, model catalogs, and Zarr stores. Run `diagnostics.html` on the actual HTTPS web host to verify actual browsers and worker assets. New local files do not need extra vendor dependencies.
+
+### Prefetch configuration
+
+All values are under `display` in `config.json`:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `prefetchEnabled` | `true` | Master prefetch enable/disable |
+| `prefetchHours` | `24` | Maximum look-ahead hours from the available forecast timeline when disk cache is supported |
+| `prefetchBatchSize` | `16` | Maximum queued speculative chunks per batch; batch repeats until horizon is covered |
+| `prefetchIdleAfterMs` | `1800` | Duration without actual user input before increasing speculative concurrency |
+| `prefetchActiveConcurrency` | `1` | Background downloads permitted while actively using the viewer |
+| `prefetchIdleConcurrency` | `3` | Background downloads permitted during idle time |
+| `maxConcurrentFetches` | `6` | Combined foreground + background HTTP transfer ceiling |
+| `prefetchDiskCacheMB` | `512` | Target persistent compressed-cache size; browser may enforce a smaller quota |
+| `prefetchDiskMaxChunks` | `350` | Maximum compressed chunks retained across sessions |
+| `prefetchCacheTTLHours` | `24` | Chunk cache validity window to limit stale data after regenerated model output |
+| `prefetchMemoryOnlyHours` | `2` | Look-ahead when CacheStorage isn't available |
+| `prefetchDelayMs` | `220` | Spacing between prefetch batches |
+
+Developer troubleshooting: `OMDEVUPrefetch.stats()` in the browser console reports the prefetch mode, completed/failed chunk counts, active/queued requests and cache usage. These counters are scoped to the current selected run, field and panel configuration.
 
 ## Version 7.27: Correctly attached and oriented wind-barb feathers and pennants
 

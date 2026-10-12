@@ -67,7 +67,7 @@ const PTYPE = ['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'];
 'use strict';
 const $=id=>document.getElementById(id);
 const el=Object.fromEntries(['fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels'].map(x=>[x,$(x)]));
-const st={geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null};
+const st={geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Set(),prefetchContext:null,prefetchBatchRunning:false,prefetchCompleted:0,prefetchFailed:0,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -198,7 +198,7 @@ function createPanel(cfg,i){const card=document.createElement('section');card.cl
  expand.innerHTML=EXPAND_ICON;
  const view=document.createElement('div');view.className='panel-viewport';const snap=document.createElement('img');snap.className='map-snapshot';snap.alt='Previously rendered weather plot';snap.hidden=true;const frame=document.createElement('div');frame.className='map-frame';const lbl=document.createElement('div');lbl.className='plot-label';const title=document.createElement('strong'),sub=document.createElement('span');lbl.append(title,sub);const notice=document.createElement('div');notice.className='notice visible';const note=document.createElement('span');notice.append(note);const info=document.createElement('div');info.className='point-info';info.hidden=true;const ghost=document.createElement('div');ghost.className='sync-crosshair';ghost.hidden=true;ghost.setAttribute('aria-hidden','true');view.append(frame,snap,lbl,notice,info,ghost);if(!cfg.placeholder)view.append(save);view.append(expand);
  const ft=document.createElement('div');ft.className='panel-footer';const legendTitle=document.createElement('div');legendTitle.className='legend-title';const legendCanvas=document.createElement('canvas');legendCanvas.className='legend-canvas';const legendLabels=document.createElement('div');legendLabels.className='legend-labels';ft.append(legendTitle,legendCanvas,legendLabels);card.append(view,ft);el.viewerGrid.append(card);
- const p={cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,legendTitle,legendCanvas,legendLabels,wind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,loadingStage:'',loadSince:0,stageSince:0};
+ const p={cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,legendTitle,legendCanvas,legendLabels,wind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,initializing:false,cancelMapWait:null,loadingStage:'',loadSince:0,stageSince:0};
  notice.style.pointerEvents='none';card.addEventListener('click',()=>{selectPanel(p);if(!p.cfg.placeholder)activate(p).catch(e=>fail(p,e));});save.addEventListener('click',e=>{e.stopPropagation();openExportDialog('panel',p,e);});
  expand.addEventListener('click',e=>{e.stopPropagation();setExpandedPanel(st.expandedPanel===p?null:p);});
  if(cfg.placeholder){p.status='missing';card.classList.add('analysis-placeholder');p.title.textContent='Analysis · verifying data';p.sub.textContent='RAP F000 / MRMS · planned';setNote(p,cfg.placeholderText||'Verifying analysis data not yet available');}
@@ -262,7 +262,7 @@ function unionCycles(sources,preferredId){
  return [...merged.values()].sort((a,b)=>Date.parse(b.init_time)-Date.parse(a.init_time));
 }
 async function boot(){try{
- st.cfg=await json('config.json');st.mode=(q.get('map')||st.cfg.display?.mapProjection)==='globe'?'globe':'lambert';el.mapViewSelect.value=st.mode;
+ st.cfg=await json('config.json');st.chunkStore=new CompressedZarrStore();void st.chunkStore.open();st.mode=(q.get('map')||st.cfg.display?.mapProjection)==='globe'?'globe':'lambert';el.mapViewSelect.value=st.mode;
  st.mapView=sharedCameraFromQuery();
  let savedTheme=null;try{savedTheme=localStorage.getItem('omd_evu_theme');}catch(_){}
  const sharedTheme=q.get('theme');st.theme=(sharedTheme==='light'||sharedTheme==='dark'?sharedTheme:null)||savedTheme||st.cfg.theme||'dark';setTheme(st.theme,false);
@@ -284,8 +284,35 @@ async function boot(){try{
  ['fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn'].forEach(id=>el[id].disabled=false);el.saveAllPngBtn.disabled=false;
  if(!('DecompressionStream' in window))throw Error('Browser does not support zlib DecompressionStream');await waitLibraries();
  // No remote maps/tiles: map style and boundary layers are locally hosted.
- st.observer=new IntersectionObserver(entries=>{if(st.rendering)return;for(const e of entries)if(e.isIntersecting&&e.intersectionRatio>.04){const p=st.panels.find(p=>p.card===e.target);if(p&&!p.map&&!p.cfg.placeholder)activate(p).catch(err=>fail(p,err));}},{root:el.viewerGrid,rootMargin:'120px'});
- st.panels.filter(p=>!p.cfg.placeholder).forEach(p=>st.observer.observe(p.card));try{await activate(st.panels.find(p=>!p.cfg.placeholder));}catch(err){fail(st.panels[0],err);}updateStatus();schedulePrefetch();
+ // Load the first panel *before* subscribing to intersection events. On
+ // mobile the document scrolls (not viewerGrid), so observe the viewport.
+ // All additional map startups are queued rather than competing for WebGL
+ // contexts and evicting a map whose CSP worker is still starting.
+ const first=st.panels.find(p=>!p.cfg.placeholder);
+ if(first)activate(first,'startup').catch(err=>fail(first,err));
+ st.observer=new IntersectionObserver(entries=>{
+  if(st.rendering)return;
+  for(const e of entries)if(e.isIntersecting&&e.intersectionRatio>.04){
+   const p=st.panels.find(p=>p.card===e.target);
+   if(p&&!p.map&&!p.cfg.placeholder)activate(p,'viewport').catch(err=>fail(p,err));
+  }
+ },{root:innerWidth<=800?null:el.viewerGrid,rootMargin:'80px'});
+ st.panels.filter(p=>!p.cfg.placeholder).forEach(p=>st.observer.observe(p.card));
+ // A map request queued while scrolling might be dropped once it finally gets
+ // its initialization turn. Recheck currently visible panels after scrolling
+ // stops, even if IntersectionObserver does not fire a second enter event.
+ let visibilityRefresh=null;
+ const scanVisible=()=>{
+  clearTimeout(visibilityRefresh);
+  visibilityRefresh=setTimeout(()=>{
+   if(st.rendering||st.exporting)return;
+   for(const p of st.panels)if(!p.cfg.placeholder&&!p.map&&!p.activation&&nearViewport(p))
+    activate(p,'viewport').catch(err=>fail(p,err));
+  },260);
+ };
+ window.addEventListener('scroll',scanVisible,{passive:true});
+ window.addEventListener('resize',scanVisible,{passive:true});
+ updateStatus();schedulePrefetch();
  }catch(e){console.error(e);el.dataStatus.textContent='Viewer initialization failed: '+String(e);if(!st.panels.length)el.viewerGrid.textContent='Initialization failed: '+String(e);else st.panels.forEach(p=>setNote(p,'Initialization failed: '+String(e)));}}
 async function waitLibraries(){
  for(let k=0;k<100;k++){
@@ -340,7 +367,9 @@ function shareUrl(){
  setCameraUrlParams(u,currentSharedCamera());
  return u.href;
 }
-function bind(){el.mobileControlsBtn.onclick=()=>{const opened=el.mobileControlsBtn.getAttribute('aria-expanded')!=='true';el.mobileControlsBtn.setAttribute('aria-expanded',String(opened));el.mobileControlsBtn.title=opened?'Hide viewer controls':'Show viewer controls';el.mobileControlsBtn.innerHTML=opened?'☷ Controls <span class="collapse-indicator" aria-hidden="true">▴</span>':'☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span>';document.getElementById('viewerControls').classList.toggle('is-open',opened);requestAnimationFrame(layout);};el.fieldSelect.onchange=()=>{st.field=el.fieldSelect.value;refreshHours();syncUI();updateSharedLegend();renderAll();};el.cycleSelect.onchange=()=>{st.runPinned=true;st.ref=st.cycles.find(x=>x.id===el.cycleSelect.value)||st.ref;refreshHours();syncUI();renderAll();};el.fcstSelect.onchange=()=>{st.hour=Number(el.fcstSelect.value);syncUI();renderAll();};el.stepBackBtn.onclick=()=>step(-1);el.stepForwardBtn.onclick=()=>step(1);el.playBtn.onclick=play;el.pauseBtn.onclick=stop;el.speedDownBtn.onclick=()=>changeSpeed(-1);el.speedUpBtn.onclick=()=>changeSpeed(1);
+function bind(){
+ // Deliberate input, rather than passive mouse movement, reduces speculation.
+ for(const type of ['pointerdown','wheel','keydown','touchstart'])document.addEventListener(type,markUserActivity,{passive:true});el.mobileControlsBtn.onclick=()=>{const opened=el.mobileControlsBtn.getAttribute('aria-expanded')!=='true';el.mobileControlsBtn.setAttribute('aria-expanded',String(opened));el.mobileControlsBtn.title=opened?'Hide viewer controls':'Show viewer controls';el.mobileControlsBtn.innerHTML=opened?'☷ Controls <span class="collapse-indicator" aria-hidden="true">▴</span>':'☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span>';document.getElementById('viewerControls').classList.toggle('is-open',opened);requestAnimationFrame(layout);};el.fieldSelect.onchange=()=>{st.field=el.fieldSelect.value;refreshHours();syncUI();updateSharedLegend();renderAll();};el.cycleSelect.onchange=()=>{st.runPinned=true;st.ref=st.cycles.find(x=>x.id===el.cycleSelect.value)||st.ref;refreshHours();syncUI();renderAll();};el.fcstSelect.onchange=()=>{st.hour=Number(el.fcstSelect.value);syncUI();renderAll();};el.stepBackBtn.onclick=()=>step(-1);el.stepForwardBtn.onclick=()=>step(1);el.playBtn.onclick=play;el.pauseBtn.onclick=stop;el.speedDownBtn.onclick=()=>changeSpeed(-1);el.speedUpBtn.onclick=()=>changeSpeed(1);
  el.mapViewSelect.onchange=()=>{st.mode=el.mapViewSelect.value;for(const p of st.active)if(p.map)applyProjection(p.map);syncUI();};
  // A select retains keyboard focus after its menu closes. Return arrow keys
  // to forecast navigation after an actual selection (mouse or keyboard).
@@ -603,6 +632,29 @@ function createMap(p){
  m.on('mousemove',e=>queueSynchronizedHover(p,e.lngLat));
  m.on('mouseleave',()=>{if(st.hover?.master===p)clearSynchronizedHover();});
  m.on('error',e=>{p.lastMapError=String(e.error?.message||e.error||e);console.warn('MapLibre',p.lastMapError);});
+ // WebGL context loss is a browser/GPU resource signal, not an arbitrary
+ // panel-count threshold. Allow MapLibre to restore the canvas; only reduce
+ // the phone's active-context budget if restoration does not occur promptly.
+ const canvas=m.getCanvas();
+ canvas?.addEventListener('webglcontextlost',e=>{
+  e.preventDefault();
+  if(p.map!==m)return;
+  p.contextLost=true;st.contextLossCount++;
+  p.status='loading';stage(p,'WebGL context interrupted; attempting recovery…');updateStatus();
+  clearTimeout(p.contextLossTimer);
+  p.contextLossTimer=setTimeout(()=>handlePersistentContextLoss(p,m),3000);
+ });
+ canvas?.addEventListener('webglcontextrestored',()=>{
+  if(p.map!==m)return;
+  p.contextLost=false;clearTimeout(p.contextLossTimer);p.contextLossTimer=null;
+  // MapLibre rebuilds its resources on restore. Refresh the weather layer
+  // afterward so an old WebGL texture never remains displayed as valid data.
+  setTimeout(()=>{
+   if(p.map!==m)return;
+   if(p.busy){setTimeout(()=>{if(p.map===m&&!p.busy)void renderPanel(p,st.seq);},650);}
+   else void renderPanel(p,st.seq);
+  },180);
+ });
  m.on('load',()=>{
   if(p.map!==m)return;
   try{addGeographySkeleton(m);}
@@ -615,11 +667,17 @@ function createMap(p){
 }
 function discardMap(p){
  if(!p.map)return;
+ clearTimeout(p.contextLossTimer);p.contextLossTimer=null;p.contextLost=false;
+ // An evicted MapLibre startup must never leave waitMapReady polling until
+ // the entire 90-second deadline. Normal viewport eviction intentionally
+ // avoids initializing/busy maps, but cancellation is still defensive.
+ if(p.cancelMapWait)p.cancelMapWait();
  if(st.hover?.master===p)clearSynchronizedHover();else{p.ghost.hidden=true;p.info.hidden=true;}
  if(p.geoTimer)clearTimeout(p.geoTimer);p.geoTimer=null;
  try{const snap=p.lastSnapshot||p.map.getCanvas().toDataURL('image/png');p.snap.src=snap;p.lastSnapshot=snap;p.snap.hidden=false;}
  catch(e){console.warn('Could not retain snapshot',e);}
  p.map.remove();p.map=null;p.wind=null;p.windCanvas=null;p.windFrameRequested=false;p.component=null;p.layer=null;p.rawField=null;p.lastKey=null;p.mapReady=null;p.grid=null;p.gridKey=null;
+ p.initializing=false;p.cancelMapWait=null;
  p.geoApplied=new Set();p.geoPending=new Set();p.frame.replaceChildren();
  p.view.classList.remove('has-live-map');st.active=st.active.filter(x=>x!==p);
 }
@@ -630,65 +688,247 @@ function waitMapReady(p,m){
   const finish=(error)=>{
    if(settled)return;settled=true;clearTimeout(tick);clearTimeout(deadline);clearInterval(poll);
    if(typeof m.off==='function')m.off('load',onLoad);
+   if(p.cancelMapWait===cancel)p.cancelMapWait=null;
    error?reject(error):resolve();
   };
-  const onLoad=()=>{if(st.mode==='lambert'&&!st.mapView&&!m.__evuExtentFitted)fitDataExtent(m);finish(null);};
+  const cancel=()=>finish(new Error('Map initialization was canceled'));
+  p.cancelMapWait=cancel;
+  const onLoad=()=>{if(p.map!==m){cancel();return;}
+   if(st.mode==='lambert'&&!st.mapView&&!m.__evuExtentFitted)fitDataExtent(m);finish(null);
+  };
   m.on('load',onLoad);
-  // A load event can be lost during rapid initialization; style readiness is enough
-  // to attach autumnplot-gl. Safely install geographic layer stubs if needed.
   const probe=()=>{
-   if(p.map!==m)return;
+   if(p.map!==m){cancel();return;}
    try{
+    // A phone may finish layout later than MapLibre startup; resizing after
+    // the host has a nonzero size can unblock the initial render.
+    const host=p.frame.firstElementChild;
+    if(host&&host.clientWidth>4&&host.clientHeight>4&&m.getCanvas?.()?.width===0)m.resize?.();
     if(m.loaded?.()||m.isStyleLoaded?.()){
      if(!m.getLayer?.('coast'))addGeographySkeleton(m);
      finish(null);
     }
    }catch(e){p.lastMapError='Style readiness: '+String(e);}
   };
-  poll=setInterval(probe,800);
+  poll=setInterval(probe,500);
   tick=setTimeout(()=>{
-   if(p.map===m)setNote(p,'MapLibre startup delayed. Check vendor worker and WebGL with diagnostics.html…');
+   if(p.map===m)setNote(p,'MapLibre is starting slowly on this device…');
   },7000);
   deadline=setTimeout(()=>finish(new Error('MapLibre map did not start after '+Math.round(timeout/1000)+' s. '+
    (p.lastMapError?`Map error: ${p.lastMapError}. `:'')+
-   'Check diagnostics.html; verify vendor/maplibre-gl-csp-worker.js loads, WebGL is enabled, and the site Content Security Policy allows worker-src self.')),timeout);
+   'Check diagnostics.html; verify vendor/maplibre-gl-csp-worker.js loads, WebGL is enabled, and worker-src self is allowed.')),timeout);
   probe();
  });
 }
-async function activate(p){
+function nearViewport(p){
+ // Offscreen queued observer work is no longer worth consuming a GPU context.
+ // Mobile pages scroll the document, whereas desktop uses the plotting grid.
+ const r=p.card.getBoundingClientRect(),margin=100;
+ if(innerWidth<=800)return r.bottom>=-margin&&r.top<=innerHeight+margin;
+ const b=el.viewerGrid.getBoundingClientRect();
+ return r.bottom>=b.top-margin&&r.top<=b.bottom+margin&&r.right>=b.left&&r.left<=b.right;
+}
+function configuredMapCapacity(){
+ // In particular, a narrow viewport is NOT evidence of a four-context limit.
+ // Default to the number of genuine map panels, capped by user configuration.
+ const actual=st.panels.filter(p=>!p.cfg.placeholder).length;
+ const configured=Number(st.cfg?.display?.maxActiveMaps);
+ return Math.max(1,Math.min(20,Number.isFinite(configured)&&configured>0?Math.floor(configured):actual));
+}
+function mapCapacity(){
+ return Math.min(configuredMapCapacity(),st.mobilePressureCap??20);
+}
+function trimMapsForGpuPressure(){
+ if(st.exporting)return;
+ // This path only runs after an ACTUAL failed WebGL restoration on mobile.
+ // Prefer releasing offscreen, idle contexts; never discard loading maps.
+ let changed=false;
+ while(st.active.length>mapCapacity()){
+  const idle=st.active.filter(p=>p.map&&!p.initializing&&!p.busy&&!p.activation);
+  if(!idle.length)break;
+  idle.sort((a,b)=>Number(nearViewport(a))-Number(nearViewport(b))||Number(!a.contextLost)-Number(!b.contextLost)||a._used-b._used);
+  const victim=idle[0];discardMap(victim);
+  victim.status='waiting';victim.save.disabled=true;
+  setNote(victim,'Map paused after GPU resource pressure. Tap or scroll here to reactivate.');
+  changed=true;
+ }
+ if(changed)updateStatus();
+ if(st.active.length>mapCapacity())setTimeout(trimMapsForGpuPressure,900);
+}
+function handlePersistentContextLoss(p,m){
+ p.contextLossTimer=null;
+ if(p.map!==m||!p.contextLost)return;
+ const oldCap=mapCapacity();
+ if(innerWidth<=800&&oldCap>4){
+  st.mobilePressureCap=Math.max(4,oldCap-1);
+  console.warn('OMD EVU: mobile WebGL context could not be restored; reducing active maps to',st.mobilePressureCap);
+  trimMapsForGpuPressure();
+ }
+ // If this particular map has not recovered even after resources are released,
+ // replace the lost context on demand rather than leave a permanently dead map.
+ setTimeout(()=>{
+  if(p.map!==m||!p.contextLost)return;
+  if(p.initializing||p.busy||p.activation){
+   p.contextLossTimer=setTimeout(()=>handlePersistentContextLoss(p,m),2000);return;
+  }
+  discardMap(p);p.status='waiting';p.save.disabled=true;
+  setNote(p,'WebGL context was lost; tap this panel to retry.');updateStatus();
+ },5000);
+}
+function waitMapInitTurn(p,source){
+ // Only serialize the MapLibre setup. Zarr downloads and GPU plotting are
+ // allowed to run while the next map initializes. This prevents a burst of
+ // simultaneous CSP-worker/GPU starts on phones without slowing all downloads.
+ if(innerWidth>800)return createReadyMap(p,source);
+ const previous=st.mapInitQueue;
+ const job=previous.catch(()=>{}).then(()=>createReadyMap(p,source));
+ st.mapInitQueue=job.then(()=>{},()=>{});
+ return job;
+}
+async function createReadyMap(p,source){
+ if(p.map){if(p.mapReady)await p.mapReady;return p.map;}
+ if(source==='viewport'&&!nearViewport(p))return null;
+ const limit=mapCapacity();
+ if(st.active.length>=limit){
+  // Never evict an initializing map or a plot being decoded/rendered.
+  // Prefer offscreen idle maps; only a direct click/export may displace
+  // another visible map if all slots are occupied.
+  const idle=st.active.filter(x=>x!==p&&!x.busy&&!x.initializing&&!x.activation);
+  const pool=(source==='viewport'?idle.filter(x=>!nearViewport(x)):idle)
+   .sort((a,b)=>Number(nearViewport(a))-Number(nearViewport(b))||a._used-b._used);
+  if(!pool.length){
+   p.status='waiting';setNote(p,source==='viewport'?'Waiting for a free mobile map slot…':'Finishing another map; tap this panel again if needed');updateStatus();
+   return null;
+  }
+  discardMap(pool[0]);
+ }
+ p.initializing=true;p._used=++st.clock;st.active.push(p);p.status='loading';
+ setNote(p,'Initializing map engine…');updateStatus();
+ let m=null;
+ try{
+  // Give CSS/grid sizing a frame before constructing the WebGL surface.
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  if(source==='viewport'&&!nearViewport(p)){
+   st.active=st.active.filter(x=>x!==p);p.status='waiting';return null;
+  }
+  m=createMap(p);p.mapReady=waitMapReady(p,m);
+  await p.mapReady;
+  if(p.map!==m)return null;
+  return m;
+ }catch(e){
+  if(p.map===m)discardMap(p);
+  throw e;
+ }finally{
+  p.initializing=false;
+  if(p.map===m)p.mapReady=null;
+  if(!p.map){st.active=st.active.filter(x=>x!==p);if(p.status==='loading')p.status='waiting';}
+  updateStatus();
+ }
+}
+async function activate(p,source='direct'){
  if(!p||p.cfg.placeholder)return;
  if(p.activation)return p.activation;
- p.activation=activateInternal(p).finally(()=>{p.activation=null;});
+ p.activation=activateInternal(p,source).finally(()=>{p.activation=null;});
  return p.activation;
 }
-async function activateInternal(p){
- if(p.map){p._used=++st.clock;if(p.mapReady)await p.mapReady;return renderPanel(p,st.seq);}
- const limit=Math.max(1,Math.min(innerWidth<=800?4:12,Number(st.cfg.display.maxActiveMaps||7)));
- if(st.active.length>=limit){
-  const candidates=st.active.filter(x=>!x.busy&&x!==p).sort((a,b)=>a._used-b._used);
-  if(candidates[0])discardMap(candidates[0]);else return;
- }
- p._used=++st.clock;st.active.push(p);p.status='loading';
- setNote(p,'Initializing map engine (geographic overlays load separately)…');updateStatus();
- const m=createMap(p);p.mapReady=waitMapReady(p,m);
- try{await p.mapReady;if(p.map===m)await renderPanel(p,st.seq);}
- catch(e){if(p.map===m)discardMap(p);throw e;}
- finally{if(p.map===m)p.mapReady=null;}
+async function activateInternal(p,source){
+ let m;
+ try{m=await waitMapInitTurn(p,source);}
+ catch(e){if(/Map initialization was canceled/.test(String(e?.message||e)))return;throw e;}
+ if(!m||p.map!==m)return;
+ p._used=++st.clock;
+ await renderPanel(p,st.seq);
 }
 async function renderAll(){cancelQueuedPrefetches();st.seq++;st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateStatus();schedulePrefetch();}}
-// Foreground fetches always take priority. At most one speculative request is
-// active, leaving capacity for immediate navigation even on slow connections.
+// The compressed-byte store is optional. CacheStorage is available under HTTPS
+// (or localhost), survives browser reloads, and holds many forecast hours without
+// filling the decoded GPU-data caches. Missing/quota-restricted storage simply
+// degrades to a bounded memory-only look-ahead.
+class CompressedZarrStore {
+ constructor(){this.cache=null;this.opening=null;this.disabled=false;this.entries=new Map();this.bytes=0;this.pendingWrite=Promise.resolve();}
+ get budget(){return Math.max(32,Math.min(4096,Number(st.cfg?.display?.prefetchDiskCacheMB??512)))*1048576;}
+ get maxItems(){return Math.max(16,Math.min(2000,Number(st.cfg?.display?.prefetchDiskMaxChunks??350)));}
+ async open(){
+  if(this.disabled)return null;
+  if(this.cache)return this.cache;
+  if(this.opening)return this.opening;
+  this.opening=(async()=>{
+   if(!('caches' in window)||location.protocol==='file:')return null;
+   try{
+    const cache=await caches.open('omd-evu-zarr-chunks-v1');
+    // Size metadata are headers, so a reload does not have to read all chunks.
+    const keys=await cache.keys();
+    for(const request of keys){
+     const response=await cache.match(request);
+     if(!response)continue;
+     const bytes=Math.max(0,Number(response.headers.get('x-evu-cache-bytes'))||0);
+     const cachedAt=Number(response.headers.get('x-evu-cached-at'));
+     if(!bytes||!cachedAt||Date.now()-cachedAt>this.ttlMs){await cache.delete(request);continue;}
+     this.entries.set(request.url,bytes);this.bytes+=bytes;
+    }
+    this.cache=cache;return cache;
+   }catch(e){console.warn('Persistent Zarr cache unavailable:',e);this.disabled=true;return null;}
+  })();return this.opening;
+ }
+ async read(url){
+  const cache=await this.open();if(!cache)return null;
+  try{
+   const response=await cache.match(url);if(!response)return null;
+   const cachedAt=Number(response.headers.get('x-evu-cached-at'));
+   if(!cachedAt||Date.now()-cachedAt>this.ttlMs){
+    await cache.delete(url);const old=this.entries.get(url)||0;
+    this.entries.delete(url);this.bytes=Math.max(0,this.bytes-old);return null;
+   }
+   return response.arrayBuffer();
+  }catch(e){console.warn('Zarr cache read failed:',e);return null;}
+ }
+ async save(url,bytes){
+  const cache=await this.open();if(!cache||bytes.byteLength>this.budget)return false;
+  // Serialize writes and eviction accounting; downloads remain concurrent.
+  const saveOne=async()=>{
+   try{
+    if(this.entries.has(url))return true;
+    while(this.entries.size && (this.entries.size>=this.maxItems||this.bytes+bytes.byteLength>this.budget)){
+     const [old,size]=this.entries.entries().next().value;
+     await cache.delete(old);this.entries.delete(old);this.bytes-=size;
+    }
+    const response=new Response(bytes,{headers:{'content-type':'application/octet-stream','x-evu-cache-bytes':String(bytes.byteLength),'x-evu-cached-at':String(Date.now())}});
+    await cache.put(url,response);
+    this.entries.set(url,bytes.byteLength);this.bytes+=bytes.byteLength;
+    return true;
+   }catch(e){
+    // Quota/permissions errors should not make the actual forecast plot fail.
+    console.warn('Persistent Zarr cache write disabled:',e);
+    this.disabled=true;return false;
+   }
+  };
+  const job=this.pendingWrite.then(saveOne,saveOne);
+  this.pendingWrite=job.then(()=>{},()=>{});
+  return job;
+ }
+}
+function prefetchMode(){
+ const d=st.cfg?.display||{};
+ if(d.prefetchEnabled===false||d.prefetchNextHour===false||document.hidden||navigator.connection?.saveData)return 'off';
+ return Date.now()-st.lastUserActivity>=Math.max(250,Number(d.prefetchIdleAfterMs??1800))?'idle':'active';
+}
+// Avoid consuming every request slot with speculative downloads. Foreground
+// navigation always moves to the front of the shared queue, including a
+// prefetched chunk that is still queued rather than fetched.
 function limiter(fn,background=false,key=null){
  return new Promise((resolve,reject)=>{
-  const t={fn,resolve,reject,background,key};
-  st.queue.push(t);if(key)st.queuedFetches.set(key,t);pump();
+  const task={fn,resolve,reject,background,key};
+  st.queue.push(task);if(key)st.queuedFetches.set(key,task);pump();
  });
 }
 function pump(){
- const cap=Math.max(1,Math.min(6,Number(st.cfg.display.maxConcurrentFetches||3)));
+ const d=st.cfg?.display||{};
+ const cap=Math.max(2,Math.min(12,Number(d.maxConcurrentFetches||6)));
+ const mode=prefetchMode();
+ const desired=Math.min(cap-1,Math.max(1,Number(mode==='idle'?d.prefetchIdleConcurrency??3:d.prefetchActiveConcurrency??1)));
  while(st.running<cap){
   let idx=st.queue.findIndex(t=>!t.background);
-  if(idx<0 && st.prefetchActive<1)idx=st.queue.findIndex(t=>t.background);
+  if(idx<0&&mode!=='off'&&st.prefetchActive<desired)idx=st.queue.findIndex(t=>t.background);
   if(idx<0)return;
   const t=st.queue.splice(idx,1)[0];
   if(t.key)st.queuedFetches.delete(t.key);
@@ -698,17 +938,57 @@ function pump(){
   });
  }
 }
+function markUserActivity(){
+ st.lastUserActivity=Date.now();
+ // After a new gesture, new downloads revert to one low-priority slot.
+ // Existing downloads are allowed to finish, so there is no wasted transfer.
+ pump();
+}
 function cancelQueuedPrefetches(){
  if(st.prefetchTimer){clearTimeout(st.prefetchTimer);st.prefetchTimer=null;}
  st.prefetchGeneration++;
  const keep=[];
  for(const task of st.queue){
   if(!task.background){keep.push(task);continue;}
-  if(task.key)st.queuedFetches.delete(task.key);
+  if(task.key){st.queuedFetches.delete(task.key);st.prefetchAttempted.delete(task.key);}
   task.reject(new Error('Superseded background forecast prefetch'));
  }
- st.queue=keep;
- pump();
+ st.queue=keep;pump();
+}
+// Return *compressed* bytes; every caller (foreground/idle/background) shares
+// the same network request. Only the foreground renderer decompresses them.
+async function compressedChunk(url,opts={}){
+ if(!st.chunkStore)st.chunkStore=new CompressedZarrStore();
+ const existing=st.compressedInflight.get(url);
+ if(existing){
+  if(!opts.background){const queued=st.queuedFetches.get(url);if(queued?.background){queued.background=false;pump();}}
+  return existing;
+ }
+ const task=limiter(async()=>{
+  const cached=await st.chunkStore.read(url);
+  if(cached)return cached;
+  const attempts=2,timeout=Math.max(30000,Number(st.cfg?.display?.chunkTimeoutSeconds??150)*1000);
+  let last;
+  for(let attempt=0;attempt<attempts;attempt++){
+   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeout);
+   try{
+    const response=await fetch(url,{signal:controller.signal});
+    if(!response.ok){const error=Error(`Chunk HTTP ${response.status}: ${url}`);error.status=response.status;throw error;}
+    const bytes=await response.arrayBuffer();
+    // Foreground plotting never waits for persistent-cache writes; background
+    // prefetches do wait so the next batch starts with durable cached chunks.
+    if(opts.background)await st.chunkStore.save(url,bytes);
+    else void st.chunkStore.save(url,bytes);
+    return bytes;
+   }catch(e){last=controller.signal.aborted?Error(`Zarr chunk timed out after ${Math.round(timeout/1000)} s: ${url}`):e;
+    if(attempt===attempts-1||e.status===404||e.status===403||e.status===401||e.status===400||e.status===416)throw last;
+    await sleep(350*(attempt+1));
+   }finally{clearTimeout(timer);}
+  }
+  throw last;
+ },Boolean(opts.background),url);
+ st.compressedInflight.set(url,task);
+ try{return await task;}finally{if(st.compressedInflight.get(url)===task)st.compressedInflight.delete(url);}
 }
 function cacheGet(k){const v=st.cache.get(k);if(v){st.cache.delete(k);st.cache.set(k,v);}return v;}
 function cachePut(k,v){
@@ -740,36 +1020,28 @@ async function getDisplayData(src,ds,v,h,m,onProgress){
  st.displayInflight.set(k,pending);
  try{return await pending;}finally{st.displayInflight.delete(k);}
 }
-async function chunk(src,ds,v,h,onProgress=()=>{},opts={}){const url=new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',src.url)).href,k=url;const cached=cacheGet(k);if(cached)return cached;if(st.inflight.has(k)){
-  // If a forecast hour is requested while its prefetch is still queued,
-  // promote the SAME request instead of making a second HTTP download.
-  if(!opts.background){const queued=st.queuedFetches.get(k);if(queued&&queued.background){queued.background=false;pump();}}
-  try{return await st.inflight.get(k);}
-  catch(e){
-   if(!opts.background&&isSupersededPrefetch(e)){
-    // The background queue was canceled between scheduling and promotion.
-    // Its promise is settled; request the hour again as foreground work.
-    await Promise.resolve();
-    return chunk(src,ds,v,h,onProgress,opts);
-   }
-   throw e;
-  }
- }
- const task=limiter(async()=>{const [nt,ny,nx]=v.shape;if(v.chunks[0]!==1||v.chunks[1]!==ny||v.chunks[2]!==nx)throw Error('Unsupported chunking; expected [1,ny,nx]');if(v.compressor?.id!=='zlib'||!['<f4','|u1'].includes(v.dtype))throw Error('Only zlib float32/uint8 Zarr-v2 fields supported');onProgress(`Requesting ${v.name} F${pad3(h)} Zarr chunk…`);
- const controller=new AbortController();const waitMs=Math.max(30000,Number(st.cfg.display.chunkTimeoutSeconds||150)*1000);
- const timer=setTimeout(()=>controller.abort(),waitMs);
- let decoded;
- try{
-  const r=await fetch(url,{signal:controller.signal});
-  if(!r.ok)throw Error(`Chunk HTTP ${r.status}: ${url}`);
-  const bytes=r.headers.get('content-length');
-  onProgress(`Downloading ${v.name} F${pad3(h)}${bytes?' ('+(Number(bytes)/1048576).toFixed(1)+' MB compressed)':''}…`);
-  if(!r.body)throw Error('This browser/server did not provide a streaming Zarr response');
-  decoded=await new Response(r.body.pipeThrough(new DecompressionStream('deflate'))).arrayBuffer();
- }catch(e){if(controller.signal.aborted)throw Error(`Zarr chunk timed out after ${Math.round(waitMs/1000)} s: ${url}`);throw e;}
- finally{clearTimeout(timer);}
- onProgress(`Decompressed ${v.name} F${pad3(h)}: preparing GPU data…`);
- const expected=nx*ny*(v.dtype==='<f4'?4:1);if(decoded.byteLength!==expected)throw Error(`Decoded ${decoded.byteLength} bytes; expected ${expected}`);const ary=v.dtype==='<f4'?new Float32Array(decoded):new Uint8Array(decoded);cachePut(k,ary);return ary;},Boolean(opts.background),k);st.inflight.set(k,task);try{return await task;}finally{st.inflight.delete(k);}}
+async function chunk(src,ds,v,h,onProgress=()=>{},opts={}){
+ const url=new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',src.url)).href;
+ const cached=cacheGet(url);if(cached)return cached;
+ if(st.inflight.has(url))return st.inflight.get(url);
+ const load=(async()=>{
+  const [nt,ny,nx]=v.shape;
+  if(v.chunks[0]!==1||v.chunks[1]!==ny||v.chunks[2]!==nx)throw Error('Unsupported chunking; expected [1,ny,nx]');
+  if(v.compressor?.id!=='zlib'||!['<f4','|u1'].includes(v.dtype))throw Error('Only zlib float32/uint8 Zarr-v2 fields supported');
+  onProgress(`Requesting ${v.name} F${pad3(h)} Zarr chunk…`);
+  let compressed;
+  compressed=await compressedChunk(url,opts);
+  onProgress(`Decompressing ${v.name} F${pad3(h)}…`);
+  const decoded=await new Response(compressed).body.pipeThrough(new DecompressionStream('deflate'));
+  const buffer=await new Response(decoded).arrayBuffer();
+  const expected=nx*ny*(v.dtype==='<f4'?4:1);
+  if(buffer.byteLength!==expected)throw Error(`Decoded ${buffer.byteLength} bytes; expected ${expected}`);
+  const ary=v.dtype==='<f4'?new Float32Array(buffer):new Uint8Array(buffer);
+  cachePut(url,ary);return ary;
+ })();
+ st.inflight.set(url,load);
+ try{return await load;}finally{if(st.inflight.get(url)===load)st.inflight.delete(url);}
+}
 function gridFromDataset(ds,v){const g=ds.grid||{},[_,ny,nx]=v.shape;const get=(name,alt)=>Number(g['GRIB_'+name]??alt);const a=Number(st.cfg.display.earthRadiusM||6371229);const grid=apgl.LambertGrid.fromLLCornerLonLat(nx,ny,get('LoVInDegrees',-97.5),get('LaDInDegrees',38.5),[get('Latin1InDegrees',38.5),get('Latin2InDegrees',38.5)],get('longitudeOfFirstGridPointInDegrees',-122.719528),get('latitudeOfFirstGridPointInDegrees',21.138123),get('DxInMetres',3000),get('DyInMetres',3000),a,a);return grid;}
 function gridForPanel(p,ds,v){
  const sig=JSON.stringify([ds.grid,v.shape[1],v.shape[2],st.cfg.display.earthRadiusM]);
@@ -987,8 +1259,8 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);const selec
  finally{clearTimeout(deadline);}
  p.lastKey=signature;}
 
- p.rawField=field;legend(p,m);if(st.field==='wspd10')await prepareWindBarbs(p,ds,h,seq);await waitPaint(p.map);if(seq!==st.seq||!p.map)return;p.status='ready';p.save.disabled=false;clearNote(p);if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});// The PNG export path explicitly captures a finished render frame. Avoid stale blank snapshots here.
- }catch(e){if(seq===st.seq)fail(p,e);}finally{if(noteDelay!==null)clearTimeout(noteDelay);p.busy=false;updateStatus();}}
+ p.rawField=field;legend(p,m);if(st.field==='wspd10')await prepareWindBarbs(p,ds,h,seq);await waitPaint(p.map);if(seq!==st.seq||!p.map||p.contextLost)return;p.status='ready';p.save.disabled=false;clearNote(p);if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});// The PNG export path explicitly captures a finished render frame. Avoid stale blank snapshots here.
+ }catch(e){if(seq===st.seq)fail(p,e);}finally{if(noteDelay!==null)clearTimeout(noteDelay);p.busy=false;updateStatus();if(!st.rendering&&!st.panels.some(x=>x.busy))schedulePrefetch();}}
 // Keep the legend in the same units/range as the autumnplot-gl color map.
 // Legend-only categorical swatches: 0/No is unshaded in the *map* (the
 // native map background remains visible); draw a black No tile in legends so
@@ -1097,44 +1369,68 @@ async function waitPaint(map){if(!map)return;map.triggerRepaint();await new Prom
 function playbackHours(){if(!st.ref)return[];return st.cfg.loopOnlyAvailableHours?availableHours():Array.from({length:Math.max(1,...st.ref.entries.flatMap(({ds})=>(ds.variables||[]).map(v=>v.shape?.[0]||0)))},(_,i)=>i);}
 function nextHour(dir=1){const hours=playbackHours();if(!hours.length)return null;const ix=hours.indexOf(st.hour),idx=(ix<0?(dir>0?-1:0):ix)+dir;return hours[(idx+hours.length)%hours.length];}
 async function step(dir){const h=nextHour(dir);if(h===null)return;st.hour=h;syncUI();await renderAll();}
-// Prepare the next few hours after *every* successful plot, including when
-// the viewer is paused and the user advances manually. Only compressed Zarr
-// chunks are downloaded/decompressed speculatively; GPU work stays foreground.
-// Low-priority tasks yield to user requests and share the same LRU/inflight maps.
+// Forecast prefetch rolls forward in small batches as long as the page is
+// visible. The compressed files persist in a bounded CacheStorage when
+// available, while decoded memory remains reserved for actively viewed frames.
+// Candidate order is hour-major, then model: all comparison panels get F+1
+// before any receives F+2. Deduplicate identical source/chunk URLs.
+function prefetchContextKey(){return `${st.ref?.id||''}|${st.field||''}|${st.panels.filter(p=>!p.cfg.placeholder).map(p=>p.cfg.source).join(',')}`;}
 function schedulePrefetch(){
  if(st.prefetchTimer)clearTimeout(st.prefetchTimer);
  const d=st.cfg?.display||{};
- if(d.prefetchEnabled===false||d.prefetchNextHour===false||document.hidden||!st.ref||!st.active.length||st.rendering)return;
+ if(prefetchMode()==='off'||!st.ref||st.rendering||st.exporting||st.prefetchBatchRunning||st.panels.some(p=>p.busy||p.initializing)||!st.panels.some(p=>p.status==='ready'))return;
+ const context=prefetchContextKey();
+ if(context!==st.prefetchContext){st.prefetchContext=context;st.prefetchAttempted.clear();st.prefetchCompleted=0;st.prefetchFailed=0;}
  const generation=st.prefetchGeneration;
- st.prefetchTimer=setTimeout(()=>{
+ st.prefetchTimer=setTimeout(async()=>{
   st.prefetchTimer=null;
-  if(generation!==st.prefetchGeneration||document.hidden||st.rendering)return;
-  const timeline=playbackHours();if(!timeline.length)return;
-  const advance=Math.max(1,Math.min(4,Math.floor(Number(d.prefetchHours??2)||2)));
-  const limit=Math.max(1,Math.min(32,Math.floor(Number(d.prefetchMaxFields??12)||12)));
-  const pos=timeline.indexOf(st.hour);
+  if(generation!==st.prefetchGeneration||prefetchMode()==='off'||st.rendering||st.exporting||st.panels.some(p=>p.busy||p.initializing)||!st.panels.some(p=>p.status==='ready'))return;
+  const timeline=playbackHours();if(timeline.length<2)return;
+  const pos=timeline.indexOf(st.hour),base=pos<0?0:pos;
+  // With no disk cache, stop at a short horizon to avoid thrashing the raw
+  // memory LRU with more hours than can be held usefully.
+  if(!st.chunkStore)st.chunkStore=new CompressedZarrStore();
+  const disk=Boolean(await st.chunkStore.open());
+  if(generation!==st.prefetchGeneration||prefetchMode()==='off'||st.rendering)return;
+  const horizon=Math.min(timeline.length-1,Math.max(1,Math.floor(Number(disk?d.prefetchHours??24:d.prefetchMemoryOnlyHours??2))));
+  const batchLimit=Math.max(1,Math.min(64,Number(d.prefetchBatchSize??16)));
   const seen=new Set(),candidates=[];
-  for(let ahead=1;ahead<=advance;ahead++){
-   const h=timeline[((pos<0?-1:pos)+ahead+timeline.length)%timeline.length];
-   for(const p of st.active){
-    if(!p.map||!p.src||p.src.error)continue;
-    const selected=choose(p,h),{ds,v}=selected,fh=selected.h;
-    if(!ds||!v||!Number.isInteger(fh)||fh<0||fh>=v.shape[0]||!v.available_hours.includes(fh))continue;
-    const url=new URL(`${ds.path}/${v.name}/${fh}.0.0`,new URL('.',p.src.url)).href;
-    if(seen.has(url)||st.cache.has(url)||st.inflight.has(url))continue;
-    seen.add(url);candidates.push({src:p.src,ds,v,h:fh});
-    if(candidates.length>=limit)break;
+  for(let ahead=1;ahead<=horizon;ahead++){
+   const h=timeline[(base+ahead)%timeline.length];
+   for(const p of st.panels){
+    if(p.cfg.placeholder)continue;
+    const selected=choose(p,h),{ds,v}=selected,fh=selected.h,src=p.src;
+    if(!src||src.error||!ds||!v||!Number.isInteger(fh)||fh<0||fh>=v.shape[0]||!v.available_hours?.includes(fh))continue;
+    const url=new URL(`${ds.path}/${v.name}/${fh}.0.0`,new URL('.',src.url)).href;
+    if(seen.has(url)||st.prefetchAttempted.has(url)||st.compressedInflight.has(url))continue;
+    seen.add(url);candidates.push({url,src,ds,v,h:fh});
+    if(candidates.length>=batchLimit)break;
    }
-   if(candidates.length>=limit)break;
+   if(candidates.length>=batchLimit)break;
   }
-  // Avoid prefetch floods when multiple models (and 20 panels) are compared.
-  // Cache eviction remains enforced by decodedCacheMB.
-  for(const c of candidates){
-   if(generation!==st.prefetchGeneration)break;
-   void chunk(c.src,c.ds,c.v,c.h,()=>{},{background:true}).catch(()=>{});
+  if(!candidates.length)return;
+  st.prefetchBatchRunning=true;
+  // A canceled/stale batch never schedules more work for its old context.
+  try{await Promise.allSettled(candidates.map(async c=>{
+   st.prefetchAttempted.add(c.url);
+   try{
+    // Without CacheStorage, populate decoded memory rather than discard bytes.
+    if(disk)await compressedChunk(c.url,{background:true});
+    else await chunk(c.src,c.ds,c.v,c.h,()=>{},{background:true});
+    st.prefetchCompleted++;
+   }catch(e){if(!isSupersededPrefetch(e)){st.prefetchFailed++;console.debug('Zarr prefetch unavailable:',c.url,e);}}
+  }));}
+  finally{
+   st.prefetchBatchRunning=false;
+   if(prefetchMode()!=='off'&&!st.rendering){
+    // Allow user gestures, painting and other browser work between batches.
+    schedulePrefetch();
+   }
   }
- },Math.max(50,Math.min(1200,Number(d.prefetchDelayMs??180)||180)));
+ },Math.max(80,Math.min(2500,Number(d.prefetchDelayMs??220))));
 }
+// Diagnostic readout without displaying cache chatter across nine maps.
+window.OMDEVUPrefetch={stats:()=>({mode:prefetchMode(),downloadsCompleted:st.prefetchCompleted,downloadsFailed:st.prefetchFailed,attempted:st.prefetchAttempted.size,queued:st.queue.filter(x=>x.background).length,active:st.prefetchActive,decodedMB:Math.round(st.cacheBytes/1048576),compressedDiskMB:Math.round((st.chunkStore?.bytes||0)/1048576),diskEnabled:Boolean(st.chunkStore?.cache&&!st.chunkStore?.disabled)}),resume:()=>schedulePrefetch()};
 async function play(){if(st.playing)return;st.playing=true;el.playBtn.classList.add('active');el.pauseBtn.classList.remove('active');
  while(st.playing){const start=Date.now();try{await step(1);}catch(err){console.error('Playback stopped',err);stop();break;}
   if(!st.playing)break;
@@ -1547,7 +1843,7 @@ async function exportAll(ratio='16:9'){
  }finally{el.saveAllPngBtn.disabled=false;updateStatus();}
 }
 document.addEventListener('visibilitychange',()=>{
- if(document.hidden){if(st.prefetchTimer)clearTimeout(st.prefetchTimer);st.prefetchTimer=null;}
+ if(document.hidden)cancelQueuedPrefetches();
  else if(st.cfg)schedulePrefetch();
 });
 window.addEventListener('DOMContentLoaded',boot);
