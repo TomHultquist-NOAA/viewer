@@ -1579,10 +1579,25 @@ function captureMapFrame(map,settleFrames=1){
 async function decodePNG(data){
  if(!data)return null;const img=new Image();img.src=data;await img.decode();return img;
 }
+async function ensureExportGeography(p,zoom){
+ const map=p?.map,d=st.cfg?.display||{};if(!map)return;
+ const targetZoom=Number.isFinite(zoom)?zoom:map.getZoom();
+ const jobs=[];
+ if(d.showCoastlines!==false){jobs.push(installGeo(p,'coast'));if(targetZoom>=detailThreshold())jobs.push(installGeo(p,'coast_detail'));}
+ if(d.showStateBoundaries!==false)jobs.push(installGeo(p,'states'));
+ if(d.showCountryBoundaries!==false){jobs.push(installGeo(p,'country'));if(targetZoom>=detailThreshold())jobs.push(installGeo(p,'country_detail'));}
+ if(d.showLandFill!==false){jobs.push(installGeo(p,'land'));if(targetZoom>=detailThreshold()){jobs.push(installGeo(p,'land_detail'));jobs.push(installGeo(p,'lakes_detail'));}}
+ if(d.showCountiesOnZoom!==false&&targetZoom>=countyThreshold())jobs.push(installGeo(p,'counties'));
+ if(jobs.length)await Promise.all(jobs);
+ updateGeographyVisibility(p);
+ await waitPaint(map);
+ await waitPaint(map);
+}
 async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividual=false){
  const map=p.map,canvas=map.getCanvas(),node=map.getContainer();
  const oldStyle=node.getAttribute('style')||'';
  const oldCenter=map.getCenter(),oldZoom=map.getZoom(),oldBearing=map.getBearing(),oldPitch=map.getPitch();
+ await ensureExportGeography(p,oldZoom);
  // A sharp standalone export enlarges the viewport and adds log2(scale) to
  // MapLibre zoom; that artificial zoom must NOT reveal counties that were
  // hidden in the live panel. Use the original zoom to decide county visibility.
