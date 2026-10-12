@@ -31,7 +31,8 @@ The Analysis panel is reserved for future verifying-analysis integration. A mode
 2. **Preserve `vendor/`**, including the MapLibre CSP worker and autumnplot-gl distribution. On a new installation, use `vendor_dependencies.py` to obtain the required third-party files.
 3. **Preserve operational data** in `data/`: `catalog*.json` and referenced `.zarr` directories. Those are provided by the separate GRIB2-to-Zarr processing and publishing workflow, not by this ZIP.
 4. Back up any locally customized `config.json` and merge settings as appropriate before replacing it.
-5. Hard-refresh the browser after deployment to avoid cached viewer scripts or styles.
+5. If upgrading an earlier installation, you can delete the obsolete `build_catalog.py` from the web directory. Extracting a new ZIP does not remove files left by older releases.
+6. Hard-refresh the browser after deployment to avoid cached viewer scripts or styles.
 
 Serve the viewer over HTTP(S) rather than opening `index.html` as a local file. Persistent compressed-data caching requires a browser environment that supports CacheStorage (typically HTTPS or localhost).
 
@@ -46,7 +47,6 @@ Serve the viewer over HTTP(S) rather than opening `index.html` as a local file. 
 | `data/map_*.geojson` | Geographic boundaries and fills |
 | `diagnostics.html` | WebGL, MapLibre, worker, and multi-panel diagnostics |
 | `vendor_dependencies.py` | Third-party browser library setup helper |
-| `build_catalog.py` | Optional legacy RRFS catalog utility |
 
 ## Configuration
 
