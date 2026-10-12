@@ -109,8 +109,8 @@
     "showLandFill": true,
     "mapProjection": "lambert",
     "fieldRendering": "raster",
-    "globeCountyMinZoom": 4.68,
-    "countyMinZoom": 4.6,
+    "globeCountyMinZoom": 4.3,
+    "countyMinZoom": 4.25,
     "maxActiveMaps": 9,
     "maxZoom": 12,
     "syncMaps": true,
@@ -144,7 +144,8 @@
     "prefetchMemoryOnlyHours": 2,
     "prefetchDiskCacheMB": 512,
     "prefetchDiskMaxChunks": 350,
-    "prefetchCacheTTLHours": 24
+    "prefetchCacheTTLHours": 24,
+    "countyPreloadLeadZoom": 0.35
   },
   "theme": "dark"
 }

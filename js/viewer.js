@@ -67,7 +67,7 @@ const PTYPE = ['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'];
 'use strict';
 const $=id=>document.getElementById(id);
 const el=Object.fromEntries(['fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels'].map(x=>[x,$(x)]));
-const st={geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Set(),prefetchContext:null,prefetchBatchRunning:false,prefetchCompleted:0,prefetchFailed:0,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
+const st={geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Set(),prefetchContext:null,prefetchBatchRunning:false,prefetchCompleted:0,prefetchFailed:0,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -159,7 +159,7 @@ function mapStyle(){
 function detailThreshold(){return Math.max(0,Number(st.cfg?.display?.detailMinZoom??0)||0);}
 function countyThreshold(){
  const d=st.cfg?.display||{};
- return Number(d[st.mode==='globe'?'globeCountyMinZoom':'countyMinZoom']??(st.mode==='globe'?5.05:4.85));
+ return Number(d[st.mode==='globe'?'globeCountyMinZoom':'countyMinZoom']??(st.mode==='globe'?4.30:4.25));
 }
 function detailMaskData(){
  const ring=[[-173,4],[-43,4],[-43,82],[-173,82],[-173,4]];
@@ -264,6 +264,9 @@ function unionCycles(sources,preferredId){
 async function boot(){try{
  st.cfg=await json('config.json');st.chunkStore=new CompressedZarrStore();void st.chunkStore.open();st.mode=(q.get('map')||st.cfg.display?.mapProjection)==='globe'?'globe':'lambert';el.mapViewSelect.value=st.mode;
  st.mapView=sharedCameraFromQuery();
+ // A deep link supplies the camera for its chosen mode, but the alternate
+ // projection starts independently and is remembered once it is visited.
+ if(st.mapView)st.mapViews[st.mode]=st.mapView;
  let savedTheme=null;try{savedTheme=localStorage.getItem('omd_evu_theme');}catch(_){}
  const sharedTheme=q.get('theme');st.theme=(sharedTheme==='light'||sharedTheme==='dark'?sharedTheme:null)||savedTheme||st.cfg.theme||'dark';setTheme(st.theme,false);
  const pcfg=st.cfg.panels||[{id:'rrfs-main',source:'rrfs',label:'RRFS'}];if(!pcfg.length||pcfg.length>20||pcfg.length>(st.cfg.layout?.maxPanels||20))throw Error('Configure 1–20 panels');
@@ -370,12 +373,12 @@ function shareUrl(){
 function bind(){
  // Deliberate input, rather than passive mouse movement, reduces speculation.
  for(const type of ['pointerdown','wheel','keydown','touchstart'])document.addEventListener(type,markUserActivity,{passive:true});el.mobileControlsBtn.onclick=()=>{const opened=el.mobileControlsBtn.getAttribute('aria-expanded')!=='true';el.mobileControlsBtn.setAttribute('aria-expanded',String(opened));el.mobileControlsBtn.title=opened?'Hide viewer controls':'Show viewer controls';el.mobileControlsBtn.innerHTML=opened?'☷ Controls <span class="collapse-indicator" aria-hidden="true">▴</span>':'☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span>';document.getElementById('viewerControls').classList.toggle('is-open',opened);requestAnimationFrame(layout);};el.fieldSelect.onchange=()=>{st.field=el.fieldSelect.value;refreshHours();syncUI();updateSharedLegend();renderAll();};el.cycleSelect.onchange=()=>{st.runPinned=true;st.ref=st.cycles.find(x=>x.id===el.cycleSelect.value)||st.ref;refreshHours();syncUI();renderAll();};el.fcstSelect.onchange=()=>{st.hour=Number(el.fcstSelect.value);syncUI();renderAll();};el.stepBackBtn.onclick=()=>step(-1);el.stepForwardBtn.onclick=()=>step(1);el.playBtn.onclick=play;el.pauseBtn.onclick=stop;el.speedDownBtn.onclick=()=>changeSpeed(-1);el.speedUpBtn.onclick=()=>changeSpeed(1);
- el.mapViewSelect.onchange=()=>{st.mode=el.mapViewSelect.value;for(const p of st.active)if(p.map)applyProjection(p.map);syncUI();};
+ el.mapViewSelect.onchange=()=>switchProjection(el.mapViewSelect.value);
  // A select retains keyboard focus after its menu closes. Return arrow keys
  // to forecast navigation after an actual selection (mouse or keyboard).
  for(const sel of [el.fieldSelect,el.cycleSelect,el.fcstSelect,el.mapViewSelect]){
   sel.addEventListener('change',()=>requestAnimationFrame(()=>{if(document.activeElement===sel)sel.blur();}));
- }el.resetViewBtn.onclick=()=>{st.mapView=null;for(const p of st.active)if(p.map)resetView(p.map);};el.themeToggleBtn.onclick=()=>setTheme(st.theme==='dark'?'light':'dark',true);
+ }el.resetViewBtn.onclick=()=>switchProjection(st.mode,{reset:true});el.themeToggleBtn.onclick=()=>setTheme(st.theme==='dark'?'light':'dark',true);
  el.copyLinkBtn.onclick=async()=>{try{await navigator.clipboard.writeText(shareUrl());el.copyLinkBtn.textContent='Copied';setTimeout(()=>el.copyLinkBtn.textContent='Copy link',1400);}catch(e){console.warn(e);}};
  el.saveAllPngBtn.onclick=e=>openExportDialog('all',null,e);
  el.exportCloseBtn.onclick=el.exportCancelBtn.onclick=()=>{if(!st.exporting)el.exportDialog.close();};
@@ -475,7 +478,10 @@ function maybeDetailedGeography(p){
 }
 function maybeCounties(p){
  const m=p.map,d=st.cfg?.display||{};
- if(m&&d.showCountiesOnZoom!==false&&m.getZoom()>=countyThreshold())void installGeo(p,'counties');
+ // Warm the shared GeoJSON cache before the layer becomes visible, so county
+ // lines can appear promptly once the configured threshold is crossed.
+ const lead=Math.max(0,Math.min(1,Number(d.countyPreloadLeadZoom??0.35)||0));
+ if(m&&d.showCountiesOnZoom!==false&&m.getZoom()>=countyThreshold()-lead)void installGeo(p,'counties');
 }
 function geographyZoom(p){updateGeographyVisibility(p);maybeCounties(p);maybeDetailedGeography(p);}
 function startGeography(p){
@@ -557,21 +563,74 @@ function fitDataExtent(map){
  }finally{st.syncing=old;}
 }
 
-function applyProjection(map){
+// Capture a geographic camera rather than pixel-space center. This works in
+// both MapLibre Mercator (2D) and Globe and allows the different projections
+// to keep their own remembered viewpoint during the current viewer session.
+function cameraFromMap(map){
+ if(!map)return null;
+ try{
+  const c=map.getCenter();
+  const camera={center:[Number(c.lng),Number(c.lat)],zoom:Number(map.getZoom()),
+   bearing:Number(map.getBearing()),pitch:Number(map.getPitch())};
+  if([camera.center[0],camera.center[1],camera.zoom,camera.bearing,camera.pitch].every(Number.isFinite))return camera;
+ }catch(e){console.warn('Could not read map camera',e);}
+ return null;
+}
+function applyProjection(map,camera=null){
  const globe=st.mode==='globe';
  if(map.setMaxBounds)map.setMaxBounds(null);
  map.setMinZoom(0);
  map.setProjection({type:globe?'globe':'mercator'});
- if(map.getLayer('counties'))map.setLayerZoomRange('counties',countyThreshold(),24);
- const b=makeViewBounds();map.setMaxZoom(st.cfg.display.maxZoom||12);
- map.jumpTo({...b,bearing:0,pitch:0});
+ map.setMaxZoom(st.cfg.display.maxZoom||12);
+ // Recompute flat-view zoom limits without leaving the camera at the fitted
+ // overview. fitDataExtent() can otherwise overwrite a user's saved 2D view.
  if(!globe){map.__evuExtentFitted=false;fitDataExtent(map);}
+ const target=camera||(globe?makeViewBounds():cameraFromMap(map)||makeViewBounds());
+ map.jumpTo(target);
  if(map.getLayer('counties'))map.setLayerZoomRange('counties',countyThreshold(),24);
- st.mapView=null;
- for(const p of st.active)if(p.map===map)geographyZoom(p);
+ for(const p of st.active)if(p.map===map){geographyZoom(p);scheduleWindRedraw(p);}
+ return cameraFromMap(map);
 }
-function resetView(map){applyProjection(map);}
-function syncViews(source){if(st.syncing||st.exportRender||!st.cfg.display.syncMaps)return;st.syncing=true;const c=source.getCenter(),camera={center:[c.lng,c.lat],zoom:source.getZoom(),bearing:source.getBearing(),pitch:source.getPitch()};st.mapView=camera;for(const p of st.active)if(p.map&&p.map!==source)p.map.jumpTo(camera);st.syncing=false;}
+function switchProjection(mode,{reset=false}={}){
+ if(mode!=='lambert'&&mode!=='globe')return;
+ if(mode===st.mode&&!reset)return;
+ const outgoingMode=st.mode;
+ // Snapshot BEFORE changing projection. MapLibre can clamp or recenter the
+ // camera during setProjection() and during flat-view extent fitting.
+ const outgoing=currentSharedCamera();
+ if(mode!==outgoingMode&&outgoing)st.mapViews[outgoingMode]=outgoing;
+ st.mode=mode;
+ // On first visit, inherit the prior geographic location; thereafter restore
+ // exactly the last viewpoint of this projection. Reset affects only this mode.
+ if(reset)st.mapViews[mode]=null;
+ let target=reset?null:(st.mapViews[mode]||outgoing);
+ const previousSyncing=st.syncing;
+ st.syncing=true;
+ try{
+  let firstCamera=null;
+  for(const p of st.active){
+   if(!p.map)continue;
+   const applied=applyProjection(p.map,target||firstCamera);
+   if(!firstCamera&&applied)firstCamera=applied;
+  }
+  // Use the actual applied camera (which may be clamped at the 2D zoom limit)
+  // as the shared state for later mobile panel initialization.
+  st.mapView=firstCamera||target||null;
+  st.mapViews[mode]=st.mapView;
+ }finally{st.syncing=previousSyncing;}
+ clearSynchronizedHover();
+ syncUI();
+}
+function syncViews(source){
+ if(st.syncing||st.exportRender||!st.cfg.display.syncMaps)return;
+ const camera=cameraFromMap(source);if(!camera)return;
+ st.syncing=true;
+ try{
+  st.mapView=camera;
+  st.mapViews[st.mode]=camera;
+  for(const p of st.active)if(p.map&&p.map!==source)p.map.jumpTo(camera);
+ }finally{st.syncing=false;}
+}
 // Cursor position is shared geographically, never as a pixel coordinate; each
 // panel projects the location onto its own camera and samples its own field.
 function clearSynchronizedHover(){

@@ -1,3 +1,12 @@
+# v7.33 — Independent 2D/Globe viewpoints and earlier counties (October 12, 2026)
+
+- **Each projection remembers its camera separately.** Panning, zooming, or rotating the Globe changes only its saved view. Switching back to 2D restores the previous 2D center/zoom (plus bearing/pitch); returning to Globe restores the Globe camera. The first switch to a mode without a saved view uses the current geographic camera, rather than jumping back to the default overview.
+- **All panels stay synchronized** in each mode, including maps that initialize later on mobile. Projection switching applies the target camera to every active panel without transient synchronization events overwriting it.
+- **Reset view affects only the current projection.** It restores the existing 2D fitted-model overview or the configured initial Globe overview; the other mode retains its saved view.
+- **Counties appear modestly earlier.** Default thresholds are **zoom 4.25 in 2D** (previously 4.60) and **4.30 in Globe** (previously 4.68). Both remain configurable in `config.json`; the new `display.countyPreloadLeadZoom` defaults to 0.35 so county geography can be fetched slightly before it is rendered.
+- **Deep links** still honor an explicit `lat/lon/zoom` for the mode selected in the URL. Views are remembered within the current page session; an ordinary reload still opens to the viewer's normal startup view. No additional browser storage or backend changes are required.
+- Preserves the v7.32 mobile all-panels mode, sequential map startup, adaptive WebGL fallback, Zarr prefetch/cache, and PNG export behavior. Deploy over the existing viewer without replacing `vendor/` or your operational Zarr/catalog data. Back up customized `config.json` and merge the three county settings.
+
 # v7.32 — Keep all configured maps active on mobile (October 12, 2026)
 
 - **No arbitrary four-map phone limit.** The viewer now honors `display.maxActiveMaps` on all screen sizes. With the supplied `config.json` the default is **up to nine live WebGL maps**: the standard 3×3 layout contains eight real maps and one Analysis placeholder, so eight GPU contexts are expected. Changing the configurable limit to 20 is supported but not guaranteed by every device.
