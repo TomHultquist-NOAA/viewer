@@ -67,7 +67,7 @@ const PTYPE = ['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'];
 /* OMD EVU autumnplot-gl + MapLibre GL viewer. Zarr-v2 decoding stays browser-native. */
 'use strict';
 const $=id=>document.getElementById(id);
-const el=Object.fromEntries(['fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels'].map(x=>[x,$(x)]));
+const el=Object.fromEntries(['fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels'].map(x=>[x,$(x)]));
 const st={geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Set(),prefetchContext:null,prefetchBatchRunning:false,prefetchCompleted:0,prefetchFailed:0,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
@@ -271,6 +271,8 @@ async function boot(){try{
  if(st.mapView)st.mapViews[st.mode]=st.mapView;
  let savedTheme=null;try{savedTheme=localStorage.getItem('omd_evu_theme');}catch(_){}
  const sharedTheme=q.get('theme');st.theme=(sharedTheme==='light'||sharedTheme==='dark'?sharedTheme:null)||savedTheme||st.cfg.theme||'dark';setTheme(st.theme,false);
+ let savedControlsPosition='top';try{savedControlsPosition=localStorage.getItem('omd_evu_controls_position')||'top';}catch(_){}
+ setControlsPosition(savedControlsPosition,false);
  const pcfg=st.cfg.panels||[{id:'rrfs-main',source:'rrfs',label:'RRFS'}];if(!pcfg.length||pcfg.length>20||pcfg.length>(st.cfg.layout?.maxPanels||20))throw Error('Configure 1–20 panels');
  if(new Set(pcfg.map(x=>x.id)).size!==pcfg.length)throw Error('Panel IDs must be unique');el.viewerGrid.replaceChildren();st.panels=pcfg.map(createPanel);layout();selectPanel(st.panels[0]);
  const sources=st.cfg.sources?.length?st.cfg.sources:[{id:'rrfs',label:'RRFS',catalogUrl:'data/catalog.json'}];const results=await Promise.all(sources.map(async s=>{const source={...s,url:new URL(s.catalogUrl||'data/catalog.json',document.baseURI),datasets:[]};try{const cat=await json(source.url.href);if(cat.schema!=='rrfs-zarr-viewer-1'||!Array.isArray(cat.datasets))throw Error('Catalog schema mismatch');source.datasets=cat.datasets.sort((a,b)=>Date.parse(b.init_time)-Date.parse(a.init_time));}catch(e){source.error=String(e);console.warn(s.id,e);}return source;}));results.forEach(s=>st.sources.set(s.id,s));st.primary=st.sources.get(st.cfg.primarySource)||results.find(s=>s.datasets.length);
@@ -380,7 +382,7 @@ function bind(){
  // to forecast navigation after an actual selection (mouse or keyboard).
  for(const sel of [el.fieldSelect,el.cycleSelect,el.fcstSelect,el.mapViewSelect]){
   sel.addEventListener('change',()=>requestAnimationFrame(()=>{if(document.activeElement===sel)sel.blur();}));
- }el.resetViewBtn.onclick=()=>switchProjection(st.mode,{reset:true});el.themeToggleBtn.onclick=()=>setTheme(st.theme==='dark'?'light':'dark',true);
+ }el.resetViewBtn.onclick=()=>switchProjection(st.mode,{reset:true});el.themeToggleBtn.onclick=()=>setTheme(st.theme==='dark'?'light':'dark',true);el.controlsPositionBtn.onclick=()=>setControlsPosition(document.documentElement.dataset.controlsPosition==='left'?'top':'left',true);
  el.copyLinkBtn.onclick=async()=>{try{await navigator.clipboard.writeText(shareUrl());el.copyLinkBtn.textContent='Copied';setTimeout(()=>el.copyLinkBtn.textContent='Copy link',1400);}catch(e){console.warn(e);}};
  el.saveAllPngBtn.onclick=e=>openExportDialog('all',null,e);
  el.exportCloseBtn.onclick=el.exportCancelBtn.onclick=()=>{if(!st.exporting)el.exportDialog.close();};
@@ -412,6 +414,26 @@ function bind(){
   finally{st.exporting=false;el.exportConfirmBtn.disabled=false;el.exportCancelBtn.disabled=false;el.exportCloseBtn.disabled=false;el.exportConfirmBtn.textContent='Download PNG';}
  });
  window.addEventListener('resize',layout);window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;if(['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();if(e.key==='ArrowRight')step(1);if(e.key==='ArrowLeft')step(-1);if(e.key===' '){e.preventDefault();st.playing?stop():play();}if(e.key==='ArrowUp'||e.key==='ArrowDown'){const a=st.cycles,idx=a.indexOf(st.ref)+(e.key==='ArrowUp'?-1:1);if(a[idx]){st.runPinned=true;st.ref=a[idx];refreshHours();syncUI();renderAll();}}});}
+const CONTROLS_LEFT_ICON='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>';
+const CONTROLS_TOP_ICON='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>';
+function setControlsPosition(requested,persist=false){
+ const position=requested==='left'?'left':'top';
+ document.documentElement.dataset.controlsPosition=position;
+ // The icon shows the destination, like the dark/light theme toggle.
+ el.controlsPositionBtn.innerHTML=position==='left'?CONTROLS_TOP_ICON:CONTROLS_LEFT_ICON;
+ const action=position==='left'?'top':'left';
+ el.controlsPositionBtn.title=`Move controls to ${action==='top'?'top':'left side'}`;
+ el.controlsPositionBtn.setAttribute('aria-label',el.controlsPositionBtn.title);
+ el.controlsPositionBtn.setAttribute('aria-pressed',String(position==='left'));
+ if(persist){try{localStorage.setItem('omd_evu_controls_position',position);}catch(_){}}
+ // Wait for CSS Grid to recalculate the plotting workspace before resizing
+ // MapLibre canvases; keep all active panels/cameras intact.
+ if(st.panels.length)requestAnimationFrame(()=>{
+  layout();requestAnimationFrame(()=>{
+   layout();for(const p of st.panels)if(p.map&&(!st.expandedPanel||st.expandedPanel===p))scheduleWindRedraw(p);
+  });
+ });
+}
 function setTheme(theme,save){
  st.theme=theme;document.documentElement.dataset.theme=theme;
  el.themeToggleBtn.innerHTML=theme==='dark'?'<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>':'<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 15.3A8.5 8.5 0 0 1 8.7 3.6 8.5 8.5 0 1 0 20.4 15.3Z"/></svg>';

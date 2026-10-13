@@ -1,6 +1,6 @@
 # OMD EVU Model Viewer
 
-**Version 7.35 · October 12, 2026**
+**Version 7.37 · October 13, 2026**
 
 A browser-based, multi-panel weather-model viewer for the Office of Modeling and Development (OMD), Evaluation and Verification Unit (EVU). It displays forecast fields from hosted Zarr v2 datasets using MapLibre GL JS and autumnplot-gl. Map geography is served from local GeoJSON files; plots are rendered in the browser.
 
@@ -10,10 +10,14 @@ A browser-based, multi-panel weather-model viewer for the Office of Modeling and
 - Select a forecast field, model initialization cycle, and forecast hour; step or animate through available forecast times.
 - Pan and zoom synchronized maps in **2D** or **Globe** mode. Each mode remembers its own center and zoom while the page is open.
 - Display local state, country, coastline, lake, and zoom-dependent county boundaries.
-- Use light or dark mode, expand an individual panel, and inspect data under the cursor.
+- Use light or dark mode, expand an individual panel, and inspect data under the cursor. On desktop, switch the controls between the top toolbar (default) and a left sidebar using the icon beside the theme button; the layout choice is saved in the browser.
 - Save an individual panel or the full comparison as a PNG in **16:9** or **4:3**, with **Fill** or **Fit** framing. Exports prepare the applicable geographic detail before capture.
 - Prefetch upcoming forecast data, with bounded browser caches and adaptive network use.
 - Use the viewer on desktop and mobile, including sequential mobile map initialization and WebGL resource recovery.
+
+## Desktop control placement
+
+On desktop-width browsers (over 800 px), the layout button beside the light/dark switch toggles between **Top** (default) and **Left**. The chosen placement is saved using browser `localStorage` and restored on later visits. The left-side controls scroll independently when the window is short. The existing mobile control layout is unaffected and does not display this toggle.
 
 ## Default panel arrangement
 

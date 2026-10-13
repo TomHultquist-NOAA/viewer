@@ -344,3 +344,73 @@ body{grid-template-rows:auto auto minmax(0,1fr);}
 
 /* Full diagnostics for long analysis/grid errors; tap to see or copy details. */
 .notice.error-details{white-space:pre-line;overflow-wrap:anywhere;max-height:68%;overflow-y:auto;cursor:pointer;user-select:text;overscroll-behavior:contain}
+
+
+/* v7.37: desktop-only placement control. The <=800px mobile controls and
+   collapse/expand behavior remain exactly as before. */
+.controls-position-toggle{display:none!important}
+@media (min-width:801px){
+ .toolbar .controls-position-toggle{
+  display:inline-flex!important;align-items:center;justify-content:center;
+  width:34px;min-width:34px;height:34px;flex:0 0 34px;order:5;
+  padding:0;line-height:1;
+ }
+ .controls-position-toggle svg{display:block;width:19px;height:19px;flex:0 0 auto}
+ .controls-position-toggle:focus-visible{outline:2px solid var(--highlight);outline-offset:2px}
+ html[data-controls-position="left"] body{
+  grid-template-columns:clamp(220px,18vw,260px) minmax(0,1fr);
+  grid-template-rows:minmax(0,auto) minmax(0,1fr);
+ }
+ html[data-controls-position="left"] .toolbar{
+  grid-column:1;grid-row:1 / span 2;min-height:0;min-width:0;
+  display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
+  justify-content:flex-start;gap:14px;padding:13px 11px;
+  overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;
+ }
+ html[data-controls-position="left"] .toolbar-brandline{
+  display:flex;flex-direction:column;gap:10px;align-items:stretch;
+ }
+ html[data-controls-position="left"] .toolbar .brand{
+  align-self:stretch;white-space:normal;min-width:0;
+ }
+ html[data-controls-position="left"] .toolbar .brand>div:last-child{min-width:0}
+ html[data-controls-position="left"] .toolbar .brand strong{font-size:14px;line-height:1.2;display:block}
+ html[data-controls-position="left"] .toolbar .brand small{font-size:10px}
+ html[data-controls-position="left"] .toolbar-brand-actions{
+  display:flex;align-items:center;justify-content:flex-end;gap:7px;
+ }
+ html[data-controls-position="left"] .toolbar .theme-toggle{
+  order:initial;margin:0;flex:0 0 34px;
+ }
+ html[data-controls-position="left"] .toolbar .controls-position-toggle{
+  order:initial;margin:0;
+ }
+ html[data-controls-position="left"] .toolbar-controls{
+  display:flex;flex:0 0 auto;flex-direction:column;align-items:stretch;
+  flex-wrap:nowrap;gap:11px;min-width:0;width:100%;
+ }
+ html[data-controls-position="left"] .toolbar-controls .control,
+ html[data-controls-position="left"] .toolbar-controls .field-control,
+ html[data-controls-position="left"] .toolbar-controls .cycle-control,
+ html[data-controls-position="left"] .toolbar-controls .forecast-control,
+ html[data-controls-position="left"] .toolbar-controls .speed-control,
+ html[data-controls-position="left"] .toolbar-controls .map-view-control{
+  width:100%;max-width:none;min-width:0;flex:0 0 auto;
+ }
+ html[data-controls-position="left"] .toolbar-controls .control label{font-size:11px}
+ html[data-controls-position="left"] .toolbar-controls select{width:100%}
+ html[data-controls-position="left"] .toolbar .transport{
+  align-self:stretch;justify-content:space-around;width:100%;margin:0;
+ }
+ html[data-controls-position="left"] .speed-buttons{width:100%}
+ html[data-controls-position="left"] .toolbar-utilities{
+  width:100%;display:grid;grid-template-columns:minmax(0,1fr);gap:7px;
+ }
+ html[data-controls-position="left"] .toolbar-utilities .utility{width:100%;min-width:0}
+ html[data-controls-position="left"] .helper{
+  grid-column:2;grid-row:1;min-width:0;align-self:start;
+ }
+ html[data-controls-position="left"] .viewer-workspace{
+  grid-column:2;grid-row:2;min-width:0;min-height:0;
+ }
+}
