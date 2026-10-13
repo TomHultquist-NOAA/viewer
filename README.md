@@ -1,6 +1,6 @@
 # OMD EVU Model Viewer
 
-**Version 7.43 · October 13, 2026**
+**Version 7.44 · October 13, 2026**
 
 A browser-based, multi-panel weather-model viewer for the Office of Modeling and Development (OMD), Evaluation and Verification Unit (EVU). It displays forecast fields from hosted Zarr v2 datasets using MapLibre GL JS and autumnplot-gl. Map geography is served from local GeoJSON files; plots are rendered in the browser.
 
@@ -10,16 +10,16 @@ A browser-based, multi-panel weather-model viewer for the Office of Modeling and
 - Select a forecast field, model initialization cycle, and forecast hour; step or animate through available forecast times.
 - Pan and zoom synchronized maps in **2D** or **Globe** mode. Each mode remembers its own center and zoom while the page is open. On mouse-equipped devices, the glowing master cursor uses a native cursor graphic (no animation-frame trailing); matching geographic crosshairs remain synchronized across the other panels.
 - Display local state, country, coastline, lake, and zoom-dependent county boundaries. Expanded panels adjust county visibility to account for their larger geographic viewport, without altering multi-panel thresholds.
-- Use light or dark mode, expand an individual panel, and inspect data under the cursor. On desktop, switch the controls between the top toolbar (default) and a left sidebar using the icon beside the theme button; the layout choice is saved in the browser.
+- Use light or dark mode, expand an individual panel, and inspect data under the cursor. On desktop, switch the controls between the top toolbar and a left sidebar (default for new visitors) using the icon beside the theme button; the layout choice is saved in the browser.
 - Save an individual panel or the full comparison as a PNG in **16:9** or **4:3**, with **Fill** or **Fit** framing. Exports prepare the applicable geographic detail before capture.
 - Toggle **Contours** on supported continuous fields (temperature, moisture, winds, precipitation, snow amounts, and reflectivity). Contours are rendered in the current map projection for 2D and Globe views, and included in PNG exports. While panning, zooming, or rotating, the contour overlay is temporarily hidden and no CPU-intensive contour calculations are performed; it redraws at full quality when movement has stopped. Conventional field-specific intervals adapt to map zoom, data range, and panel dimensions; continuous, interpolated paths have readable, rotated, non-overlapping labels even in normal-size panels. Categorical fields have no contour control. The choice is remembered by the browser; contour lines are off by default.
 - Compare **1-hour precipitation** or **accumulated precipitation since the selected model cycle initialization**. The model F001 one-hour amount equals its F001 cumulative total (no F000 file required); at F002 and beyond the one-hour amount is derived from consecutive model running totals; the Analysis panel uses MRMS 1-hour QPE directly or adds consecutive hourly MRMS QPE valid times for the matching cycle-to-date total. Missing MRMS hours prevent displaying an incomplete running total. The MRMS sum is computed on demand in the browser, which can be slow or memory-intensive for long forecast leads at native MRMS grid resolution.
-- Prefetch upcoming forecast data, with bounded browser caches and adaptive network use.
+- Prefetch nearby forecast data **ahead and behind** the selected hour across all model/analysis panels, with balanced background download slots, playback-safe scheduling, dependency warming for 1-hour precipitation and wind barbs, and bounded browser caches. Active plotting requests always take priority.
 - Use the viewer on desktop and mobile, including sequential mobile map initialization and WebGL resource recovery.
 
 ## Desktop control placement
 
-On desktop-width browsers (over 800 px), the layout button beside the light/dark switch toggles between **Top** (default) and **Left**. The chosen placement is saved using browser `localStorage` and restored on later visits. When left placement is selected, the navigation tips, live panel status counts, and autumnplot-gl attribution also move into the sidebar. The left-side controls scroll independently when the window is short. The existing mobile control layout is unaffected and does not display this toggle.
+On desktop-width browsers (over 800 px), the layout button beside the light/dark switch toggles between **Top** and **Left** (default for first-time visitors). The chosen placement is saved using browser `localStorage` and restored on later visits, overriding the first-visit default. When left placement is selected, the navigation tips, live panel status counts, and autumnplot-gl attribution also move into the sidebar. The left-side controls scroll independently when the window is short. The existing mobile control layout is unaffected and does not display this toggle.
 
 ## Default panel arrangement
 
@@ -54,7 +54,7 @@ Serve the viewer over HTTP(S) rather than opening `index.html` as a local file. 
 | `diagnostics.html` | WebGL, MapLibre, worker, and multi-panel diagnostics |
 | `vendor_dependencies.py` | Third-party browser library setup helper |
 
-The verification acquisition, conversion, and publishing scripts are distributed separately from the web viewer. No WCOSS2 converter update is needed for v7.43; both MRMS precipitation modes use the already published native-hourly `mrms_apcp` Zarr stores. A future server-side prefix-sum product could accelerate very long lead-time totals.
+The verification acquisition, conversion, and publishing scripts are distributed separately from the web viewer. No WCOSS2 converter update is needed for v7.44; both MRMS precipitation modes use the already published native-hourly `mrms_apcp` Zarr stores. A future server-side prefix-sum product could accelerate very long lead-time totals.
 
 ## Configuration
 
@@ -66,8 +66,8 @@ Edit `config.json` to change model catalog locations, panel order, default field
 | `countyMinZoom` / `globeCountyMinZoom` | County visibility thresholds in 2D / Globe (4.25 / 4.30) |
 | `countyPreloadLeadZoom` | Preload county geography ahead of visibility (0.35) |
 | Expanded panel county threshold | Automatically delays county boundaries based on enlarged viewport area; normal panel zoom thresholds remain unchanged |
-| `prefetchHours` | Forecast hours to consider for ahead-of-time downloading (24) |
-| `prefetchDiskCacheMB` | Target compressed browser cache budget (512 MB) |
+| `prefetchHours` / `prefetchBehindHours` | Speculative window ahead / behind the selected forecast hour (12 / 4) |
+| `prefetchDiskCacheMB` / `prefetchDiskMaxChunks` | Target compressed browser cache budget and maximum chunks (768 MB / 550) |
 | `exportPanelWidth` / `exportAllWidth` | Output PNG widths for 16:9 exports (1920 / 2560 pixels) |
 
 The available fields, runs, and hours are determined by the published model catalogs. Model data may legitimately be unavailable for some selections.
@@ -91,3 +91,11 @@ clipboard permissions allow it. This diagnostics enhancement does not change
 meteorological data or map-grid interpretation.
 
 **REFS mean sources:** CRAIN/CFRZR/CICEP/CSNOW, ASNOW and WEASD are from `mean` GRIB files; composite reflectivity is from the `pmmn` GRIB product. An unidentified local GRIB field is not presented as PTYPE until its meaning is verified.
+
+## Forecast prefetch behavior
+
+The viewer fetches current display data first. In parallel, its low-priority shared download queue warms upcoming and recently passed forecast hours for all panels, including models that are not yet activated. A direction-aware queue prioritizes forward hours while playing or stepping forward and backward hours while stepping backward. Requests remain queued across hour changes rather than being discarded on every frame; changing the selected field or cycle invalidates speculation for the old context. Concurrent requests to the same Zarr chunk are deduplicated, and foreground requests promote a queued background chunk.
+
+For 1-hour forecast precipitation, the required current and previous accumulated chunks are prefetched; for 10-m wind speed, the U/V wind components required for barbs are prefetched. Analysis uses the exact valid hour, respecting MRMS and RTMA/URMA selection. For accumulated MRMS QPE, the viewer warms the target hour plus nearby contributing hourly chunks; it does not speculate through an entire long native-resolution MRMS sum, which would exhaust typical browser caches. Persistent CacheStorage is used when supported, with decoded-memory fallback. Saving data is bounded by limits in `config.json`; cache eviction and absent files are not permanently marked as prefetched.
+
+For diagnostics, open the browser console and run `OMDEVUPrefetch.stats()` to inspect downloads by source, pending background requests, cached megabytes, and failures. `OMDEVUPrefetch.resume()` schedules another background pass. Browser Save-Data mode and hidden tabs suspend speculation.

@@ -69,7 +69,7 @@ const PTYPE = ['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'];
 'use strict';
 const $=id=>document.getElementById(id);
 const el=Object.fromEntries(['contourControl','contourToggleBtn','fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels'].map(x=>[x,$(x)]));
-const st={contours:false,mrmsAccumCache:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Set(),prefetchContext:null,prefetchBatchRunning:false,prefetchCompleted:0,prefetchFailed:0,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
+const st={contours:false,mrmsAccumCache:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -296,7 +296,7 @@ async function boot(){try{
  const sharedTheme=q.get('theme');st.theme=(sharedTheme==='light'||sharedTheme==='dark'?sharedTheme:null)||savedTheme||st.cfg.theme||'dark';setTheme(st.theme,false);
  let savedContours='0';try{savedContours=localStorage.getItem('omd_evu_contours')||'0';}catch(_){}
  st.contours=savedContours==='1';el.contourToggleBtn.checked=st.contours;
- let savedControlsPosition='top';try{savedControlsPosition=localStorage.getItem('omd_evu_controls_position')||'top';}catch(_){}
+ let savedControlsPosition='left';try{savedControlsPosition=localStorage.getItem('omd_evu_controls_position')||'left';}catch(_){}
  setControlsPosition(savedControlsPosition,false);
  const pcfg=st.cfg.panels||[{id:'rrfs-main',source:'rrfs',label:'RRFS'}];if(!pcfg.length||pcfg.length>20||pcfg.length>(st.cfg.layout?.maxPanels||20))throw Error('Configure 1–20 panels');
  if(new Set(pcfg.map(x=>x.id)).size!==pcfg.length)throw Error('Panel IDs must be unique');el.viewerGrid.replaceChildren();st.panels=pcfg.map(createPanel);layout();selectPanel(st.panels[0]);
@@ -402,7 +402,7 @@ function shareUrl(){
 }
 function bind(){
  // Deliberate input, rather than passive mouse movement, reduces speculation.
- for(const type of ['pointerdown','wheel','keydown','touchstart'])document.addEventListener(type,markUserActivity,{passive:true});el.mobileControlsBtn.onclick=()=>{const opened=el.mobileControlsBtn.getAttribute('aria-expanded')!=='true';el.mobileControlsBtn.setAttribute('aria-expanded',String(opened));el.mobileControlsBtn.title=opened?'Hide viewer controls':'Show viewer controls';el.mobileControlsBtn.innerHTML=opened?'☷ Controls <span class="collapse-indicator" aria-hidden="true">▴</span>':'☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span>';document.getElementById('viewerControls').classList.toggle('is-open',opened);requestAnimationFrame(layout);};el.fieldSelect.onchange=()=>{st.field=el.fieldSelect.value;refreshHours();syncUI();updateSharedLegend();renderAll();};el.cycleSelect.onchange=()=>{st.runPinned=true;st.ref=st.cycles.find(x=>x.id===el.cycleSelect.value)||st.ref;refreshHours();syncUI();renderAll();};el.fcstSelect.onchange=()=>{st.hour=Number(el.fcstSelect.value);syncUI();renderAll();};el.stepBackBtn.onclick=()=>step(-1);el.stepForwardBtn.onclick=()=>step(1);el.playBtn.onclick=play;el.pauseBtn.onclick=stop;el.speedDownBtn.onclick=()=>changeSpeed(-1);el.speedUpBtn.onclick=()=>changeSpeed(1);
+ for(const type of ['pointerdown','wheel','keydown','touchstart'])document.addEventListener(type,markUserActivity,{passive:true});el.mobileControlsBtn.onclick=()=>{const opened=el.mobileControlsBtn.getAttribute('aria-expanded')!=='true';el.mobileControlsBtn.setAttribute('aria-expanded',String(opened));el.mobileControlsBtn.title=opened?'Hide viewer controls':'Show viewer controls';el.mobileControlsBtn.innerHTML=opened?'☷ Controls <span class="collapse-indicator" aria-hidden="true">▴</span>':'☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span>';document.getElementById('viewerControls').classList.toggle('is-open',opened);requestAnimationFrame(layout);};el.fieldSelect.onchange=()=>{st.field=el.fieldSelect.value;refreshHours();syncUI();updateSharedLegend();renderAll();};el.cycleSelect.onchange=()=>{st.runPinned=true;st.ref=st.cycles.find(x=>x.id===el.cycleSelect.value)||st.ref;refreshHours();syncUI();renderAll();};el.fcstSelect.onchange=()=>{const next=Number(el.fcstSelect.value);if(next!==st.hour)st.prefetchDirection=next<st.hour?-1:1;st.hour=next;syncUI();renderAll();};el.stepBackBtn.onclick=()=>step(-1);el.stepForwardBtn.onclick=()=>step(1);el.playBtn.onclick=play;el.pauseBtn.onclick=stop;el.speedDownBtn.onclick=()=>changeSpeed(-1);el.speedUpBtn.onclick=()=>changeSpeed(1);
  el.mapViewSelect.onchange=()=>switchProjection(el.mapViewSelect.value);
  el.contourToggleBtn.onchange=()=>{st.contours=el.contourToggleBtn.checked;try{localStorage.setItem('omd_evu_contours',st.contours?'1':'0');}catch(_){}for(const p of st.panels)scheduleContourRedraw(p);};
  // A select retains keyboard focus after its menu closes. Return arrow keys
@@ -1002,7 +1002,7 @@ async function activateInternal(p,source){
  p._used=++st.clock;
  await renderPanel(p,st.seq);
 }
-async function renderAll(){cancelQueuedPrefetches();st.seq++;st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateStatus();schedulePrefetch();}}
+async function renderAll(){if(st.prefetchContext!==null&&st.prefetchContext!==prefetchContextKey())cancelQueuedPrefetches();st.seq++;st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateStatus();schedulePrefetch();}}
 // The compressed-byte store is optional. CacheStorage is available under HTTPS
 // (or localhost), survives browser reloads, and holds many forecast hours without
 // filling the decoded GPU-data caches. Missing/quota-restricted storage simply
@@ -1010,7 +1010,8 @@ async function renderAll(){cancelQueuedPrefetches();st.seq++;st.rendering=true;c
 class CompressedZarrStore {
  constructor(){this.cache=null;this.opening=null;this.disabled=false;this.entries=new Map();this.bytes=0;this.pendingWrite=Promise.resolve();}
  get budget(){return Math.max(32,Math.min(4096,Number(st.cfg?.display?.prefetchDiskCacheMB??512)))*1048576;}
- get maxItems(){return Math.max(16,Math.min(2000,Number(st.cfg?.display?.prefetchDiskMaxChunks??350)));}
+ get maxItems(){return Math.max(16,Math.min(3000,Number(st.cfg?.display?.prefetchDiskMaxChunks??550)));}
+ get ttlMs(){return Math.max(1,Math.min(168,Number(st.cfg?.display?.prefetchCacheTTLHours??24)))*3600000;}
  async open(){
   if(this.disabled)return null;
   if(this.cache)return this.cache;
@@ -1042,6 +1043,7 @@ class CompressedZarrStore {
     await cache.delete(url);const old=this.entries.get(url)||0;
     this.entries.delete(url);this.bytes=Math.max(0,this.bytes-old);return null;
    }
+   const size=this.entries.get(url);if(size){this.entries.delete(url);this.entries.set(url,size);}
    return response.arrayBuffer();
   }catch(e){console.warn('Zarr cache read failed:',e);return null;}
  }
@@ -1073,6 +1075,7 @@ class CompressedZarrStore {
 function prefetchMode(){
  const d=st.cfg?.display||{};
  if(d.prefetchEnabled===false||d.prefetchNextHour===false||document.hidden||navigator.connection?.saveData)return 'off';
+ if(st.playing||st.rendering||st.panels?.some(p=>p.busy||p.initializing))return 'active';
  return Date.now()-st.lastUserActivity>=Math.max(250,Number(d.prefetchIdleAfterMs??1800))?'idle':'active';
 }
 // Avoid consuming every request slot with speculative downloads. Foreground
@@ -1088,7 +1091,7 @@ function pump(){
  const d=st.cfg?.display||{};
  const cap=Math.max(2,Math.min(12,Number(d.maxConcurrentFetches||6)));
  const mode=prefetchMode();
- const desired=Math.min(cap-1,Math.max(1,Number(mode==='idle'?d.prefetchIdleConcurrency??3:d.prefetchActiveConcurrency??1)));
+ const desired=Math.min(Math.max(1,cap-2),Math.max(1,Number(mode==='idle'?d.prefetchIdleConcurrency??4:d.prefetchActiveConcurrency??2)));
  while(st.running<cap){
   let idx=st.queue.findIndex(t=>!t.background);
   if(idx<0&&mode!=='off'&&st.prefetchActive<desired)idx=st.queue.findIndex(t=>t.background);
@@ -1109,11 +1112,11 @@ function markUserActivity(){
 }
 function cancelQueuedPrefetches(){
  if(st.prefetchTimer){clearTimeout(st.prefetchTimer);st.prefetchTimer=null;}
- st.prefetchGeneration++;
+ st.prefetchGeneration++;st.prefetchBatchToken=null;st.prefetchFocus=null;st.prefetchSeenForFocus.clear();
  const keep=[];
  for(const task of st.queue){
   if(!task.background){keep.push(task);continue;}
-  if(task.key){st.queuedFetches.delete(task.key);st.prefetchAttempted.delete(task.key);}
+  if(task.key)st.queuedFetches.delete(task.key);
   task.reject(new Error('Superseded background forecast prefetch'));
  }
  st.queue=keep;pump();
@@ -1913,69 +1916,125 @@ function updateSharedLegend(){
 async function waitPaint(map){if(!map)return;map.triggerRepaint();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));await sleep(100);}
 function playbackHours(){if(!st.ref)return[];return st.cfg.loopOnlyAvailableHours?availableHours():Array.from({length:Math.max(1,...st.ref.entries.flatMap(({ds})=>(ds.variables||[]).map(v=>v.shape?.[0]||0)))},(_,i)=>i);}
 function nextHour(dir=1){const hours=playbackHours();if(!hours.length)return null;const ix=hours.indexOf(st.hour),idx=(ix<0?(dir>0?-1:0):ix)+dir;return hours[(idx+hours.length)%hours.length];}
-async function step(dir){const h=nextHour(dir);if(h===null)return;st.hour=h;syncUI();await renderAll();}
-// Forecast prefetch rolls forward in small batches as long as the page is
-// visible. The compressed files persist in a bounded CacheStorage when
-// available, while decoded memory remains reserved for actively viewed frames.
-// Candidate order is hour-major, then model: all comparison panels get F+1
-// before any receives F+2. Deduplicate identical source/chunk URLs.
+async function step(dir){const h=nextHour(dir);if(h===null)return;st.prefetchDirection=dir<0?-1:1;st.hour=h;syncUI();await renderAll();}
+// Adaptive, bidirectional prefetch. Keep the speculative queue alive across
+// forecast-hour changes; otherwise continuous play cancels nearly every batch.
+// Current-hour plot fetches always outrank background work (see pump()).
+// Candidates are hour-major, so all nine data sources warm before distant leads.
 function prefetchContextKey(){return `${st.ref?.id||''}|${st.field||''}|${st.panels.filter(p=>!p.cfg.placeholder).map(p=>p.cfg.source).join(',')}`;}
+function prefetchOffsets(ahead,behind,dir=1){
+ const out=[];const mx=Math.max(ahead,behind);
+ for(let n=1;n<=mx;n++){
+  if(dir<0){if(n<=behind)out.push(-n);if(n<=ahead)out.push(n);}
+  else{if(n<=ahead)out.push(n);if(n<=behind)out.push(-n);}
+ }
+ return out;
+}
+function prefetchChunkUrl(src,ds,v,h){
+ return new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',src.url)).href;
+}
+function prefetchCandidates(timeline,disk,batchLimit){
+ const d=st.cfg?.display||{},pos=timeline.indexOf(st.hour),base=pos<0?0:pos;
+ const ahead=Math.max(1,Math.floor(Number(disk?d.prefetchHours??12:d.prefetchMemoryOnlyHours??2)));
+ const behind=Math.max(0,Math.floor(Number(disk?d.prefetchBehindHours??4:d.prefetchMemoryOnlyBehindHours??1)));
+ const seen=new Set(),candidates=[],now=Date.now();
+ // Failure cooldown is temporary: failed and evicted items are eventually retried.
+ for(const [url,when] of st.prefetchAttempted)if(when<=now)st.prefetchAttempted.delete(url);
+ const enqueue=(src,ds,v,h)=>{
+  if(!src||!ds||!v||!Number.isInteger(h)||h<0||h>=v.shape[0]||!v.available_hours?.includes(h))return;
+  const url=prefetchChunkUrl(src,ds,v,h);
+  if(seen.has(url)||st.prefetchSeenForFocus.has(url)||st.compressedInflight.has(url)||st.inflight.has(url)||
+    st.chunkStore?.entries.has(url)||st.cache.has(url)||
+    (st.prefetchAttempted.get(url)||0)>now)return;
+  seen.add(url);candidates.push({url,src,ds,v,h});
+ };
+ for(const offset of prefetchOffsets(ahead,behind,st.prefetchDirection)){
+  // Don't wrap from F000 to F084 or vice versa solely for speculation.
+  const ix=base+offset;if(ix<0||ix>=timeline.length)continue;
+  const requested=timeline[ix],chosen=[];
+  // Pass 1: all panels' main display chunks, including analysis, get an
+  // equal opportunity before any panel's secondary chunks consume bandwidth.
+  for(const p of st.panels){
+   if(p.cfg.placeholder)continue;
+   const choice=choose(p,requested),{ds,v,h}=choice,src=p.src;
+   if(choice.error||!ds||!v)continue;
+   chosen.push({p,ds,v,h,src});
+   enqueue(src,ds,v,h);
+  }
+  // Pass 2: dependent inputs (one-hour difference, wind barbs and recent
+  // MRMS sums), so future frames are actually fully renderable.
+  for(const {p,ds,v,h,src} of chosen){
+   if(st.field==='apcp1h'&&p.cfg.timeMode!=='analysis'&&h>1)enqueue(src,ds,v,h-1);
+   if(st.field==='wspd10'){
+    for(const name of ['u10','v10']){
+     const w=ds.variables.find(x=>x.name===name);if(w)enqueue(src,ds,w,h);
+    }
+   }
+   if(st.field==='apcp'&&p.cfg.timeMode==='analysis'&&ds.product==='mrms_apcp'){
+    const last=Math.max(1,Math.floor(Number(d.prefetchMrmsRecentHours??3)));
+    for(let t=Math.max(1,requested-last);t<requested;t++){
+     const record=mrmsHourlyRecord(src,valid(st.ref,t));
+     const variable=record?.variables.find(x=>x.name==='apcp');
+     if(record&&variable)enqueue(src,record,variable,0);
+    }
+   }
+  }
+  if(candidates.length>=batchLimit)break;
+ }
+ return candidates.slice(0,batchLimit);
+}
 function schedulePrefetch(){
- if(st.prefetchTimer)clearTimeout(st.prefetchTimer);
  const d=st.cfg?.display||{};
- if(prefetchMode()==='off'||!st.ref||st.rendering||st.exporting||st.prefetchBatchRunning||st.panels.some(p=>p.busy||p.initializing)||!st.panels.some(p=>p.status==='ready'))return;
+ if(prefetchMode()==='off'||!st.ref||st.exporting)return;
  const context=prefetchContextKey();
- if(context!==st.prefetchContext){st.prefetchContext=context;st.prefetchAttempted.clear();st.prefetchCompleted=0;st.prefetchFailed=0;}
+ if(context!==st.prefetchContext){
+  cancelQueuedPrefetches();st.prefetchContext=context;st.prefetchAttempted.clear();
+  st.prefetchCompleted=0;st.prefetchFailed=0;st.prefetchBySource.clear();
+ }
+ // Prefetch starts before every panel finishes painting. The shared network
+ // limiter reserves slots for foreground plotting and promotes matching URLs.
+ const focus=`${context}|${st.hour}|${st.prefetchDirection}`;
+ if(st.prefetchFocus!==focus){st.prefetchFocus=focus;st.prefetchSeenForFocus.clear();}
+ if(st.prefetchTimer||st.prefetchBatchToken?.context===context)return;
  const generation=st.prefetchGeneration;
  st.prefetchTimer=setTimeout(async()=>{
   st.prefetchTimer=null;
-  if(generation!==st.prefetchGeneration||prefetchMode()==='off'||st.rendering||st.exporting||st.panels.some(p=>p.busy||p.initializing)||!st.panels.some(p=>p.status==='ready'))return;
+  if(generation!==st.prefetchGeneration||prefetchMode()==='off'||!st.ref||st.exporting)return;
   const timeline=playbackHours();if(timeline.length<2)return;
-  const pos=timeline.indexOf(st.hour),base=pos<0?0:pos;
-  // With no disk cache, stop at a short horizon to avoid thrashing the raw
-  // memory LRU with more hours than can be held usefully.
   if(!st.chunkStore)st.chunkStore=new CompressedZarrStore();
   const disk=Boolean(await st.chunkStore.open());
-  if(generation!==st.prefetchGeneration||prefetchMode()==='off'||st.rendering)return;
-  const horizon=Math.min(timeline.length-1,Math.max(1,Math.floor(Number(disk?d.prefetchHours??24:d.prefetchMemoryOnlyHours??2))));
-  const batchLimit=Math.max(1,Math.min(64,Number(d.prefetchBatchSize??16)));
-  const seen=new Set(),candidates=[];
-  for(let ahead=1;ahead<=horizon;ahead++){
-   const h=timeline[(base+ahead)%timeline.length];
-   for(const p of st.panels){
-    if(p.cfg.placeholder)continue;
-    const selected=choose(p,h),{ds,v}=selected,fh=selected.h,src=p.src;
-    if(!src||src.error||!ds||!v||!Number.isInteger(fh)||fh<0||fh>=v.shape[0]||!v.available_hours?.includes(fh))continue;
-    const url=new URL(`${ds.path}/${v.name}/${fh}.0.0`,new URL('.',src.url)).href;
-    if(seen.has(url)||st.prefetchAttempted.has(url)||st.compressedInflight.has(url))continue;
-    seen.add(url);candidates.push({url,src,ds,v,h:fh});
-    if(candidates.length>=batchLimit)break;
-   }
-   if(candidates.length>=batchLimit)break;
-  }
+  if(generation!==st.prefetchGeneration||prefetchMode()==='off'||st.exporting)return;
+  const limit=Math.max(1,Math.min(64,Number(d.prefetchBatchSize??12)));
+  const candidates=prefetchCandidates(timeline,disk,limit);
   if(!candidates.length)return;
-  st.prefetchBatchRunning=true;
-  // A canceled/stale batch never schedules more work for its old context.
-  try{await Promise.allSettled(candidates.map(async c=>{
-   st.prefetchAttempted.add(c.url);
-   try{
-    // Without CacheStorage, populate decoded memory rather than discard bytes.
-    if(disk)await compressedChunk(c.url,{background:true});
-    else await chunk(c.src,c.ds,c.v,c.h,()=>{},{background:true});
-    st.prefetchCompleted++;
-   }catch(e){if(!isSupersededPrefetch(e)){st.prefetchFailed++;console.debug('Zarr prefetch unavailable:',c.url,e);}}
-  }));}
-  finally{
-   st.prefetchBatchRunning=false;
-   if(prefetchMode()!=='off'&&!st.rendering){
-    // Allow user gestures, painting and other browser work between batches.
-    schedulePrefetch();
+  const token={context};st.prefetchBatchToken=token;st.prefetchBatchRunning=true;
+  try{
+   await Promise.allSettled(candidates.map(async c=>{
+    try{
+     if(disk)await compressedChunk(c.url,{background:true});
+     else await chunk(c.src,c.ds,c.v,c.h,()=>{},{background:true});
+     if(generation===st.prefetchGeneration){st.prefetchCompleted++;st.prefetchSeenForFocus.add(c.url);const id=c.src?.id||'unknown';st.prefetchBySource.set(id,(st.prefetchBySource.get(id)||0)+1);}
+    }catch(e){
+     if(generation===st.prefetchGeneration&&!isSupersededPrefetch(e)){
+      st.prefetchFailed++;
+      // 404s generally represent delayed/missing hours. Retry later so
+      // recently published sources become eligible without a page reload.
+      const backoff=e?.status===404?120000:45000;
+      st.prefetchAttempted.set(c.url,Date.now()+backoff);
+      console.debug('Zarr prefetch unavailable:',c.url,e);
+     }
+    }
+   }));
+  }finally{
+   if(st.prefetchBatchToken===token){
+    st.prefetchBatchToken=null;st.prefetchBatchRunning=false;
+    if(prefetchMode()!=='off')schedulePrefetch();
    }
   }
- },Math.max(80,Math.min(2500,Number(d.prefetchDelayMs??220))));
+ },Math.max(50,Math.min(2500,Number(d.prefetchDelayMs??120))));
 }
 // Diagnostic readout without displaying cache chatter across nine maps.
-window.OMDEVUPrefetch={stats:()=>({mode:prefetchMode(),downloadsCompleted:st.prefetchCompleted,downloadsFailed:st.prefetchFailed,attempted:st.prefetchAttempted.size,queued:st.queue.filter(x=>x.background).length,active:st.prefetchActive,decodedMB:Math.round(st.cacheBytes/1048576),compressedDiskMB:Math.round((st.chunkStore?.bytes||0)/1048576),diskEnabled:Boolean(st.chunkStore?.cache&&!st.chunkStore?.disabled)}),resume:()=>schedulePrefetch()};
+window.OMDEVUPrefetch={stats:()=>({mode:prefetchMode(),downloadsCompleted:st.prefetchCompleted,downloadsFailed:st.prefetchFailed,failedCoolingDown:st.prefetchAttempted.size,bySource:Object.fromEntries(st.prefetchBySource),direction:st.prefetchDirection<0?'backward':'forward',queued:st.queue.filter(x=>x.background).length,active:st.prefetchActive,decodedMB:Math.round(st.cacheBytes/1048576),compressedDiskMB:Math.round((st.chunkStore?.bytes||0)/1048576),diskEnabled:Boolean(st.chunkStore?.cache&&!st.chunkStore?.disabled)}),resume:()=>schedulePrefetch()};
 async function play(){if(st.playing)return;st.playing=true;el.playBtn.classList.add('active');el.pauseBtn.classList.remove('active');
  while(st.playing){const start=Date.now();try{await step(1);}catch(err){console.error('Playback stopped',err);stop();break;}
   if(!st.playing)break;
