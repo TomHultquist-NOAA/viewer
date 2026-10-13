@@ -124,7 +124,7 @@ function updateSpeedButtons(){
 function changeSpeed(dir){st.loopSpeedIndex=Math.max(0,Math.min(LOOP_INTERVALS.length-1,st.loopSpeedIndex+dir));updateSpeedButtons();}
 
 async function json(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error(`${url}: HTTP ${r.status}`);return r.json();}
-function fieldInfo(v){const meta=FIELDS[v.name]||{label:v.attrs?.long_name||v.name,unit:v.attrs?.units||'',min:0,max:100,copyColors:'rh2m'};const colors=meta.copyColors?FIELDS[meta.copyColors].colors:meta.colors;return {...meta,colors,fraction:meta.fraction||!!meta.copyColors&&!!FIELDS[meta.copyColors].fraction};}
+function fieldInfo(v){const meta=FIELDS[v.name]||{label:v.attrs?.long_name||v.name,unit:v.attrs?.units||'',min:0,max:100,copyColors:'rh2m'};const colors=meta.copyColors?FIELDS[meta.copyColors].colors:meta.colors;const meanFraction=!!(meta.category&&v.attrs?.ensemble_mean_fraction);return {...meta,colors,fraction:meta.fraction||!!meta.copyColors&&!!FIELDS[meta.copyColors].fraction,ensembleMeanFraction:meanFraction,label:meanFraction?meta.label+' · weighted mean':meta.label,unit:meanFraction?'fraction':meta.unit};}
 // A raw Zarr chunk is converted ONCE into the display units used by the GPU
 // field, its color map and its hover readout. Never convert sampled GPU values.
 function convert(x,m){switch(m.convert){case 'F':return(x-273.15)*1.8+32;case 'C':return x-273.15;case 'mmtoin':return x/25.4;case 'mtoin':return x*39.37007874;case 'perhour':return x*3600;case 'mpsToKt':return x*1.9438444924406;default:return x;}}
@@ -527,7 +527,9 @@ function choose(p,hourOverride=st.hour){const src=st.sources.get(p.cfg.source||s
  if(p.cfg.timeMode==='analysis'){
   const requested=st.field==='snowc'?'snowpresence':st.field;
   const wanted=valid(st.ref,hourOverride).toISOString();
-  ds=list.find(d=>cycleKey(d.init_time)===wanted&&d.variables?.some(v=>v.name===requested));
+  const candidates=list.filter(d=>cycleKey(d.init_time)===wanted&&d.variables?.some(v=>v.name===requested));
+  const analysisRank=d=>d.product==='urma'?0:d.product==='rtma'?1:2;
+  ds=candidates.sort((a,b)=>analysisRank(a)-analysisRank(b))[0];
   if(!ds)return{error:`Analysis unavailable for ${fmt(wanted)} (${FIELDS[st.field]?.label||st.field}); source latency or no verifier`,ds:null};
   return{ds,v:ds.variables.find(v=>v.name===requested),h:0};
  }
@@ -1175,6 +1177,10 @@ function sampledColors(colors,n){
 }
 function pal(m,v){
  if(m.ptype)return{levels:[.5,1.5,2.5,3.5,4.5,5.5],colors:PTYPE.slice(1)};
+ if(m.category&&m.ensembleMeanFraction){
+  const colors=['#14253b', '#294b67', '#477c9b', '#77b2c9',m.category];
+  return{levels:[.01,.10,.25,.50,.75,1.01],colors};
+ }
  if(m.category)return{levels:[.5,1.5],colors:[m.category]};
  if(m.levels&&m.bandColors){
   return {levels:m.levels.slice(),colors:sampledColors(m.bandColors,m.levels.length-1),banded:true};
@@ -1336,7 +1342,7 @@ async function prepareWindBarbs(p,ds,h,seq){
   scheduleWindRedraw(p);
  }catch(e){console.warn('10-m barbs unavailable for '+p.cfg.label+':',e);}
 }
-async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=`${p.cfg.label||p.cfg.id} · ${selected.v?fieldInfo(selected.v).label:(FIELDS[p.cfg.field||st.field]?.label||p.cfg.field||st.field||'No data')}`;p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?(p.cfg.timeMode==='analysis'?`Valid ${fmt(selected.ds.init_time)} · ${selected.ds.product?.toUpperCase()||'analysis'}${selected.ds.source_time&&selected.ds.source_time!==selected.ds.init_time?' · sample '+fmt(selected.ds.source_time):''}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
+async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=`${p.cfg.label||p.cfg.id} · ${selected.v?fieldInfo(selected.v).label:(FIELDS[p.cfg.field||st.field]?.label||p.cfg.field||st.field||'No data')}`;p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?(p.cfg.timeMode==='analysis'?`Valid ${fmt(selected.ds.init_time)} · ${selected.ds.product==='rtma'?'RTMA (preliminary)':selected.ds.product?.toUpperCase()||'analysis'}${selected.ds.source_time&&selected.ds.source_time!==selected.ds.init_time?' · sample '+fmt(selected.ds.source_time):''}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
  if(selected.error||!selected.v||!Number.isInteger(selected.h)||selected.h<0||selected.h>=selected.v.shape[0]||!selected.v.available_hours.includes(selected.h)){if(p.layer&&p.map?.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);p.layer=null;p.component=null;p.rawField=null;p.lastKey=null;p.status='missing';p.save.disabled=true;setNote(p,selected.error||`No ${selected.v.name} for F${pad3(selected.h)}`);legend(p,null);updateStatus();return;}
  const {ds,v,h}=selected,m=fieldInfo(v);p.status='loading';p.loadSince=Date.now();p.save.disabled=true;updateStatus();p.busy=true;
  // When this hour is cached, replace its texture silently: status overlays make
@@ -1384,11 +1390,12 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);const selec
 // native map background remains visible); draw a black No tile in legends so
 // both states are explicit. Do not add a black category to the GPU colormap.
 function legendSwatches(m,palette){
- return m?.category?['#000000',m.category]:palette.colors;
+ return m?.category&&!m.ensembleMeanFraction?['#000000',m.category]:palette.colors;
 }
 function legendTicks(m,v){
  if(!m)return [];
  if(m.ptype)return ['Rain','Snow','FZRA','Ice','Mixed'].map((label,i)=>({label,pos:(i+.5)/5}));
+ if(m.ensembleMeanFraction)return [0,.25,.5,.75,1].map(v=>({label:String(v),pos:v}));
  if(m.category)return [{label:'No',pos:.25},{label:'Yes',pos:.75}];
  const p=pal(m,v),lo=p.levels[0],hi=p.levels.at(-1);
  const count=Math.max(3,Math.min(15,Number(st.cfg?.display?.legendTickCount??11)||11));

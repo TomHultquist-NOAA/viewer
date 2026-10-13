@@ -1,6 +1,6 @@
 # OMD EVU Model Viewer
 
-**Version 7.37 · October 13, 2026**
+**Version 7.38 · October 13, 2026**
 
 A browser-based, multi-panel weather-model viewer for the Office of Modeling and Development (OMD), Evaluation and Verification Unit (EVU). It displays forecast fields from hosted Zarr v2 datasets using MapLibre GL JS and autumnplot-gl. Map geography is served from local GeoJSON files; plots are rendered in the browser.
 
@@ -27,7 +27,7 @@ On desktop-width browsers (over 800 px), the layout button beside the light/dark
 | **Row 2** | REFS-2 | REFS-3 | REFS-4 |
 | **Row 3** | REFS-5 | REFS-mean | Analysis (verification) |
 
-The Analysis panel uses valid-time-matched verification fields from `data/catalog_analysis.json`. Missing or delayed verifying data is identified in the panel; it is not replaced by an older hour. MRMS is ingested at full native resolution (stride 1) by default, which requires more memory and bandwidth.
+The Analysis panel uses valid-time-matched verification fields from `data/catalog_analysis.json`. For common near-surface fields, it uses preliminary RTMA while the corresponding URMA valid hour is not yet available, and automatically prefers URMA when both are present. It labels RTMA explicitly as preliminary. REFS mean categorical fields are displayed as continuous weighted-mean fractions rather than binary flags. Missing or delayed verifying data is identified in the panel; it is not replaced by an older hour. MRMS is ingested at full native resolution (stride 1) by default, which requires more memory and bandwidth.
 
 ## Deployment and updates
 
@@ -85,3 +85,5 @@ The complete error, field, catalog dataset, grid type, array dimensions,
 and Zarr store are shown in an alert and copied to the clipboard where
 clipboard permissions allow it. This diagnostics enhancement does not change
 meteorological data or map-grid interpretation.
+
+**REFS mean sources:** CRAIN/CFRZR/CICEP/CSNOW, ASNOW and WEASD are from `mean` GRIB files; composite reflectivity is from the `pmmn` GRIB product. An unidentified local GRIB field is not presented as PTYPE until its meaning is verified.
