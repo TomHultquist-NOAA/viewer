@@ -1,6 +1,6 @@
 # OMD EVU Model Viewer
 
-**Version 7.34 · October 12, 2026**
+**Version 7.35 · October 12, 2026**
 
 A browser-based, multi-panel weather-model viewer for the Office of Modeling and Development (OMD), Evaluation and Verification Unit (EVU). It displays forecast fields from hosted Zarr v2 datasets using MapLibre GL JS and autumnplot-gl. Map geography is served from local GeoJSON files; plots are rendered in the browser.
 
@@ -21,9 +21,9 @@ A browser-based, multi-panel weather-model viewer for the Office of Modeling and
 | --- | --- | --- | --- |
 | **Row 1** | RRFS | HRRR | REFS-1 |
 | **Row 2** | REFS-2 | REFS-3 | REFS-4 |
-| **Row 3** | REFS-5 | REFS-mean | Analysis (placeholder) |
+| **Row 3** | REFS-5 | REFS-mean | Analysis (verification) |
 
-The Analysis panel is reserved for future verifying-analysis integration. A model or forecast hour without available data is identified in its panel.
+The Analysis panel uses valid-time-matched verification fields from `data/catalog_analysis.json`. Missing or delayed verifying data is identified in the panel; it is not replaced by an older hour. MRMS is ingested at full native resolution (stride 1) by default, which requires more memory and bandwidth.
 
 ## Deployment and updates
 
@@ -48,6 +48,8 @@ Serve the viewer over HTTP(S) rather than opening `index.html` as a local file. 
 | `diagnostics.html` | WebGL, MapLibre, worker, and multi-panel diagnostics |
 | `vendor_dependencies.py` | Third-party browser library setup helper |
 
+The verification acquisition, conversion, and publishing scripts are distributed separately from the web viewer.
+
 ## Configuration
 
 Edit `config.json` to change model catalog locations, panel order, default field, map options, and resource limits. Frequently useful settings under `display` include:
@@ -71,3 +73,11 @@ The available fields, runs, and hours are determined by the published model cata
 - **PNG geography is unexpectedly incomplete:** Confirm that the `data/map_*.geojson` files are accessible and inspect browser network errors. The exporter loads the geographic layers required at the current zoom before capturing.
 
 **Rendering libraries:** [autumnplot-gl](https://github.com/tsupinie/autumnplot-gl) and MapLibre GL JS.
+
+## Full Analysis rendering errors
+
+If an Analysis panel reports a rendering error, tap or click its message.
+The complete error, field, catalog dataset, grid type, array dimensions,
+and Zarr store are shown in an alert and copied to the clipboard where
+clipboard permissions allow it. This diagnostics enhancement does not change
+meteorological data or map-grid interpretation.

@@ -39,6 +39,11 @@
       "id": "refs_mean",
       "label": "REFS-mean",
       "catalogUrl": "data/catalog_refs_mean.json"
+    },
+    {
+      "id": "analysis",
+      "label": "Verification analysis",
+      "catalogUrl": "data/catalog_analysis.json"
     }
   ],
   "primarySource": "rrfs",
@@ -87,8 +92,7 @@
       "id": "analysis",
       "source": "analysis",
       "label": "Analysis",
-      "placeholder": true,
-      "placeholderText": "Verifying analysis \u2014 RAP F000 / MRMS (coming later)"
+      "timeMode": "analysis"
     }
   ],
   "layout": {

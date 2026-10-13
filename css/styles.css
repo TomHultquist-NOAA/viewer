@@ -341,3 +341,6 @@ body{grid-template-rows:auto auto minmax(0,1fr);}
  }
  .viewer-grid.focus-panel>.panel-card.is-focused{min-height:0}
 }
+
+/* Full diagnostics for long analysis/grid errors; tap to see or copy details. */
+.notice.error-details{white-space:pre-line;overflow-wrap:anywhere;max-height:68%;overflow-y:auto;cursor:pointer;user-select:text;overscroll-behavior:contain}

@@ -46,6 +46,7 @@ const FIELDS = {
  asnow:{label:'Total snowfall',unit:'in',convert:'mtoin',levels:[.1,.5,1,2,3,4,6,8,12,16,20,24,30,36,48,60,72,96],bandColors:SNOW_COLORS},
  weasd:{label:'Snow water equivalent',unit:'in',convert:'mmtoin',levels:[.01,.05,.1,.25,.5,.75,1,1.5,2,3,4,5,6,8,10,12,16,20,25],bandColors:RAIN_COLORS},
  snod:{label:'Snow depth',unit:'in',convert:'mtoin',levels:[.1,.5,1,2,3,4,6,8,12,16,24,30,36,48,60,72,96,144],bandColors:SNOW_COLORS},
+ snowpresence:{label:'RAP snow presence (≥ 1 cm)',unit:'',category:'#70c7f0'},
  snowc:{label:'Snow cover',unit:'%',min:0,max:100,cutoff:1,copyColors:'rh2m'},
  cpofp:{label:'Percent frozen precipitation',unit:'%',min:0,max:100,copyColors:'t2m'},
  sden:{label:'Snow density',unit:'kg m⁻³',min:50,max:500,copyColors:'rh2m'},
@@ -208,7 +209,8 @@ function setNote(p,msg){p.note.textContent=msg;p.notice.classList.add('visible')
 function stage(p,label){p.loadingStage=label;p.stageSince=Date.now();setNote(p,label);}
 function loadingErrorMessage(e){const msg=String(e?.message||e);if(/GPU layer|geometry worker|GPU timeout/i.test(msg))return msg+' Check the complete vendor/autumnplot-gl distribution, especially its worker .js files. Run vendor_dependencies.py again.';if(/HTTP 404/.test(msg))return msg+' Check that the full Zarr directory and chunk file were copied to the same directory as catalog.json.';if(/abort|timeout/i.test(msg))return msg+' Check browser Network tab for a slow or blocked chunk or worker.';return msg;}
 
-function clearNote(p){p.notice.classList.remove('visible');}
+function clearNote(p){p.notice.classList.remove('visible','error-details');
+ p.notice.style.pointerEvents='none';p.notice.onclick=null;p.notice.title='';p.lastErrorDetails=null;}
 // Focus one model *within the existing plotting workspace*, never the browser
 // Fullscreen API. Keep every panel and its MapLibre instance alive so the
 // 3x3 view and the geographic camera are restored without reloading data.
@@ -246,7 +248,7 @@ function cycleKey(time){const ms=Date.parse(time);return Number.isFinite(ms)?new
 function unionCycles(sources,preferredId){
  const merged=new Map();
  for(const source of sources){
-  if(source.error)continue;
+  if(source.error||source.id==='analysis')continue; // Valid-hour analyses are NOT forecast cycles.
   for(const ds of source.datasets){
    const key=cycleKey(ds.init_time);if(!key)continue;
    if(!merged.has(key))merged.set(key,{id:key,init_time:key,model:'',grid:null,variables:[],entries:[],sourceIds:[]});
@@ -498,6 +500,16 @@ function startGeography(p){
 }
 
 function choose(p,hourOverride=st.hour){const src=st.sources.get(p.cfg.source||st.primary.id);p.src=src;if(!src)return{error:`Unknown source ${p.cfg.source}`};if(src.error)return{error:src.error};let ds;const mode=p.cfg.run||'selected',list=src.datasets;
+ // Verification datasets are independent one-hour analyses. Match forecast
+ // INIT + FHR exactly, not the model's initialization time or nearest cycle.
+ if(p.cfg.timeMode==='analysis'){
+  const requested=st.field==='snowc'?'snowpresence':st.field;
+  const wanted=valid(st.ref,hourOverride).toISOString();
+  ds=list.find(d=>cycleKey(d.init_time)===wanted&&d.variables?.some(v=>v.name===requested));
+  if(!ds)return{error:`Analysis unavailable for ${fmt(wanted)} (${FIELDS[st.field]?.label||st.field}); source latency or no verifier`,ds:null};
+  return{ds,v:ds.variables.find(v=>v.name===requested),h:0};
+ }
+
  if(mode==='latest')ds=list[0];else if(mode==='nearest')ds=list.slice().sort((a,b)=>Math.abs(Date.parse(a.init_time)-Date.parse(st.ref.init_time))-Math.abs(Date.parse(b.init_time)-Date.parse(st.ref.init_time)))[0];else if(mode==='selected')ds=list.find(d=>cycleKey(d.init_time)===st.ref.id);else ds=list.find(d=>d.id===mode);
  if(!ds)return{error:`No matching cycle for ${fmt(st.ref.init_time)}`};if(p.cfg.runOffset){ds=list[list.indexOf(ds)+Number(p.cfg.runOffset)];if(!ds)return{error:'Cycle offset unavailable'};}
  const name=p.cfg.field||st.field,v=ds.variables.find(x=>x.name===name);if(!v)return{error:`Field ${name} is unavailable`,ds};let h=hourOverride+Number(p.cfg.forecastHourOffset||0);if(p.cfg.timeMode==='valid')h=Math.round((valid(st.ref,hourOverride)-Date.parse(ds.init_time))/3600000)+Number(p.cfg.forecastHourOffset||0);return{ds,v,h};}
@@ -514,7 +526,24 @@ function fail(p,e){
   },30);}
   return;
  }
- console.error(e);p.status='error';p.save.disabled=true;stage(p,'Rendering error: '+loadingErrorMessage(e));updateStatus();
+ const info=[`Panel: ${p.cfg.label||p.cfg.id}`,`Field: ${p.v?.name||st.field||'unknown'}`,
+  `Dataset: ${p.ds?.id||'unknown'}`,`Grid: ${p.ds?.grid?.GRIB_gridType||'unknown'}`,
+  `Dimensions: ${p.v?.shape?.join(' × ')||'unknown'}`,
+  `Store: ${p.ds?.path||'unknown'}`,
+  `Error: ${loadingErrorMessage(e)}`,
+  e?.stack?`Stack: ${e.stack}`:null].filter(Boolean).join('\n');
+ console.error('OMD EVU rendering failure\n'+info,e);
+ p.status='error';p.save.disabled=true;
+ p.lastErrorDetails=info;
+ stage(p,'Rendering error: '+loadingErrorMessage(e)+'\nTap here to view/copy full error');
+ p.notice.classList.add('error-details');p.notice.title=info;
+ p.notice.style.pointerEvents='auto';
+ p.notice.onclick=event=>{
+  event.stopPropagation();
+  if(navigator.clipboard?.writeText)navigator.clipboard.writeText(info).catch(()=>{});
+  window.alert(info);
+ };
+ updateStatus();
 }
 function updateStatus(){const totals={ready:0,waiting:0,loading:0,missing:0,error:0};st.panels.forEach(p=>totals[p.status]=(totals[p.status]||0)+1);el.dataStatus.textContent=`${totals.ready} ready · ${totals.loading} loading · ${totals.waiting} queued · ${totals.missing} missing · ${totals.error} errors`;}
 function makeViewBounds(){
@@ -1101,7 +1130,15 @@ async function chunk(src,ds,v,h,onProgress=()=>{},opts={}){
  st.inflight.set(url,load);
  try{return await load;}finally{if(st.inflight.get(url)===load)st.inflight.delete(url);}
 }
-function gridFromDataset(ds,v){const g=ds.grid||{},[_,ny,nx]=v.shape;const get=(name,alt)=>Number(g['GRIB_'+name]??alt);const a=Number(st.cfg.display.earthRadiusM||6371229);const grid=apgl.LambertGrid.fromLLCornerLonLat(nx,ny,get('LoVInDegrees',-97.5),get('LaDInDegrees',38.5),[get('Latin1InDegrees',38.5),get('Latin2InDegrees',38.5)],get('longitudeOfFirstGridPointInDegrees',-122.719528),get('latitudeOfFirstGridPointInDegrees',21.138123),get('DxInMetres',3000),get('DyInMetres',3000),a,a);return grid;}
+function gridFromDataset(ds,v){const g=ds.grid||{},[_,ny,nx]=v.shape;
+ if(g.GRIB_gridType==='regular_ll'){
+  if(typeof apgl.PlateCarreeGrid!=='function')throw Error('This autumnplot-gl build lacks PlateCarreeGrid for MRMS. Update vendor/autumnplot-gl.js');
+  return new apgl.PlateCarreeGrid(nx,ny,Number(g.longitude_min),Number(g.latitude_min),Number(g.longitude_max),Number(g.latitude_max));
+ }
+ if(g.GRIB_gridType&&g.GRIB_gridType!=='lambert')throw Error('Unsupported geographic grid '+g.GRIB_gridType);
+ const get=(name,alt)=>Number(g['GRIB_'+name]??alt);const a=Number(st.cfg.display.earthRadiusM||6371229);
+ return apgl.LambertGrid.fromLLCornerLonLat(nx,ny,get('LoVInDegrees',-97.5),get('LaDInDegrees',38.5),[get('Latin1InDegrees',38.5),get('Latin2InDegrees',38.5)],get('longitudeOfFirstGridPointInDegrees',-122.719528),get('latitudeOfFirstGridPointInDegrees',21.138123),get('DxInMetres',3000),get('DyInMetres',3000),a,a);
+}
 function gridForPanel(p,ds,v){
  const sig=JSON.stringify([ds.grid,v.shape[1],v.shape[2],st.cfg.display.earthRadiusM]);
  if(p.grid&&p.gridKey===sig)return p.grid;
@@ -1277,7 +1314,7 @@ async function prepareWindBarbs(p,ds,h,seq){
   scheduleWindRedraw(p);
  }catch(e){console.warn('10-m barbs unavailable for '+p.cfg.label+':',e);}
 }
-async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=`${p.cfg.label||p.cfg.id} · ${selected.v?fieldInfo(selected.v).label:(FIELDS[p.cfg.field||st.field]?.label||p.cfg.field||st.field||'No data')}`;p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`:'Source unavailable';
+async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=`${p.cfg.label||p.cfg.id} · ${selected.v?fieldInfo(selected.v).label:(FIELDS[p.cfg.field||st.field]?.label||p.cfg.field||st.field||'No data')}`;p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?(p.cfg.timeMode==='analysis'?`Valid ${fmt(selected.ds.init_time)} · ${selected.ds.product?.toUpperCase()||'analysis'}${selected.ds.source_time&&selected.ds.source_time!==selected.ds.init_time?' · sample '+fmt(selected.ds.source_time):''}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
  if(selected.error||!selected.v||!Number.isInteger(selected.h)||selected.h<0||selected.h>=selected.v.shape[0]||!selected.v.available_hours.includes(selected.h)){if(p.layer&&p.map?.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);p.layer=null;p.component=null;p.rawField=null;p.lastKey=null;p.status='missing';p.save.disabled=true;setNote(p,selected.error||`No ${selected.v.name} for F${pad3(selected.h)}`);legend(p,null);updateStatus();return;}
  const {ds,v,h}=selected,m=fieldInfo(v);p.status='loading';p.loadSince=Date.now();p.save.disabled=true;updateStatus();p.busy=true;
  // When this hour is cached, replace its texture silently: status overlays make
