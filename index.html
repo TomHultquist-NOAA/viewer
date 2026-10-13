@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#09111f">
 <title>OMD EVU Model Viewer | autumnplot-gl</title>
-<link rel="stylesheet" href="css/styles.css?v=7.40">
+<link rel="stylesheet" href="css/styles.css?v=7.43">
 <!-- WebGL comes from the browser. MapLibre uses a separately hosted worker for CSP-safe startup. -->
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <script src="vendor/maplibre-gl-csp.js"></script>
 <script src="vendor/autumnplot-gl.js"></script>
-<script src="js/viewer.js?v=7.40" defer></script>
+<script src="js/viewer.js?v=7.43" defer></script>
 </head>
 <body>
 <header class="toolbar">
@@ -26,6 +26,7 @@
     <div class="control forecast-control"><label for="fcstSelect">F-hour</label><select id="fcstSelect" disabled></select></div>
     <div class="transport" aria-label="Forecast navigation"><button id="stepBackBtn" class="round" disabled title="Previous hour">◀◀</button><button id="playBtn" class="round" disabled title="Play">▶</button><button id="pauseBtn" class="round active" disabled title="Pause">Ⅱ</button><button id="stepForwardBtn" class="round" disabled title="Next hour">▶▶</button></div>
     <div class="control speed-control"><label>Speed</label><div class="speed-buttons" role="group" aria-label="Loop playback speed"><button id="speedDownBtn" type="button" title="Slower playback" aria-label="Slower playback">−</button><output id="speedValue" aria-live="polite" title="Playback speed relative to normal">1×</output><button id="speedUpBtn" type="button" title="Faster playback" aria-label="Faster playback">+</button></div></div>
+    <div id="contourControl" class="control contour-control" hidden><label for="contourToggleBtn">Contours</label><label class="contour-switch"><input type="checkbox" id="contourToggleBtn" aria-label="Show contours"><span>Show lines</span></label></div>
     <div class="control map-view-control"><label for="mapViewSelect">Map view</label><select id="mapViewSelect"><option value="lambert">2D</option><option value="globe">Globe</option></select></div>
     <div class="toolbar-utilities"><button id="resetViewBtn" class="utility">Reset view</button><button id="saveAllPngBtn" class="utility" disabled>Save all panels PNG</button><button id="copyLinkBtn" class="utility">Copy link</button></div>
   </div>

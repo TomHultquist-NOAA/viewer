@@ -435,3 +435,16 @@ body{grid-template-rows:auto auto minmax(0,1fr);}
   grid-column:2;grid-row:1;min-width:0;min-height:0;
  }
 }
+
+/* v7.42: smooth labeled isolines above shading, below hover and panel controls. */
+.contour-overlay{position:absolute;inset:0;z-index:3;width:100%;height:100%;pointer-events:none;display:block}
+.contour-control[hidden]{display:none!important}
+.toolbar-controls .contour-control{width:112px;min-width:102px}
+.contour-switch{display:flex;align-items:center;gap:6px;height:32px;padding:3px 8px;
+ border:1px solid var(--border);border-radius:8px;background:var(--control);color:var(--text);
+ font-size:11px!important;white-space:nowrap;cursor:pointer}
+.contour-switch input{width:15px;height:15px;accent-color:var(--accent)}
+@media(min-width:801px){html[data-controls-position="left"] .toolbar-controls .contour-control{width:100%}}
+
+/* Wind barbs remain on top when contours are also enabled. */
+.wind-overlay{z-index:4}

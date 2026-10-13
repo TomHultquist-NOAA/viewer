@@ -39,6 +39,7 @@ const FIELDS = {
  // PRATE input is kg m-2 s-1; the GPU sees mm/hour after the ONE conversion.
  prate:{label:'Precipitation rate',unit:'mm h⁻¹',convert:'perhour',levels:[.05,.25,.5,1,2.5,5,7.5,10,15,20,30,40,50,75,100,125,150,175,200],bandColors:RAIN_COLORS},
  // Zarr accumulation amounts are kg m-2 = mm of water; display as inches.
+ apcp1h:{label:'1-hour precipitation',unit:'in',convert:'mmtoin',levels:[.005,.01,.03,.05,.1,.2,.3,.5,.75,1,1.5,2,3,4,5,7,10,15,20],bandColors:RAIN_COLORS},
  apcp:{label:'Accumulated precipitation',unit:'in',convert:'mmtoin',levels:[.01,.05,.1,.25,.5,.75,1,1.5,2,3,4,5,6,8,10,12,16,20,25],bandColors:RAIN_COLORS},
  frozr:{label:'Frozen rain accumulation',unit:'in',convert:'mmtoin',levels:[.01,.03,.05,.1,.2,.3,.5,.75,1,1.5,2,3,4,5,6,8],bandColors:RAIN_COLORS},
  frzr:{label:'Freezing rain accumulation',unit:'in',convert:'mmtoin',levels:[.005,.01,.03,.05,.1,.2,.3,.5,.75,1,1.5,2,3,4,5,6],bandColors:RAIN_COLORS},
@@ -59,7 +60,7 @@ const FIELDS = {
 // Fixed forecaster field sequence. U/V are read for barbs, not separate menu fields.
 const FIELD_ORDER = [
  'ptype','refc','csnow','cicep','cfrzr','crain',
- 't2m','dpt2m','rh2m','prate','apcp','frozr','frzr','tsnowp',
+ 't2m','dpt2m','rh2m','prate','apcp1h','apcp','frozr','frzr','tsnowp',
  'asnow','cpofp','snowc','sden','weasd','snod',
  't925','t850','t700','wspd10','gust'
 ];
@@ -67,8 +68,8 @@ const PTYPE = ['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'];
 /* OMD EVU autumnplot-gl + MapLibre GL viewer. Zarr-v2 decoding stays browser-native. */
 'use strict';
 const $=id=>document.getElementById(id);
-const el=Object.fromEntries(['fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels'].map(x=>[x,$(x)]));
-const st={geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Set(),prefetchContext:null,prefetchBatchRunning:false,prefetchCompleted:0,prefetchFailed:0,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
+const el=Object.fromEntries(['contourControl','contourToggleBtn','fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels'].map(x=>[x,$(x)]));
+const st={contours:false,mrmsAccumCache:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Set(),prefetchContext:null,prefetchBatchRunning:false,prefetchCompleted:0,prefetchFailed:0,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -124,7 +125,7 @@ function updateSpeedButtons(){
 function changeSpeed(dir){st.loopSpeedIndex=Math.max(0,Math.min(LOOP_INTERVALS.length-1,st.loopSpeedIndex+dir));updateSpeedButtons();}
 
 async function json(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error(`${url}: HTTP ${r.status}`);return r.json();}
-function fieldInfo(v){const meta=FIELDS[v.name]||{label:v.attrs?.long_name||v.name,unit:v.attrs?.units||'',min:0,max:100,copyColors:'rh2m'};const colors=meta.copyColors?FIELDS[meta.copyColors].colors:meta.colors;const meanFraction=!!(meta.category&&v.attrs?.ensemble_mean_fraction);return {...meta,colors,fraction:meta.fraction||!!meta.copyColors&&!!FIELDS[meta.copyColors].fraction,ensembleMeanFraction:meanFraction,label:meanFraction?meta.label+' · weighted mean':meta.label,unit:meanFraction?'fraction':meta.unit};}
+function fieldInfo(v,requested=st.field){const meta=FIELDS[requested==='apcp1h'&&v.name==='apcp'?'apcp1h':v.name]||{label:v.attrs?.long_name||v.name,unit:v.attrs?.units||'',min:0,max:100,copyColors:'rh2m'};const colors=meta.copyColors?FIELDS[meta.copyColors].colors:meta.colors;const meanFraction=!!(meta.category&&v.attrs?.ensemble_mean_fraction);return {...meta,colors,fraction:meta.fraction||!!meta.copyColors&&!!FIELDS[meta.copyColors].fraction,ensembleMeanFraction:meanFraction,label:meanFraction?meta.label+' · weighted mean':meta.label,unit:meanFraction?'fraction':meta.unit};}
 // A raw Zarr chunk is converted ONCE into the display units used by the GPU
 // field, its color map and its hover readout. Never convert sampled GPU values.
 function convert(x,m){switch(m.convert){case 'F':return(x-273.15)*1.8+32;case 'C':return x-273.15;case 'mmtoin':return x/25.4;case 'mtoin':return x*39.37007874;case 'perhour':return x*3600;case 'mpsToKt':return x*1.9438444924406;default:return x;}}
@@ -216,7 +217,7 @@ function createPanel(cfg,i){const card=document.createElement('section');card.cl
  expand.innerHTML=EXPAND_ICON;
  const view=document.createElement('div');view.className='panel-viewport';const snap=document.createElement('img');snap.className='map-snapshot';snap.alt='Previously rendered weather plot';snap.hidden=true;const frame=document.createElement('div');frame.className='map-frame';const lbl=document.createElement('div');lbl.className='plot-label';const title=document.createElement('strong'),sub=document.createElement('span');lbl.append(title,sub);const notice=document.createElement('div');notice.className='notice visible';const note=document.createElement('span');notice.append(note);const info=document.createElement('div');info.className='point-info';info.hidden=true;const ghost=document.createElement('div');ghost.className='sync-crosshair';ghost.hidden=true;ghost.setAttribute('aria-hidden','true');view.append(frame,snap,lbl,notice,info,ghost);if(!cfg.placeholder)view.append(save);view.append(expand);
  const ft=document.createElement('div');ft.className='panel-footer';const legendTitle=document.createElement('div');legendTitle.className='legend-title';const legendCanvas=document.createElement('canvas');legendCanvas.className='legend-canvas';const legendLabels=document.createElement('div');legendLabels.className='legend-labels';ft.append(legendTitle,legendCanvas,legendLabels);card.append(view,ft);el.viewerGrid.append(card);
- const p={cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,legendTitle,legendCanvas,legendLabels,wind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,initializing:false,cancelMapWait:null,loadingStage:'',loadSince:0,stageSince:0};
+ const p={contourCanvas:null,contourFrameRequested:false,contourRafId:null,contourRedrawTimer:null,contourCache:null,cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,legendTitle,legendCanvas,legendLabels,wind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,initializing:false,cancelMapWait:null,loadingStage:'',loadSince:0,stageSince:0};
  notice.style.pointerEvents='none';card.addEventListener('click',()=>{selectPanel(p);if(!p.cfg.placeholder)activate(p).catch(e=>fail(p,e));});save.addEventListener('click',e=>{e.stopPropagation();openExportDialog('panel',p,e);});
  expand.addEventListener('click',e=>{e.stopPropagation();setExpandedPanel(st.expandedPanel===p?null:p);});
  if(cfg.placeholder){p.status='missing';card.classList.add('analysis-placeholder');p.title.textContent='Analysis · verifying data';p.sub.textContent='RAP F000 / MRMS · planned';setNote(p,cfg.placeholderText||'Verifying analysis data not yet available');}
@@ -257,7 +258,7 @@ function setExpandedPanel(panel,activatePanel=true){
  // overlay). Do not ask MapLibre to render a hidden, zero-width canvas.
  requestAnimationFrame(()=>{
   for(const p of st.panels){if(p.map&&(!st.expandedPanel||st.expandedPanel===p)){
-   p.map.resize();geographyZoom(p);scheduleWindRedraw(p);
+   p.map.resize();geographyZoom(p);scheduleWindRedraw(p);scheduleContourRedraw(p);
   }}
   if(activatePanel&&panel&&!panel.cfg.placeholder&&st.expandedPanel===panel)
    activate(panel).catch(err=>fail(panel,err));
@@ -293,6 +294,8 @@ async function boot(){try{
  if(st.mapView)st.mapViews[st.mode]=st.mapView;
  let savedTheme=null;try{savedTheme=localStorage.getItem('omd_evu_theme');}catch(_){}
  const sharedTheme=q.get('theme');st.theme=(sharedTheme==='light'||sharedTheme==='dark'?sharedTheme:null)||savedTheme||st.cfg.theme||'dark';setTheme(st.theme,false);
+ let savedContours='0';try{savedContours=localStorage.getItem('omd_evu_contours')||'0';}catch(_){}
+ st.contours=savedContours==='1';el.contourToggleBtn.checked=st.contours;
  let savedControlsPosition='top';try{savedControlsPosition=localStorage.getItem('omd_evu_controls_position')||'top';}catch(_){}
  setControlsPosition(savedControlsPosition,false);
  const pcfg=st.cfg.panels||[{id:'rrfs-main',source:'rrfs',label:'RRFS'}];if(!pcfg.length||pcfg.length>20||pcfg.length>(st.cfg.layout?.maxPanels||20))throw Error('Configure 1–20 panels');
@@ -303,7 +306,7 @@ async function boot(){try{
  // Old shared URLs use dataset IDs (e.g. rrfs_20261008_0000). Accept those
  // as well as the new canonical UTC cycle key; no URL parameter -> latest.
  const wanted=q.get('run');st.runPinned=!!wanted;st.ref=st.cycles.find(c=>c.id===wanted||c.entries.some(x=>x.ds.id===wanted))||st.cycles[0];
- const names=new Set(results.flatMap(s=>s.datasets.flatMap(d=>d.variables.map(v=>v.name))));const ordered=FIELD_ORDER.filter(n=>names.has(n));el.fieldSelect.replaceChildren(...ordered.map(n=>new Option(FIELDS[n]?.label||n,n)));
+ const names=new Set(results.flatMap(s=>s.datasets.flatMap(d=>d.variables.map(v=>v.name))));const ordered=FIELD_ORDER.filter(n=>names.has(n==='apcp1h'?'apcp':n));el.fieldSelect.replaceChildren(...ordered.map(n=>new Option(FIELDS[n]?.label||n,n)));
  st.field=ordered.includes(q.get('field'))?q.get('field'):ordered.includes(st.cfg.defaultField)?st.cfg.defaultField:ordered[0];el.cycleSelect.replaceChildren(...st.cycles.map(c=>new Option(fmt(c.init_time),c.id)));
  const defaultDelay=Number(st.cfg?.display?.loopIntervalMs??850);
  st.loopSpeedIndex=LOOP_INTERVALS.reduce((best,ms,i)=>Math.abs(ms-defaultDelay)<Math.abs(LOOP_INTERVALS[best]-defaultDelay)?i:best,2);
@@ -374,11 +377,12 @@ async function waitLibraries(){
 // It is never restricted by the legacy RRFS catalog or one model's time range.
 function timelineVariables(){
  if(!st.ref||!st.field)return [];
- return st.ref.entries.map(({ds})=>(ds.variables||[]).find(v=>v.name===st.field)).filter(Boolean);
+ return st.ref.entries.map(({ds})=>(ds.variables||[]).find(v=>v.name===(st.field==='apcp1h'?'apcp':st.field))).filter(Boolean);
 }
 function availableHours(){return [...new Set(timelineVariables().flatMap(v=>v.available_hours||[]))].sort((a,b)=>a-b);}
 function refreshHours(){const vars=timelineVariables(),hours=Math.max(1,...vars.map(v=>v.shape?.[0]||0),...st.ref.entries.flatMap(({ds})=>(ds.variables||[]).map(v=>v.shape?.[0]||0)));const available=new Set(availableHours());el.fcstSelect.replaceChildren(...Array.from({length:hours},(_,i)=>new Option(`F${pad3(i)}${available.has(i)?'':' · missing'}`,i)));st.hour=Math.max(0,Math.min(hours-1,st.hour));}
 function syncUI(){
+ updateContourControl();
  el.fieldSelect.value=st.field;el.cycleSelect.value=st.ref.id;el.fcstSelect.value=String(st.hour);el.mapViewSelect.value=st.mode;
  try{const u=new URL(location.href);
   // An automatically chosen latest cycle is NOT pinned into the address bar:
@@ -400,6 +404,7 @@ function bind(){
  // Deliberate input, rather than passive mouse movement, reduces speculation.
  for(const type of ['pointerdown','wheel','keydown','touchstart'])document.addEventListener(type,markUserActivity,{passive:true});el.mobileControlsBtn.onclick=()=>{const opened=el.mobileControlsBtn.getAttribute('aria-expanded')!=='true';el.mobileControlsBtn.setAttribute('aria-expanded',String(opened));el.mobileControlsBtn.title=opened?'Hide viewer controls':'Show viewer controls';el.mobileControlsBtn.innerHTML=opened?'☷ Controls <span class="collapse-indicator" aria-hidden="true">▴</span>':'☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span>';document.getElementById('viewerControls').classList.toggle('is-open',opened);requestAnimationFrame(layout);};el.fieldSelect.onchange=()=>{st.field=el.fieldSelect.value;refreshHours();syncUI();updateSharedLegend();renderAll();};el.cycleSelect.onchange=()=>{st.runPinned=true;st.ref=st.cycles.find(x=>x.id===el.cycleSelect.value)||st.ref;refreshHours();syncUI();renderAll();};el.fcstSelect.onchange=()=>{st.hour=Number(el.fcstSelect.value);syncUI();renderAll();};el.stepBackBtn.onclick=()=>step(-1);el.stepForwardBtn.onclick=()=>step(1);el.playBtn.onclick=play;el.pauseBtn.onclick=stop;el.speedDownBtn.onclick=()=>changeSpeed(-1);el.speedUpBtn.onclick=()=>changeSpeed(1);
  el.mapViewSelect.onchange=()=>switchProjection(el.mapViewSelect.value);
+ el.contourToggleBtn.onchange=()=>{st.contours=el.contourToggleBtn.checked;try{localStorage.setItem('omd_evu_contours',st.contours?'1':'0');}catch(_){}for(const p of st.panels)scheduleContourRedraw(p);};
  // A select retains keyboard focus after its menu closes. Return arrow keys
  // to forecast navigation after an actual selection (mouse or keyboard).
  for(const sel of [el.fieldSelect,el.cycleSelect,el.fcstSelect,el.mapViewSelect]){
@@ -463,7 +468,7 @@ function setControlsPosition(requested,persist=false){
  // MapLibre canvases; keep all active panels/cameras intact.
  if(st.panels.length)requestAnimationFrame(()=>{
   layout();requestAnimationFrame(()=>{
-   layout();for(const p of st.panels)if(p.map&&(!st.expandedPanel||st.expandedPanel===p))scheduleWindRedraw(p);
+   layout();for(const p of st.panels)if(p.map&&(!st.expandedPanel||st.expandedPanel===p)){scheduleWindRedraw(p);scheduleContourRedraw(p);}
   });
  });
 }
@@ -473,7 +478,7 @@ function setTheme(theme,save){
  el.themeToggleBtn.setAttribute('aria-label',`Switch to ${theme==='dark'?'light':'dark'} mode`);
  el.themeToggleBtn.title=`Switch to ${theme==='dark'?'light':'dark'} mode`;
  if(save)try{localStorage.setItem('omd_evu_theme',theme);}catch(e){}
- for(const p of st.active||[])scheduleWindRedraw(p);
+ for(const p of st.active||[]){scheduleWindRedraw(p);scheduleContourRedraw(p);}
  const c=themeColors();
  // Change paint properties IN PLACE: a full map.setStyle() destroys custom APGL layers.
  for(const p of st.active){const m=p.map;if(!m||!m.setPaintProperty)continue;
@@ -558,18 +563,22 @@ function choose(p,hourOverride=st.hour){const src=st.sources.get(p.cfg.source||s
  // Verification datasets are independent one-hour analyses. Match forecast
  // INIT + FHR exactly, not the model's initialization time or nearest cycle.
  if(p.cfg.timeMode==='analysis'){
-  const requested=st.field==='snowc'?'snowpresence':st.field;
+  const requested=st.field==='snowc'?'snowpresence':st.field==='apcp1h'?'apcp':st.field;
   const wanted=valid(st.ref,hourOverride).toISOString();
   const candidates=list.filter(d=>cycleKey(d.init_time)===wanted&&d.variables?.some(v=>v.name===requested));
   const analysisRank=d=>d.product==='urma'?0:d.product==='rtma'?1:2;
   ds=candidates.sort((a,b)=>analysisRank(a)-analysisRank(b))[0];
+  if(st.field==='apcp'&&ds?.product==='mrms_apcp'&&hourOverride>0){
+   const missing=missingMrmsHours(src,st.ref,hourOverride);
+   if(missing.length)return{error:`MRMS running total unavailable: missing ${missing.length} 1-hour QPE input(s); first ${missing[0]}`,ds:null};
+  }
   if(!ds)return{error:`Analysis unavailable for ${fmt(wanted)} (${FIELDS[st.field]?.label||st.field}); source latency or no verifier`,ds:null};
   return{ds,v:ds.variables.find(v=>v.name===requested),h:0};
  }
 
  if(mode==='latest')ds=list[0];else if(mode==='nearest')ds=list.slice().sort((a,b)=>Math.abs(Date.parse(a.init_time)-Date.parse(st.ref.init_time))-Math.abs(Date.parse(b.init_time)-Date.parse(st.ref.init_time)))[0];else if(mode==='selected')ds=list.find(d=>cycleKey(d.init_time)===st.ref.id);else ds=list.find(d=>d.id===mode);
  if(!ds)return{error:`No matching cycle for ${fmt(st.ref.init_time)}`};if(p.cfg.runOffset){ds=list[list.indexOf(ds)+Number(p.cfg.runOffset)];if(!ds)return{error:'Cycle offset unavailable'};}
- const name=p.cfg.field||st.field,v=ds.variables.find(x=>x.name===name);if(!v)return{error:`Field ${name} is unavailable`,ds};let h=hourOverride+Number(p.cfg.forecastHourOffset||0);if(p.cfg.timeMode==='valid')h=Math.round((valid(st.ref,hourOverride)-Date.parse(ds.init_time))/3600000)+Number(p.cfg.forecastHourOffset||0);return{ds,v,h};}
+ const name=p.cfg.field||st.field,v=ds.variables.find(x=>x.name===(name==='apcp1h'?'apcp':name));if(!v)return{error:`Field ${name} is unavailable`,ds};let h=hourOverride+Number(p.cfg.forecastHourOffset||0);if(p.cfg.timeMode==='valid')h=Math.round((valid(st.ref,hourOverride)-Date.parse(ds.init_time))/3600000)+Number(p.cfg.forecastHourOffset||0);if(name==='apcp1h'&&h>1&&!v.available_hours.includes(h-1))return{error:`1-hour forecast precipitation unavailable: missing F${pad3(h-1)} cumulative total`,ds:null};return{ds,v,h};}
 // A background forecast prefetch can be discarded when the selected cycle/hour
 // changes. It is a cache-management event, not a fault in the plot renderer.
 function isSupersededPrefetch(e){return /superseded background (?:forecast )?(?:fetch|prefetch)/i.test(String(e?.message||e));}
@@ -759,6 +768,8 @@ function createMap(p){
  node.style='position:absolute;inset:0;';p.frame.replaceChildren(node);
  const windCanvas=document.createElement('canvas');windCanvas.className='wind-overlay';
  windCanvas.setAttribute('aria-hidden','true');p.frame.append(windCanvas);p.windCanvas=windCanvas;
+ const contourCanvas=document.createElement('canvas');contourCanvas.className='contour-overlay';
+ contourCanvas.setAttribute('aria-hidden','true');p.frame.append(contourCanvas);p.contourCanvas=contourCanvas;
  const view=st.mapView||makeViewBounds();
  const m=new maplibregl.Map({container:node,style:mapStyle(),center:view.center,
   zoom:view.zoom,bearing:view.bearing||0,pitch:view.pitch||0,
@@ -770,8 +781,15 @@ function createMap(p){
  // Defense-in-depth for MapLibre builds that register keyboard navigation anyway.
  if(m.keyboard?.disable)m.keyboard.disable();
  p.map=m;p.geoApplied=new Set();p.geoPending=new Set();
+ // Contours are CPU-intensive, so never resample or trace them during
+ // panning, wheel zoom, touch gestures, or synced camera movements. Hiding
+ // the old overlay also avoids lines drifting over the moving map.
+ m.on('movestart',()=>suspendContours(p));
  m.on('move',()=>{if(!st.rendering)syncViews(m);scheduleWindRedraw(p);if(st.hover&&!st.exportRender&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});});
- m.on('resize',()=>scheduleWindRedraw(p));
+ m.on('resize',()=>{scheduleWindRedraw(p);scheduleContourRedraw(p,140);});
+ // Debounce across rapid wheel steps; stagger synchronized panels so nine
+ // expensive contour passes don't block the same animation frame.
+ m.on('moveend',()=>scheduleContourRedraw(p,160+p.i*35));
  m.on('zoomend',()=>geographyZoom(p));
  m.on('mousemove',e=>queueSynchronizedHover(p,e.lngLat));
  m.on('mouseleave',()=>{if(st.hover?.master===p)clearSynchronizedHover();});
@@ -811,6 +829,7 @@ function createMap(p){
 }
 function discardMap(p){
  if(!p.map)return;
+ suspendContours(p); // Don't keep timers or RAF work for an evicted panel.
  clearTimeout(p.contextLossTimer);p.contextLossTimer=null;p.contextLost=false;
  // An evicted MapLibre startup must never leave waitMapReady polling until
  // the entire 90-second deadline. Normal viewport eviction intentionally
@@ -820,7 +839,7 @@ function discardMap(p){
  if(p.geoTimer)clearTimeout(p.geoTimer);p.geoTimer=null;
  try{const snap=p.lastSnapshot||p.map.getCanvas().toDataURL('image/png');p.snap.src=snap;p.lastSnapshot=snap;p.snap.hidden=false;}
  catch(e){console.warn('Could not retain snapshot',e);}
- p.map.remove();p.map=null;p.wind=null;p.windCanvas=null;p.windFrameRequested=false;p.component=null;p.layer=null;p.rawField=null;p.lastKey=null;p.mapReady=null;p.grid=null;p.gridKey=null;
+ p.map.remove();p.map=null;p.wind=null;p.windCanvas=null;p.windFrameRequested=false;p.contourCanvas=null;p.contourFrameRequested=false;p.component=null;p.layer=null;p.rawField=null;p.lastKey=null;p.mapReady=null;p.grid=null;p.gridKey=null;
  p.initializing=false;p.cancelMapWait=null;
  p.geoApplied=new Set();p.geoPending=new Set();p.frame.replaceChildren();
  p.view.classList.remove('has-live-map');st.active=st.active.filter(x=>x!==p);
@@ -1164,6 +1183,78 @@ async function getDisplayData(src,ds,v,h,m,onProgress){
  st.displayInflight.set(k,pending);
  try{return await pending;}finally{st.displayInflight.delete(k);}
 }
+
+// Virtual precipitation presentation fields use the existing "apcp" Zarr
+// chunks: all 1-h inputs are valid-hour aligned. Never add an absent hour.
+function mrmsHourlyRecord(src,instant){
+ const key=new Date(instant).toISOString();
+ return src?.datasets?.find(ds=>ds.product==='mrms_apcp'&&
+   cycleKey(ds.init_time)===key&&ds.variables?.some(v=>v.name==='apcp'&&v.available_hours.includes(0)));
+}
+function missingMrmsHours(src,ref,lead){
+ const missing=[];
+ for(let hr=1;hr<=lead;hr++){
+  const time=valid(ref,hr);
+  if(!mrmsHourlyRecord(src,time))missing.push(fmt(time));
+ }
+ return missing;
+}
+function accumulationGridKey(ds,v){return JSON.stringify([ds.grid,v.shape.slice(1)]);}
+async function mrmsRunningTotal(p,ds,v,lead,m,onProgress,seq){
+ const src=p.src,reference=st.ref;
+ const missing=missingMrmsHours(src,reference,lead);
+ if(missing.length)throw Error(`MRMS running total unavailable: ${missing.length} hourly QPE input(s) missing; first ${missing[0]}. No partial sum shown.`);
+ const key=String(src.url)+'|'+reference.init_time+'|'+accumulationGridKey(ds,v);
+ const previous=st.mrmsAccumCache;
+ let total,from=0;
+ if(previous?.key===key&&previous.upto<=lead){total=previous.data.slice();from=previous.upto;}
+ else total=new Float32Array(v.shape[1]*v.shape[2]);
+ // F000 contains no interval after model initialization.
+ if(lead===0){
+  for(let i=0;i<total.length;i++)total[i]=0;
+  return total;
+ }
+ for(let hour=from+1;hour<=lead;hour++){
+  if(seq!==st.seq)return null;
+  const record=mrmsHourlyRecord(src,valid(reference,hour));
+  const rv=record.variables.find(x=>x.name==='apcp');
+  if(accumulationGridKey(record,rv)!==accumulationGridKey(ds,v))
+   throw Error(`MRMS running total unavailable: hourly grids differ at ${fmt(record.init_time)}`);
+  onProgress(`MRMS total: adding hour ${hour} of ${lead}…`);
+  const values=await getDisplayData(src,record,rv,0,m,()=>{});
+  if(seq!==st.seq)return null;
+  if(values.length!==total.length)throw Error('MRMS hourly precipitation grid shape mismatch');
+  for(let i=0;i<total.length;i++){
+   const a=total[i],b=values[i];
+   total[i]=(Number.isFinite(a)&&Number.isFinite(b)&&b>=0)?a+b:NaN;
+  }
+ }
+ // Retain only the latest completed sum, not dozens of huge native-grid arrays.
+ // The copy-on-continue above leaves this checkpoint safe if another render is interrupted.
+ st.mrmsAccumCache={key,upto:lead,data:total};
+ return total;
+}
+async function getPanelDisplayData(p,ds,v,h,m,onProgress,seq){
+ if(st.field==='apcp'&&p.cfg.timeMode==='analysis'&&ds.product==='mrms_apcp')
+  return mrmsRunningTotal(p,ds,v,st.hour,m,onProgress,seq);
+ const current=await getDisplayData(p.src,ds,v,h,m,onProgress);
+ if(st.field!=='apcp1h'||p.cfg.timeMode==='analysis')return current;
+ // Forecast APCP is cycle-to-date; calculate an exact Fh-1..Fh interval.
+ if(h===0){const zero=new Float32Array(current.length);for(let i=0;i<zero.length;i++)if(!Number.isFinite(current[i]))zero[i]=NaN;return zero;}
+ // F001 itself IS the one-hour accumulation (00–01 h); F000 is not required.
+ if(h===1)return current;
+ if(!v.available_hours.includes(h-1))throw Error(`1-hour precipitation unavailable: F${pad3(h-1)} accumulation is missing`);
+ onProgress(`Computing 1-h precipitation from F${pad3(h-1)} to F${pad3(h)}…`);
+ const prior=await getDisplayData(p.src,ds,v,h-1,m,()=>{});
+ if(current.length!==prior.length)throw Error('Forecast precipitation grid shape changed between forecast hours');
+ const difference=new Float32Array(current.length);
+ for(let i=0;i<difference.length;i++){
+  const a=current[i],b=prior[i];
+  difference[i]=Number.isFinite(a)&&Number.isFinite(b)&&a>=b-.0001?Math.max(0,a-b):NaN;
+ }
+ return difference;
+}
+
 async function chunk(src,ds,v,h,onProgress=()=>{},opts={}){
  const url=new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',src.url)).href;
  const cached=cacheGet(url);if(cached)return cached;
@@ -1314,6 +1405,302 @@ function globeFrontVisible(map,lon,lat){
 }
 // Render directly into an overlay canvas that shares MapLibre's CSS coordinate
 // system; composited into PNG exports using the identical map-image transform.
+
+// The overlay samples the *decoded scalar field* at projected screen points;
+// rebuilding the isolines whenever MapLibre moves keeps them aligned in both
+// Mercator and Globe projections. Raster shading and Zarr remain unchanged.
+// Conventional field-specific isolines. Zoom controls which standard interval
+// to use; viewport variability and size may coarsen it further to avoid clutter.
+// All numerical values below are in the display units used by RawScalarField.
+const CONTOUR_STEPS={
+ t2m:[10,5,2],dpt2m:[10,5,2],
+ t925:[5,2,1],t850:[5,2,1],t700:[5,2,1],
+ rh2m:[20,10,5],wspd10:[10,5,2],gust:[10,5,2],
+ u10:[10,5,2],v10:[10,5,2],refc:[10,5,5],prate:[10,5,2],
+ cpofp:[20,10,5],snowc:[20,10,5],sden:[100,50,25]
+};
+const CONTOUR_STANDARD_STEPS=[1,2,2.5,5,10,20,25,50,100,200,250,500,1000,2000];
+const CONTOUR_PRECIP=[.01,.05,.10,.25,.5,.75,1,1.5,2,3,4,5,7,10,15,20];
+const CONTOUR_PRECIP_COARSE=[.05,.10,.25,.5,1,2,3,5,10,20];
+const CONTOUR_SNOW=[.5,1,2,4,6,8,12,18,24,36,48,72];
+const CONTOUR_SNOW_COARSE=[1,2,4,8,12,24,36,48,72];
+const NO_CONTOURS=new Set(['ptype','csnow','cicep','cfrzr','crain','snowpresence']);
+function contoursAvailable(field=st.field){return Boolean(field&&!NO_CONTOURS.has(field)&&
+ (CONTOUR_STEPS[field]||['apcp','apcp1h','asnow','snod','weasd','frozr','frzr','tsnowp'].includes(field)));}
+function contourTier(zoom){return zoom<3.6?0:zoom<6?1:2;}
+function contourInterval(field,zoom){const steps=CONTOUR_STEPS[field];return steps?steps[contourTier(zoom)]:null;}
+function updateContourControl(){
+ if(!el.contourControl)return;
+ el.contourControl.hidden=!contoursAvailable();
+ el.contourToggleBtn.checked=st.contours;
+ const interval=contourInterval(st.field,st.active?.find(p=>p.map)?.map?.getZoom?.()??3);
+ const m=FIELDS[st.field];
+ el.contourControl.title=`Draw labeled ${m?.label||st.field} contours (${interval?`${interval} ${m?.unit||''} base interval; adapts to map scale`:'standard field thresholds; adapts to map scale'})`;
+}
+function suspendContours(p){
+ if(!p?.contourCanvas)return;
+ if(p.contourRedrawTimer!==null){clearTimeout(p.contourRedrawTimer);p.contourRedrawTimer=null;}
+ if(p.contourRafId!==null){cancelAnimationFrame(p.contourRafId);p.contourRafId=null;}
+ p.contourFrameRequested=false;
+ p.contourCanvas.style.visibility='hidden';
+}
+function clearContours(p){
+ suspendContours(p);
+ if(p.contourCanvas){const c=p.contourCanvas;
+  c.getContext('2d')?.clearRect(0,0,c.width,c.height);}
+}
+function contourLevels(field,minimum,maximum,zoom=3,width=400,height=250){
+ if(!Number.isFinite(minimum)||!Number.isFinite(maximum)||maximum<=minimum)return [];
+ const limit=Math.max(6,Math.min(20,Math.floor(Math.sqrt(width*height)/31)));
+ if(['apcp','apcp1h','weasd','frozr','frzr','tsnowp','asnow','snod'].includes(field)){
+  const snow=field==='asnow'||field==='snod';
+  const standard=snow?CONTOUR_SNOW:CONTOUR_PRECIP;
+  const coarse=snow?CONTOUR_SNOW_COARSE:CONTOUR_PRECIP_COARSE;
+  let levels=(zoom<3.6?coarse:standard).filter(v=>v>minimum&&v<maximum);
+  if(levels.length>limit){
+   // Choose actual conventional thresholds, not arbitrary interpolated values.
+   const n=Math.ceil(levels.length/limit);
+   levels=levels.filter((_,i)=>i%n===0);
+  }
+  return levels;
+ }
+ const base=contourInterval(field,zoom);if(!base)return [];
+ const candidate=CONTOUR_STANDARD_STEPS.filter(x=>x>=base-1e-7);
+ let increment=candidate[candidate.length-1];
+ for(const step of candidate){
+  increment=step;
+  if(Math.floor(maximum/step)-Math.floor(minimum/step)<=limit)break;
+ }
+ const start=Math.ceil((minimum+1e-9)/increment)*increment,levels=[];
+ for(let v=start;v<maximum&&levels.length<=limit+1;v+=increment)
+  if(v>minimum+1e-8)levels.push(Number(v.toFixed(5)));
+ return levels;
+}
+
+// Trace a contour through the projected viewport, with one vertex for each
+// interpolated *grid edge crossing*. Nodes are keyed by the physical edge,
+// allowing segments from adjacent cells to join without coordinate rounding.
+// For saddle cells the bilinear cell-center sign chooses the correct pairing.
+function contourPaths(values,cols,rows,dx,dy,level){
+ const nodes=new Map(),pitch=cols+1;
+ function join(a,b){
+  if(!a||!b||a.id===b.id)return;
+  for(const [v,neighbor] of [[a,b.id],[b,a.id]]){
+   let node=nodes.get(v.id);
+   if(!node){node={x:v.x,y:v.y,next:[]};nodes.set(v.id,node);}
+   if(!node.next.includes(neighbor))node.next.push(neighbor);
+  }
+ }
+ for(let iy=0;iy<rows;iy++)for(let ix=0;ix<cols;ix++){
+  const a=iy*pitch+ix;
+  const v=[values[a],values[a+1],values[a+pitch+1],values[a+pitch]];
+  if(!v.every(Number.isFinite))continue;
+  const low=Math.min(...v),high=Math.max(...v);
+  if(low>=level||high<level)continue;
+  const side=v.map(z=>z>=level),edges=[];
+  for(let e=0;e<4;e++)if(side[e]!==side[(e+1)%4])edges.push(e);
+  if(edges.length!==2&&edges.length!==4)continue;
+  function crossing(e){
+   const next=(e+1)%4;
+   const t=Math.max(0,Math.min(1,(level-v[e])/(v[next]-v[e])));
+   switch(e){
+    case 0:return {id:`h${iy}:${ix}`,x:(ix+t)*dx,y:iy*dy};
+    case 1:return {id:`v${iy}:${ix+1}`,x:(ix+1)*dx,y:(iy+t)*dy};
+    case 2:return {id:`h${iy+1}:${ix}`,x:(ix+1-t)*dx,y:(iy+1)*dy};
+    default:return{id:`v${iy}:${ix}`,x:ix*dx,y:(iy+1-t)*dy};
+   }
+  }
+  if(edges.length===2){join(crossing(edges[0]),crossing(edges[1]));continue;}
+  // At a bilinear saddle, isolate the corners whose sign differs from the
+  // center, rather than pairing all four edges in arbitrary array order.
+  const centerHigh=(v[0]+v[1]+v[2]+v[3])/4>=level;
+  for(let corner=0;corner<4;corner++)if(side[corner]!==centerHigh)
+   join(crossing((corner+3)%4),crossing(corner));
+ }
+ const paths=[],seen=new Set();
+ function edgeId(a,b){return a<b?`${a}|${b}`:`${b}|${a}`;}
+ function traverse(start,next){
+  const points=[],first=nodes.get(start);if(!first)return;
+  points.push([first.x,first.y]);
+  let prev=start,cur=next;
+  for(let n=0;n<=nodes.size;n++){
+   const link=edgeId(prev,cur);if(seen.has(link))break;
+   seen.add(link);
+   const node=nodes.get(cur);if(!node)break;
+   points.push([node.x,node.y]);
+   const nextId=node.next.find(id=>!seen.has(edgeId(cur,id)));
+   if(!nextId)break;
+   prev=cur;cur=nextId;
+  }
+  if(points.length>=2)paths.push(points);
+ }
+ // Open lines first; closed loops are processed in the second pass.
+ for(const [id,node] of nodes)if(node.next.length===1)
+  for(const next of node.next)if(!seen.has(edgeId(id,next)))traverse(id,next);
+ for(const [id,node] of nodes)for(const next of node.next)
+  if(!seen.has(edgeId(id,next)))traverse(id,next);
+ return paths;
+}
+function strokeContourPath(ctx,path){
+ const n=path.length;if(n<2)return;
+ ctx.moveTo(path[0][0],path[0][1]);
+ if(n===2){ctx.lineTo(path[1][0],path[1][1]);return;}
+ // Quadratic midpoint interpolation rounds sampled-cell corners smoothly while
+ // retaining level-crossing coordinates; no expensive geographic regridding.
+ for(let i=1;i<n-1;i++)ctx.quadraticCurveTo(path[i][0],path[i][1],
+   (path[i][0]+path[i+1][0])/2,(path[i][1]+path[i+1][1])/2);
+ ctx.lineTo(path[n-1][0],path[n-1][1]);
+}
+function contourLabel(level){
+ return Math.abs(level)>=1?String(Number(level.toFixed(1))):String(Number(level.toFixed(3)));
+}
+function contourLabelPosition(path,fraction){
+ let total=0;const arc=[];
+ for(let i=1;i<path.length;i++){
+  const [a,b]=[path[i-1],path[i]],length=Math.hypot(b[0]-a[0],b[1]-a[1]);
+  arc.push(length);total+=length;
+ }
+ if(!total)return null;
+ let remaining=total*fraction;
+ for(let i=0;i<arc.length;i++){
+  if(remaining>arc[i]){remaining-=arc[i];continue;}
+  const a=path[i],b=path[i+1],t=arc[i]?remaining/arc[i]:0;
+  const x=a[0]+t*(b[0]-a[0]),y=a[1]+t*(b[1]-a[1]);
+  // Use neighboring segments when available to orient the label along the
+  // local curve instead of a single very short grid-edge crossing.
+  const before=path[Math.max(0,i-1)],after=path[Math.min(path.length-1,i+2)];
+  let angle=Math.atan2(after[1]-before[1],after[0]-before[0]);
+  if(angle>Math.PI/2)angle-=Math.PI;
+  if(angle< -Math.PI/2)angle+=Math.PI;
+  return {x,y,angle,total};
+ }
+ return null;
+}
+function drawContours(p){
+ const canvas=p.contourCanvas,map=p.map,field=p.rawField;
+ if(!canvas||!map)return;
+ const w=map.getContainer().clientWidth||map.getCanvas().clientWidth;
+ const h=map.getContainer().clientHeight||map.getCanvas().clientHeight;
+ if(!(w>0&&h>0))return;
+ const dpr=Math.min(2,devicePixelRatio||1),dw=Math.round(w*dpr),dh=Math.round(h*dpr);
+ if(canvas.width!==dw)canvas.width=dw;if(canvas.height!==dh)canvas.height=dh;
+ const ctx=canvas.getContext('2d');if(!ctx)return;
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+ const plottedField=p.cfg?.field||st.field;
+ if(!st.contours||!contoursAvailable(plottedField)||!field||p.status==='missing'||p.status==='error')return;
+ const moving=Boolean(map.isMoving?.());
+ // Higher screen-space sampling density at rest yields smoother curves, without
+ // requiring more Zarr reads. Lower interactive density protects responsiveness.
+ const spacing=Math.max(moving?19:10,Math.sqrt(w*h/12500));
+ const cols=Math.max(2,Math.ceil(w/spacing)),rows=Math.max(2,Math.ceil(h/spacing));
+ const dx=w/cols,dy=h/rows,pitch=cols+1;
+ const values=new Float32Array(pitch*(rows+1));
+ let min=Infinity,max=-Infinity;
+ for(let iy=0;iy<=rows;iy++)for(let ix=0;ix<=cols;ix++){
+  const x=ix*dx,y=iy*dy,i=iy*pitch+ix;
+  try{
+   const pos=map.unproject([x,y]);
+   if(!Number.isFinite(pos.lng)||!Number.isFinite(pos.lat)||
+    !globeFrontVisible(map,pos.lng,pos.lat)){values[i]=NaN;continue;}
+   const v=Number(field.sampleField(pos.lng,pos.lat));
+   if(!Number.isFinite(v)||v < -1e9){values[i]=NaN;continue;}
+   values[i]=v;min=Math.min(min,v);max=Math.max(max,v);
+  }catch(_){values[i]=NaN;}
+ }
+ // A gentle cross stencil limits aliasing in pixel-space isolines. It never
+ // fills data gaps, changes missing-data masks, or alters the shaded grid.
+ // For precipitation/reflectivity avoid filtering small extrema altogether.
+ const smooth=!['refc','prate','apcp','apcp1h','weasd','frozr','frzr','tsnowp'].includes(plottedField);
+ if(smooth){
+  const filtered=values.slice();
+  for(let iy=1;iy<rows;iy++)for(let ix=1;ix<cols;ix++){
+   const i=iy*pitch+ix,c=values[i],n=values[i-pitch],s=values[i+pitch],e=values[i+1],w0=values[i-1];
+   if([c,n,s,e,w0].every(Number.isFinite))filtered[i]=.82*c+.045*(n+s+e+w0);
+  }
+  values.set(filtered);
+ }
+ const levels=contourLevels(plottedField,min,max,map.getZoom?.()??3,w,h);
+ if(!levels.length)return;
+ const all=[];
+ for(const level of levels){
+  const paths=contourPaths(values,cols,rows,dx,dy,level);
+  if(paths.length)all.push({level,paths});
+ }
+ if(!all.length)return;
+ ctx.lineJoin='round';ctx.lineCap='round';
+ // Two narrow strokes produce visible contours on every weather palette.
+ for(const [width,color] of [[2.8,st.theme==='dark'?'rgba(5,17,30,.94)':'rgba(255,255,255,.95)'],
+  [1.2,st.theme==='dark'?'rgba(251,253,255,.94)':'rgba(15,30,45,.90)']]){
+  ctx.beginPath();ctx.lineWidth=width;ctx.strokeStyle=color;
+  for(const {paths} of all)for(const path of paths)strokeContourPath(ctx,path);
+  ctx.stroke();
+ }
+ // Label connected paths, including small normal panels; never label each
+ // individual marching-squares segment. Gap/halo keep numerals legible.
+ const fontSize=Math.max(10,Math.min(13.5,9.8+Math.sqrt(w*h)/320));
+ ctx.font=`600 ${fontSize.toFixed(1)}px Arial, sans-serif`;
+ ctx.textAlign='center';ctx.textBaseline='middle';
+ const used=[],maxLabels=Math.max(2,Math.min(16,Math.floor(w*h/34000)));
+ const candidates=all.flatMap(({level,paths})=>paths.map(path=>({level,path,
+  length:path.reduce((acc,pt,i)=>i?acc+Math.hypot(pt[0]-path[i-1][0],pt[1]-path[i-1][1]):acc,0)})));
+ candidates.sort((a,b)=>b.length-a.length);
+ for(const {level,path,length} of candidates){
+  if(used.length>=maxLabels)break;
+  const label=contourLabel(level),tw=ctx.measureText?.(label)?.width||label.length*fontSize*.65;
+  if(length<Math.max(58,tw+38))continue;
+  const positions=length>500?[.5,.22,.78]:[.5,.32,.68];
+  for(const fraction of positions){
+   const pt=contourLabelPosition(path,fraction);if(!pt)continue;
+   const {x,y,angle}=pt;
+   if(x<tw/2+8||x>w-tw/2-8||y<fontSize+7||y>h-fontSize-7)continue;
+   if(used.some(v=>Math.hypot(x-v[0],y-v[1])<Math.max(84,tw+36)))continue;
+   ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+   ctx.lineWidth=3.6;ctx.lineJoin='round';
+   ctx.strokeStyle=st.theme==='dark'?'rgba(5,17,30,.98)':'rgba(255,255,255,.98)';
+   ctx.strokeText(label,0,0);
+   ctx.fillStyle=st.theme==='dark'?'#fff':'#102637';ctx.fillText(label,0,0);
+   ctx.restore();used.push([x,y]);
+   break; // One label per line before moving to the next geographic contour.
+  }
+ }
+}
+function scheduleContourRedraw(p,settleMs=0){
+ if(!p?.contourCanvas||!p.map)return;
+ // A new redraw replaces any older request (a rapidly repeated wheel zoom,
+ // a camera sync from another panel, or a new forecast hour).
+ if(p.contourRedrawTimer!==null){clearTimeout(p.contourRedrawTimer);p.contourRedrawTimer=null;}
+ if(p.contourRafId!==null){cancelAnimationFrame(p.contourRafId);p.contourRafId=null;}
+ p.contourFrameRequested=false;
+ const plottedField=p.cfg?.field||st.field;
+ if(!st.contours||!contoursAvailable(plottedField)||!p.rawField||p.status==='missing'||p.status==='error'){
+  clearContours(p);return;
+ }
+ if(p.map.isMoving?.()){suspendContours(p);return;}
+ const map=p.map;
+ const afterQuiet=()=>{
+  p.contourRedrawTimer=null;
+  if(p.map!==map||!p.contourCanvas)return;
+  if(map.isMoving?.()){suspendContours(p);return;}
+  // Explicit PNG capture draws contours independently at export resolution;
+  // its finally block requests the normal on-screen redraw after restoring
+  // the camera, so don't compete for the main thread here.
+  if(st.exportRender)return;
+  p.contourFrameRequested=true;
+  p.contourRafId=requestAnimationFrame(()=>{
+   p.contourRafId=null;p.contourFrameRequested=false;
+   if(p.map!==map||!p.contourCanvas)return;
+   if(map.isMoving?.()){suspendContours(p);return;}
+   if(st.exportRender)return;
+   if(!st.contours||!contoursAvailable(p.cfg?.field||st.field)||!p.rawField){clearContours(p);return;}
+   drawContours(p);
+   // Reveal only once the fully updated contour/label overlay is complete.
+   p.contourCanvas.style.visibility='visible';
+  });
+ };
+ if(settleMs>0)p.contourRedrawTimer=setTimeout(afterQuiet,settleMs);
+ else afterQuiet();
+}
+
 function drawWindBarbs(p){
  const c=p.windCanvas,m=p.map;if(!c||!m)return;
  const w=m.getCanvas().clientWidth||p.view.clientWidth,h=m.getCanvas().clientHeight||p.view.clientHeight;
@@ -1374,27 +1761,27 @@ async function prepareWindBarbs(p,ds,h,seq){
   scheduleWindRedraw(p);
  }catch(e){console.warn('10-m barbs unavailable for '+p.cfg.label+':',e);}
 }
-async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=`${p.cfg.label||p.cfg.id} · ${selected.v?fieldInfo(selected.v).label:(FIELDS[p.cfg.field||st.field]?.label||p.cfg.field||st.field||'No data')}`;p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?(p.cfg.timeMode==='analysis'?`Valid ${fmt(selected.ds.init_time)} · ${selected.ds.product==='rtma'?'RTMA (preliminary)':selected.ds.product?.toUpperCase()||'analysis'}${selected.ds.source_time&&selected.ds.source_time!==selected.ds.init_time?' · sample '+fmt(selected.ds.source_time):''}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
+async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContours(p);p.rawField=null;const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=`${p.cfg.label||p.cfg.id} · ${selected.v?fieldInfo(selected.v).label:(FIELDS[p.cfg.field||st.field]?.label||p.cfg.field||st.field||'No data')}`;p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?(p.cfg.timeMode==='analysis'?`Valid ${fmt(selected.ds.init_time)} · ${selected.ds.product==='rtma'?'RTMA (preliminary)':st.field==='apcp'&&selected.ds.product==='mrms_apcp'?`MRMS · total since ${fmt(st.ref.init_time)}`:selected.ds.product?.toUpperCase()||'analysis'}${selected.ds.source_time&&selected.ds.source_time!==selected.ds.init_time?' · sample '+fmt(selected.ds.source_time):''}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
  if(selected.error||!selected.v||!Number.isInteger(selected.h)||selected.h<0||selected.h>=selected.v.shape[0]||!selected.v.available_hours.includes(selected.h)){if(p.layer&&p.map?.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);p.layer=null;p.component=null;p.rawField=null;p.lastKey=null;p.status='missing';p.save.disabled=true;setNote(p,selected.error||`No ${selected.v.name} for F${pad3(selected.h)}`);legend(p,null);updateStatus();return;}
  const {ds,v,h}=selected,m=fieldInfo(v);p.status='loading';p.loadSince=Date.now();p.save.disabled=true;updateStatus();p.busy=true;
  // When this hour is cached, replace its texture silently: status overlays make
  // a smooth loop appear to flash even though nothing needs downloading.
  const rawUrl=new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',p.src.url)).href;
- const warm=st.displayCache.has(displayKey(p.src,ds,v,h,m))||st.cache.has(rawUrl);
+ const warm=st.field==='apcp'&&p.cfg.timeMode==='analysis'?false:st.field==='apcp1h'&&p.cfg.timeMode!=='analysis'?false:st.displayCache.has(displayKey(p.src,ds,v,h,m))||st.cache.has(rawUrl);
  clearNote(p);
  let lastProgress=`Loading ${m.label} F${pad3(h)}…`;
  let noteDelay=warm?null:setTimeout(()=>{
   noteDelay=null;
   if(seq===st.seq&&p.map&&p.status==='loading')stage(p,lastProgress);
  },250);
- try{const data=await getDisplayData(p.src,ds,v,h,m,msg=>{
+ try{const data=await getPanelDisplayData(p,ds,v,h,m,msg=>{
   lastProgress=msg;
   if(!warm&&noteDelay===null&&seq===st.seq&&p.map&&p.status==='loading')stage(p,msg);
- });
+ },seq);
  if(noteDelay!==null){clearTimeout(noteDelay);noteDelay=null;}
- if(seq!==st.seq||!p.map)return;
+ if(seq!==st.seq||!p.map||!data)return;
  clearNote(p);
- const grid=gridForPanel(p,ds,v),field=new apgl.RawScalarField(grid,data);const signature=JSON.stringify([v.name,v.shape,ds.grid]);
+ const grid=gridForPanel(p,ds,v),field=new apgl.RawScalarField(grid,data);const signature=JSON.stringify([st.field,v.name,v.shape,ds.grid]);
  if(p.component&&p.lastKey===signature&&typeof p.component.updateField==='function'){await p.component.updateField(field);}
  else{if(p.layer&&p.map.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);const cmap=makeColormap(m,v);const klass=st.cfg.display.fieldRendering==='smooth'&&!m.category&&!m.ptype?apgl.ContourFill:apgl.Raster;const comp=new klass(field,{cmap});const layer=new apgl.PlotLayer(`evu-field-${p.i}`,comp);p.component=comp;p.layer=layer;
  // MapLibre doesn't await async custom-layer onAdd(). autumnplot-gl's onAdd()
@@ -1415,7 +1802,7 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);const selec
  finally{clearTimeout(deadline);}
  p.lastKey=signature;}
 
- p.rawField=field;legend(p,m);if(st.field==='wspd10')await prepareWindBarbs(p,ds,h,seq);await waitPaint(p.map);if(seq!==st.seq||!p.map||p.contextLost)return;p.status='ready';p.save.disabled=false;clearNote(p);if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});// The PNG export path explicitly captures a finished render frame. Avoid stale blank snapshots here.
+ p.rawField=field;scheduleContourRedraw(p);legend(p,m);if(st.field==='wspd10')await prepareWindBarbs(p,ds,h,seq);await waitPaint(p.map);if(seq!==st.seq||!p.map||p.contextLost)return;p.status='ready';p.save.disabled=false;clearNote(p);if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});// The PNG export path explicitly captures a finished render frame. Avoid stale blank snapshots here.
  }catch(e){if(seq===st.seq)fail(p,e);}finally{if(noteDelay!==null)clearTimeout(noteDelay);p.busy=false;updateStatus();if(!st.rendering&&!st.panels.some(x=>x.busy))schedulePrefetch();}}
 // Keep the legend in the same units/range as the autumnplot-gl color map.
 // Legend-only categorical swatches: 0/No is unshaded in the *map* (the
@@ -1486,9 +1873,10 @@ function legend(p,m){
 function sharedPalette(){
  if(!st.field)return null;
  const entries=st.ref?.entries||[];
- let v=entries.flatMap(({ds})=>ds.variables||[]).find(v=>v.name===st.field);
+ const wanted=st.field==='apcp1h'?'apcp':st.field;
+ let v=entries.flatMap(({ds})=>ds.variables||[]).find(v=>v.name===wanted);
  if(!v)for(const src of st.sources.values()){
-  v=src.datasets?.flatMap(ds=>ds.variables||[]).find(v=>v.name===st.field);
+  v=src.datasets?.flatMap(ds=>ds.variables||[]).find(v=>v.name===wanted);
   if(v)break;
  }
  v=v||{name:st.field,attrs:{}};
@@ -1731,8 +2119,8 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
  const expanded=newW>screenW+1||newH>screenH+1;
  const exportZoom=oldZoom+Math.log2(renderScale);
  const oldRatio=typeof map.getPixelRatio==='function'?map.getPixelRatio():null;
- let changedRatio=false,windStyle=null;
- let png=null,windPNG=null;
+ let changedRatio=false,windStyle=null,contourStyle=null;
+ let png=null,windPNG=null,contourPNG=null;
  try{
   if(hideExportCounties)map.setLayoutProperty('counties','visibility','none');
   if(expanded){
@@ -1744,6 +2132,12 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
    map.jumpTo({center:oldCenter,zoom:exportZoom,bearing:oldBearing,pitch:oldPitch});
    // Wind barbs use a separate canvas, which must share the temporary
    // viewport in order to remain aligned with the enlarged map projection.
+   if(p.contourCanvas&&sharpIndividual){
+    contourStyle=p.contourCanvas.getAttribute('style')||'';
+    p.contourCanvas.style.inset='auto';p.contourCanvas.style.position='absolute';
+    p.contourCanvas.style.left=node.style.left;p.contourCanvas.style.top=node.style.top;
+    p.contourCanvas.style.width=newW+'px';p.contourCanvas.style.height=newH+'px';
+   }
    if(p.windCanvas&&sharpIndividual){
     windStyle=p.windCanvas.getAttribute('style')||'';
     p.windCanvas.style.inset='auto';p.windCanvas.style.position='absolute';
@@ -1761,12 +2155,16 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   // Let the high-resolution vector and autumnplot custom layers settle before
   // encoding. Existing all-panels capture remains deliberately unchanged.
   png=await captureMapFrame(map,sharpIndividual?3:1);
+  if(st.contours&&p.contourCanvas&&contoursAvailable()) {
+   drawContours(p);contourPNG=p.contourCanvas.toDataURL('image/png');
+  }
   if(p.wind&&st.field==='wspd10'&&p.windCanvas){
    drawWindBarbs(p);windPNG=p.windCanvas.toDataURL('image/png');
   }
  }finally{
   if(changedRatio){try{map.setPixelRatio(oldRatio);}catch(err){console.warn('Could not restore pixel ratio',err);}}
   if(windStyle!==null)p.windCanvas.setAttribute('style',windStyle);
+  if(contourStyle!==null)p.contourCanvas.setAttribute('style',contourStyle);
   if(expanded){
    node.setAttribute('style',oldStyle);
    try{map.resize();map.jumpTo({center:oldCenter,zoom:oldZoom,bearing:oldBearing,pitch:oldPitch});map.triggerRepaint();}
@@ -1779,13 +2177,14 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   }
   st.exportRender=false;
   if(p.windCanvas)scheduleWindRedraw(p);
+  if(p.contourCanvas)scheduleContourRedraw(p);
   if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});
  }
- return {map:await decodePNG(png),wind:await decodePNG(windPNG),png};
+ return {map:await decodePNG(png),wind:await decodePNG(windPNG),contours:await decodePNG(contourPNG),png};
 }
 async function panelImage(p,targetW=0,targetH=0,framing='fill',sharpIndividual=false){
  if(p.map){const output=await captureMapPNG(p,targetW,targetH,framing,sharpIndividual);p.lastSnapshot=output.png;return output;}
- return {map:await decodePNG(p.lastSnapshot||null),wind:null};
+ return {map:await decodePNG(p.lastSnapshot||null),wind:null,contours:null};
 }
 // Draw a captured map without ever distorting geographic shapes. In particular,
 // the map's framebuffer is often much wider than the old fixed PNG plot box.
@@ -1830,6 +2229,7 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
    const im=captured.map;
    const rect=drawMapFramed(ctx,im,x,y,w,h,st.lastExportFraming);
    drawWindExport(ctx,captured.wind,rect,im);
+   drawWindExport(ctx,captured.contours,rect,im);
   }else{
    ctx.fillStyle=muted;ctx.font=`${Math.max(16,Math.min(25,w/35))}px Arial`;
    ctx.textAlign='center';ctx.textBaseline='middle';
@@ -1869,6 +2269,7 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
   const im=captured.map;
   const rect=drawMapFramed(ctx,im,boxX,boxY,boxW,boxH,st.lastExportFraming);
   drawWindExport(ctx,captured.wind,rect,im);
+  drawWindExport(ctx,captured.contours,rect,im);
  }else{
   ctx.fillStyle=muted;ctx.font='15px Arial';ctx.textBaseline='middle';
   ctx.fillText(clipText(ctx,p.note?.textContent||'Data unavailable',boxW-32),boxX+16,boxY+boxH/2);
