@@ -69,7 +69,7 @@ const PTYPE = ['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'];
 'use strict';
 const $=id=>document.getElementById(id);
 const el=Object.fromEntries(['contourControl','contourToggleBtn','fieldSelect','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels'].map(x=>[x,$(x)]));
-const st={contours:false,mrmsAccumCache:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
+const st={cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,mrmsAccumCache:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -207,6 +207,22 @@ function addGeographySkeleton(m){
  for(const layer of layers)if(!m.getLayer(layer.id))m.addLayer(layer);
 }
 
+// When a user selects a field, cycle, or another toolbar control, the browser
+// can leave keyboard focus on that control even after the pointer returns to a
+// map. Arrow keys would then operate the control (or be ignored by the viewer)
+// until the user clicked the plot. Return focus to document-level navigation
+// as soon as a mouse/pen pointer re-enters a plotting viewport. Do not do this
+// for touch, inside dialogs, or while focus stays in the controls for keyboard
+// accessibility: merely hovering the map is the explicit handoff.
+function restorePlotKeyboardNavigation(e){
+ if(e.pointerType && e.pointerType!=='mouse' && e.pointerType!=='pen')return;
+ if(el.exportDialog?.open)return;
+ const focused=document.activeElement;
+ if(!focused || focused===document.body)return;
+ if(focused instanceof HTMLElement && focused.closest('header.toolbar, .helper')){
+  focused.blur();
+ }
+}
 function createPanel(cfg,i){const card=document.createElement('section');card.className='panel-card';card.dataset.panelId=cfg.id;
  const save=document.createElement('button');save.type='button';save.className='panel-save';
  save.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg>';
@@ -217,6 +233,8 @@ function createPanel(cfg,i){const card=document.createElement('section');card.cl
  expand.innerHTML=EXPAND_ICON;
  const view=document.createElement('div');view.className='panel-viewport';const snap=document.createElement('img');snap.className='map-snapshot';snap.alt='Previously rendered weather plot';snap.hidden=true;const frame=document.createElement('div');frame.className='map-frame';const lbl=document.createElement('div');lbl.className='plot-label';const title=document.createElement('strong'),sub=document.createElement('span');lbl.append(title,sub);const notice=document.createElement('div');notice.className='notice visible';const note=document.createElement('span');notice.append(note);const info=document.createElement('div');info.className='point-info';info.hidden=true;const ghost=document.createElement('div');ghost.className='sync-crosshair';ghost.hidden=true;ghost.setAttribute('aria-hidden','true');view.append(frame,snap,lbl,notice,info,ghost);if(!cfg.placeholder)view.append(save);view.append(expand);
  const ft=document.createElement('div');ft.className='panel-footer';const legendTitle=document.createElement('div');legendTitle.className='legend-title';const legendCanvas=document.createElement('canvas');legendCanvas.className='legend-canvas';const legendLabels=document.createElement('div');legendLabels.className='legend-labels';ft.append(legendTitle,legendCanvas,legendLabels);card.append(view,ft);el.viewerGrid.append(card);
+ view.addEventListener('pointerenter',restorePlotKeyboardNavigation);
+ view.addEventListener('pointermove',restorePlotKeyboardNavigation,{passive:true});
  const p={contourCanvas:null,contourFrameRequested:false,contourRafId:null,contourRedrawTimer:null,contourCache:null,cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,legendTitle,legendCanvas,legendLabels,wind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,initializing:false,cancelMapWait:null,loadingStage:'',loadSince:0,stageSince:0};
  notice.style.pointerEvents='none';card.addEventListener('click',()=>{selectPanel(p);if(!p.cfg.placeholder)activate(p).catch(e=>fail(p,e));});save.addEventListener('click',e=>{e.stopPropagation();openExportDialog('panel',p,e);});
  expand.addEventListener('click',e=>{e.stopPropagation();setExpandedPanel(st.expandedPanel===p?null:p);});
@@ -1008,8 +1026,8 @@ async function renderAll(){if(st.prefetchContext!==null&&st.prefetchContext!==pr
 // filling the decoded GPU-data caches. Missing/quota-restricted storage simply
 // degrades to a bounded memory-only look-ahead.
 class CompressedZarrStore {
- constructor(){this.cache=null;this.opening=null;this.disabled=false;this.entries=new Map();this.bytes=0;this.pendingWrite=Promise.resolve();}
- get budget(){return Math.max(32,Math.min(4096,Number(st.cfg?.display?.prefetchDiskCacheMB??512)))*1048576;}
+ constructor(){this.cache=null;this.opening=null;this.disabled=false;this.entries=new Map();this.bytes=0;this.pendingWrite=Promise.resolve();this.foregroundRecentlyUsed=new Map();this.quotaFailures=0;this.adaptiveBudgetBytes=null;}
+ get budget(){return Math.min(Math.max(32,Math.min(4096,Number(st.cfg?.display?.prefetchDiskCacheMB??512)))*1048576,this.adaptiveBudgetBytes??Infinity);}
  get maxItems(){return Math.max(16,Math.min(3000,Number(st.cfg?.display?.prefetchDiskMaxChunks??550)));}
  get ttlMs(){return Math.max(1,Math.min(168,Number(st.cfg?.display?.prefetchCacheTTLHours??24)))*3600000;}
  async open(){
@@ -1034,38 +1052,68 @@ class CompressedZarrStore {
    }catch(e){console.warn('Persistent Zarr cache unavailable:',e);this.disabled=true;return null;}
   })();return this.opening;
  }
- async read(url){
+ async read(url,foreground=false){
   const cache=await this.open();if(!cache)return null;
   try{
-   const response=await cache.match(url);if(!response)return null;
+   const response=await cache.match(url);if(!response){
+    const old=this.entries.get(url)||0;this.entries.delete(url);this.foregroundRecentlyUsed.delete(url);this.bytes=Math.max(0,this.bytes-old);return null;
+   }
    const cachedAt=Number(response.headers.get('x-evu-cached-at'));
    if(!cachedAt||Date.now()-cachedAt>this.ttlMs){
     await cache.delete(url);const old=this.entries.get(url)||0;
-    this.entries.delete(url);this.bytes=Math.max(0,this.bytes-old);return null;
+    this.foregroundRecentlyUsed.delete(url);this.entries.delete(url);this.bytes=Math.max(0,this.bytes-old);return null;
    }
    const size=this.entries.get(url);if(size){this.entries.delete(url);this.entries.set(url,size);}
+   if(foreground)this.rememberForeground(url);
    return response.arrayBuffer();
   }catch(e){console.warn('Zarr cache read failed:',e);return null;}
  }
- async save(url,bytes){
+ rememberForeground(url){
+  // Protect a small window of recently displayed hours from speculative
+  // prefetch eviction. This is a soft preference, never an absolute pin.
+  this.foregroundRecentlyUsed.delete(url);this.foregroundRecentlyUsed.set(url,Date.now());
+  while(this.foregroundRecentlyUsed.size>72)this.foregroundRecentlyUsed.delete(this.foregroundRecentlyUsed.keys().next().value);
+ }
+ async save(url,bytes,foreground=false){
   const cache=await this.open();if(!cache||bytes.byteLength>this.budget)return false;
   // Serialize writes and eviction accounting; downloads remain concurrent.
   const saveOne=async()=>{
-   try{
-    if(this.entries.has(url))return true;
-    while(this.entries.size && (this.entries.size>=this.maxItems||this.bytes+bytes.byteLength>this.budget)){
-     const [old,size]=this.entries.entries().next().value;
-     await cache.delete(old);this.entries.delete(old);this.bytes-=size;
-    }
-    const response=new Response(bytes,{headers:{'content-type':'application/octet-stream','x-evu-cache-bytes':String(bytes.byteLength),'x-evu-cached-at':String(Date.now())}});
-    await cache.put(url,response);
-    this.entries.set(url,bytes.byteLength);this.bytes+=bytes.byteLength;
+   const evictOne=async()=>{
+    // Foreground chunks get a soft preference. Even pinned entries remain
+    // evictable if every entry is recently used or browser quota is tight.
+    const old=[...this.entries.keys()].find(key=>!this.foregroundRecentlyUsed.has(key))||this.entries.keys().next().value;
+    if(!old)return false;
+    const size=this.entries.get(old);
+    await cache.delete(old);this.entries.delete(old);this.foregroundRecentlyUsed.delete(old);this.bytes-=size;
     return true;
-   }catch(e){
-    // Quota/permissions errors should not make the actual forecast plot fail.
-    console.warn('Persistent Zarr cache write disabled:',e);
-    this.disabled=true;return false;
+   };
+   const recentCutoff=Date.now()-10*60*1000;
+   for(const [key,time] of this.foregroundRecentlyUsed){if(time<recentCutoff||!this.entries.has(key))this.foregroundRecentlyUsed.delete(key);}
+   if(this.entries.has(url)){if(foreground)this.rememberForeground(url);return true;}
+   for(let attempt=0;attempt<4;attempt++){
+    try{
+     while(this.entries.size&&(this.entries.size>=this.maxItems||this.bytes+bytes.byteLength>this.budget))await evictOne();
+     if(bytes.byteLength>this.budget)return false;
+     const response=new Response(bytes,{headers:{'content-type':'application/octet-stream','x-evu-cache-bytes':String(bytes.byteLength),'x-evu-cached-at':String(Date.now())}});
+     await cache.put(url,response);
+     this.entries.set(url,bytes.byteLength);this.bytes+=bytes.byteLength;
+     if(foreground)this.rememberForeground(url);
+     return true;
+    }catch(e){
+     const quota=e?.name==='QuotaExceededError'||/quota exceeded|not enough space|insufficient storage/i.test(String(e?.message||e));
+     if(quota){
+      // Browser quotas can be below our configured cache target. Shrink
+      // gradually and retry without disabling persistent caching forever.
+      this.quotaFailures++;
+      this.adaptiveBudgetBytes=Math.max(16*1048576,Math.floor(Math.min(this.budget,Math.max(this.bytes,bytes.byteLength))*0.45));
+      if(this.entries.size)await evictOne();
+      if(attempt<3)continue;
+      console.warn('Persistent Zarr cache quota reached; retaining available entries.');return false;
+     }
+     console.warn('Persistent Zarr cache write disabled:',e);this.disabled=true;return false;
+    }
    }
+   return false;
   };
   const job=this.pendingWrite.then(saveOne,saveOne);
   this.pendingWrite=job.then(()=>{},()=>{});
@@ -1127,12 +1175,17 @@ async function compressedChunk(url,opts={}){
  if(!st.chunkStore)st.chunkStore=new CompressedZarrStore();
  const existing=st.compressedInflight.get(url);
  if(existing){
+  if(!opts.background){
+   st.cacheStats.shared++;opts.onLocation?.('shared');
+   void existing.then(()=>st.chunkStore?.rememberForeground(url),()=>{});
+  }
   if(!opts.background){const queued=st.queuedFetches.get(url);if(queued?.background){queued.background=false;pump();}}
   return existing;
  }
  const task=limiter(async()=>{
-  const cached=await st.chunkStore.read(url);
-  if(cached)return cached;
+  const cached=await st.chunkStore.read(url,!opts.background);
+  if(cached){if(!opts.background)st.cacheStats.disk++;opts.onLocation?.('disk');return cached;}
+  opts.onLocation?.('network');
   const attempts=2,timeout=Math.max(30000,Number(st.cfg?.display?.chunkTimeoutSeconds??150)*1000);
   let last;
   for(let attempt=0;attempt<attempts;attempt++){
@@ -1141,10 +1194,11 @@ async function compressedChunk(url,opts={}){
     const response=await fetch(url,{signal:controller.signal});
     if(!response.ok){const error=Error(`Chunk HTTP ${response.status}: ${url}`);error.status=response.status;throw error;}
     const bytes=await response.arrayBuffer();
+    st.cacheStats.network++;
     // Foreground plotting never waits for persistent-cache writes; background
     // prefetches do wait so the next batch starts with durable cached chunks.
-    if(opts.background)await st.chunkStore.save(url,bytes);
-    else void st.chunkStore.save(url,bytes);
+    if(opts.background)await st.chunkStore.save(url,bytes,false);
+    else void st.chunkStore.save(url,bytes,true);
     return bytes;
    }catch(e){last=controller.signal.aborted?Error(`Zarr chunk timed out after ${Math.round(timeout/1000)} s: ${url}`):e;
     if(attempt===attempts-1||e.status===404||e.status===403||e.status===401||e.status===400||e.status===416)throw last;
@@ -1156,23 +1210,23 @@ async function compressedChunk(url,opts={}){
  st.compressedInflight.set(url,task);
  try{return await task;}finally{if(st.compressedInflight.get(url)===task)st.compressedInflight.delete(url);}
 }
-function cacheGet(k){const v=st.cache.get(k);if(v){st.cache.delete(k);st.cache.set(k,v);}return v;}
+function cacheGet(k){const v=st.cache.get(k);if(v){st.cacheStats.decoded++;st.cache.delete(k);st.cache.set(k,v);if(st.chunkStore?.entries.has(k))st.chunkStore.rememberForeground(k);}return v;}
 function cachePut(k,v){
  if(st.cache.has(k))st.cacheBytes-=st.cache.get(k).byteLength;
  st.cache.delete(k);st.cache.set(k,v);st.cacheBytes+=v.byteLength;
  const max=Math.max(8,Number(st.cfg.display.decodedCacheMB||96))*1024*1024;
- while(st.cacheBytes>max&&st.cache.size>1){const oldest=st.cache.keys().next().value;st.cacheBytes-=st.cache.get(oldest).byteLength;st.cache.delete(oldest);}
+ while(st.cacheBytes>max&&st.cache.size>1){const oldest=st.cache.keys().next().value;st.cacheBytes-=st.cache.get(oldest).byteLength;st.cache.delete(oldest);st.cacheStats.decodedEvicted++;}
 }
 function displayKey(src,ds,v,h,m){
  const url=new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',src.url)).href;
  return url+'::'+(m.convert||'native');
 }
-function displayCacheGet(k){const v=st.displayCache.get(k);if(v){st.displayCache.delete(k);st.displayCache.set(k,v);}return v;}
+function displayCacheGet(k){const v=st.displayCache.get(k);if(v){st.cacheStats.displayReady++;st.displayCache.delete(k);st.displayCache.set(k,v);const raw=k.split('::')[0];if(st.chunkStore?.entries.has(raw))st.chunkStore.rememberForeground(raw);}return v;}
 function displayCachePut(k,v){
  if(st.displayCache.has(k))st.displayCacheBytes-=st.displayCache.get(k).byteLength;
  st.displayCache.delete(k);st.displayCache.set(k,v);st.displayCacheBytes+=v.byteLength;
  const max=Math.max(16,Number(st.cfg.display.displayReadyCacheMB||128))*1024*1024;
- while(st.displayCacheBytes>max&&st.displayCache.size>1){const oldest=st.displayCache.keys().next().value;st.displayCacheBytes-=st.displayCache.get(oldest).byteLength;st.displayCache.delete(oldest);}
+ while(st.displayCacheBytes>max&&st.displayCache.size>1){const oldest=st.displayCache.keys().next().value;st.displayCacheBytes-=st.displayCache.get(oldest).byteLength;st.displayCache.delete(oldest);st.cacheStats.displayEvicted++;}
 }
 async function getDisplayData(src,ds,v,h,m,onProgress){
  const k=displayKey(src,ds,v,h,m),cached=displayCacheGet(k);
@@ -1266,9 +1320,11 @@ async function chunk(src,ds,v,h,onProgress=()=>{},opts={}){
   const [nt,ny,nx]=v.shape;
   if(v.chunks[0]!==1||v.chunks[1]!==ny||v.chunks[2]!==nx)throw Error('Unsupported chunking; expected [1,ny,nx]');
   if(v.compressor?.id!=='zlib'||!['<f4','|u1'].includes(v.dtype))throw Error('Only zlib float32/uint8 Zarr-v2 fields supported');
-  onProgress(`Requesting ${v.name} F${pad3(h)} Zarr chunk…`);
-  let compressed;
-  compressed=await compressedChunk(url,opts);
+  const compressed=await compressedChunk(url,{...opts,onLocation:where=>{
+   if(where==='network')onProgress(`Downloading ${v.name} F${pad3(h)} Zarr chunk…`);
+   else if(where==='disk')onProgress(`Restoring cached ${v.name} F${pad3(h)}…`);
+   else if(where==='shared')onProgress(`Waiting for shared ${v.name} F${pad3(h)} chunk…`);
+  }});
   onProgress(`Decompressing ${v.name} F${pad3(h)}…`);
   const decoded=await new Response(compressed).body.pipeThrough(new DecompressionStream('deflate'));
   const buffer=await new Response(decoded).arrayBuffer();
@@ -1770,16 +1826,30 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContou
  // When this hour is cached, replace its texture silently: status overlays make
  // a smooth loop appear to flash even though nothing needs downloading.
  const rawUrl=new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',p.src.url)).href;
- const warm=st.field==='apcp'&&p.cfg.timeMode==='analysis'?false:st.field==='apcp1h'&&p.cfg.timeMode!=='analysis'?false:st.displayCache.has(displayKey(p.src,ds,v,h,m))||st.cache.has(rawUrl);
+ // Show a progress overlay immediately only for genuinely uncached input.
+ // A prefetch from CacheStorage may still require decoding, but usually
+ // finishes quickly enough that flashing a Requesting panel is distracting.
+ const derivedModel=st.field==='apcp1h'&&p.cfg.timeMode!=='analysis';
+ const derivedAnalysis=st.field==='apcp'&&p.cfg.timeMode==='analysis';
+ const rawCached=url=>st.cache.has(url)||st.chunkStore?.entries.has(url);
+ const sameHourHot=st.displayCache.has(displayKey(p.src,ds,v,h,m))||st.cache.has(rawUrl);
+ const modelPriorUrl=new URL(`${ds.path}/${v.name}/${h-1}.0.0`,new URL('.',p.src.url)).href;
+ const priorCached=!derivedModel||h<=1||rawCached(modelPriorUrl);
+ const priorHot=!derivedModel||h<=1||st.cache.has(modelPriorUrl)||st.displayCache.has(displayKey(p.src,ds,v,h-1,m));
+ const mrmsCheckpoint=derivedAnalysis&&st.mrmsAccumCache?.upto===st.hour&&st.mrmsAccumCache?.key===String(p.src.url)+'|'+st.ref.init_time+'|'+accumulationGridKey(ds,v);
+ const hot=!derivedAnalysis&&sameHourHot&&priorHot;
+ const diskWarm=!derivedAnalysis&&rawCached(rawUrl)&&priorCached;
+ const warm=hot||diskWarm||mrmsCheckpoint;
  clearNote(p);
- let lastProgress=`Loading ${m.label} F${pad3(h)}…`;
- let noteDelay=warm?null:setTimeout(()=>{
+ let lastProgress=warm?'Restoring locally cached data…':`Loading ${m.label} F${pad3(h)}…`;
+ const progressDelay=hot||mrmsCheckpoint?0:diskWarm?1100:350;
+ let noteDelay=progressDelay?setTimeout(()=>{
   noteDelay=null;
   if(seq===st.seq&&p.map&&p.status==='loading')stage(p,lastProgress);
- },250);
+ },progressDelay):null;
  try{const data=await getPanelDisplayData(p,ds,v,h,m,msg=>{
   lastProgress=msg;
-  if(!warm&&noteDelay===null&&seq===st.seq&&p.map&&p.status==='loading')stage(p,msg);
+  if(!hot&&noteDelay===null&&seq===st.seq&&p.map&&p.status==='loading')stage(p,msg);
  },seq);
  if(noteDelay!==null){clearTimeout(noteDelay);noteDelay=null;}
  if(seq!==st.seq||!p.map||!data)return;
@@ -2034,7 +2104,7 @@ function schedulePrefetch(){
  },Math.max(50,Math.min(2500,Number(d.prefetchDelayMs??120))));
 }
 // Diagnostic readout without displaying cache chatter across nine maps.
-window.OMDEVUPrefetch={stats:()=>({mode:prefetchMode(),downloadsCompleted:st.prefetchCompleted,downloadsFailed:st.prefetchFailed,failedCoolingDown:st.prefetchAttempted.size,bySource:Object.fromEntries(st.prefetchBySource),direction:st.prefetchDirection<0?'backward':'forward',queued:st.queue.filter(x=>x.background).length,active:st.prefetchActive,decodedMB:Math.round(st.cacheBytes/1048576),compressedDiskMB:Math.round((st.chunkStore?.bytes||0)/1048576),diskEnabled:Boolean(st.chunkStore?.cache&&!st.chunkStore?.disabled)}),resume:()=>schedulePrefetch()};
+window.OMDEVUPrefetch={stats:()=>({mode:prefetchMode(),downloadsCompleted:st.prefetchCompleted,downloadsFailed:st.prefetchFailed,failedCoolingDown:st.prefetchAttempted.size,bySource:Object.fromEntries(st.prefetchBySource),direction:st.prefetchDirection<0?'backward':'forward',queued:st.queue.filter(x=>x.background).length,active:st.prefetchActive,decodedMB:Math.round(st.cacheBytes/1048576),displayReadyMB:Math.round(st.displayCacheBytes/1048576),compressedDiskMB:Math.round((st.chunkStore?.bytes||0)/1048576),diskEnabled:Boolean(st.chunkStore?.cache&&!st.chunkStore?.disabled),cacheUsage:{network:st.cacheStats.network,persistentReads:st.cacheStats.disk,decodedHits:st.cacheStats.decoded,displayReadyHits:st.cacheStats.displayReady,sharedRequests:st.cacheStats.shared,decodedEvictions:st.cacheStats.decodedEvicted,displayReadyEvictions:st.cacheStats.displayEvicted},recentlyDisplayedProtected:st.chunkStore?.foregroundRecentlyUsed.size||0,cacheQuotaRetries:st.chunkStore?.quotaFailures||0,compressedCacheBudgetMB:Math.round((st.chunkStore?.budget||0)/1048576)}),resume:()=>schedulePrefetch()};
 async function play(){if(st.playing)return;st.playing=true;el.playBtn.classList.add('active');el.pauseBtn.classList.remove('active');
  while(st.playing){const start=Date.now();try{await step(1);}catch(err){console.error('Playback stopped',err);stop();break;}
   if(!st.playing)break;

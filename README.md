@@ -1,13 +1,13 @@
 # OMD EVU Model Viewer
 
-**Version 7.44 · October 13, 2026**
+**Version 7.45.1 · October 13, 2026**
 
 A browser-based, multi-panel weather-model viewer for the Office of Modeling and Development (OMD), Evaluation and Verification Unit (EVU). It displays forecast fields from hosted Zarr v2 datasets using MapLibre GL JS and autumnplot-gl. Map geography is served from local GeoJSON files; plots are rendered in the browser.
 
 ## Viewer capabilities
 
 - Compare multiple models and ensemble members in a synchronized grid (default: 3 × 3, configurable up to 20 panels).
-- Select a forecast field, model initialization cycle, and forecast hour; step or animate through available forecast times.
+- Select a forecast field, model initialization cycle, and forecast hour; step or animate through available forecast times. After using a toolbar control, moving the mouse back over a plotting panel restores the arrow-key and spacebar shortcuts without requiring a click.
 - Pan and zoom synchronized maps in **2D** or **Globe** mode. Each mode remembers its own center and zoom while the page is open. On mouse-equipped devices, the glowing master cursor uses a native cursor graphic (no animation-frame trailing); matching geographic crosshairs remain synchronized across the other panels.
 - Display local state, country, coastline, lake, and zoom-dependent county boundaries. Expanded panels adjust county visibility to account for their larger geographic viewport, without altering multi-panel thresholds.
 - Use light or dark mode, expand an individual panel, and inspect data under the cursor. On desktop, switch the controls between the top toolbar and a left sidebar (default for new visitors) using the icon beside the theme button; the layout choice is saved in the browser.
@@ -54,7 +54,7 @@ Serve the viewer over HTTP(S) rather than opening `index.html` as a local file. 
 | `diagnostics.html` | WebGL, MapLibre, worker, and multi-panel diagnostics |
 | `vendor_dependencies.py` | Third-party browser library setup helper |
 
-The verification acquisition, conversion, and publishing scripts are distributed separately from the web viewer. No WCOSS2 converter update is needed for v7.44; both MRMS precipitation modes use the already published native-hourly `mrms_apcp` Zarr stores. A future server-side prefix-sum product could accelerate very long lead-time totals.
+The verification acquisition, conversion, and publishing scripts are distributed separately from the web viewer. No WCOSS2 converter update is needed for v7.45.1; both MRMS precipitation modes use the already published native-hourly `mrms_apcp` Zarr stores. A future server-side prefix-sum product could accelerate very long lead-time totals.
 
 ## Configuration
 
@@ -91,6 +91,12 @@ clipboard permissions allow it. This diagnostics enhancement does not change
 meteorological data or map-grid interpretation.
 
 **REFS mean sources:** CRAIN/CFRZR/CICEP/CSNOW, ASNOW and WEASD are from `mean` GRIB files; composite reflectivity is from the `pmmn` GRIB product. An unidentified local GRIB field is not presented as PTYPE until its meaning is verified.
+
+## Cached-hours and loading status
+
+Previously viewed chunks are preferentially retained in the browser’s compressed cache for ten minutes so nearby background prefetching is less likely to displace them. The protection is soft: full caches still evict data when necessary. If the browser imposes a smaller storage quota than configured, the cache reduces its working budget and retries writes rather than permanently shutting off disk caching. Request/status text distinguishes a true network **Downloading** operation from **Restoring cached** data and **Decompressing** cached bytes. Previously displayed hours may still need local decompression or a GPU texture update after memory eviction; they do not necessarily require another network transfer. Cached-hour progress overlays are delayed to avoid flashing during short restores.
+
+`OMDEVUPrefetch.stats().cacheUsage` reports counts of network transfers, persistent cache reads, decoded/display-ready hits, shared requests and evictions. Network counts include speculative prefetch transfers; persistent-read counts reflect foreground restores. The diagnostics also expose cache-quota retries and the current adjusted compressed-cache budget. Actual browser performance depends on cache quotas and available memory.
 
 ## Forecast prefetch behavior
 
