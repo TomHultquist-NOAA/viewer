@@ -1,6 +1,6 @@
 # OMD EVU Model Viewer
 
-**Version 7.38 · October 13, 2026**
+**Version 7.39 · October 13, 2026**
 
 A browser-based, multi-panel weather-model viewer for the Office of Modeling and Development (OMD), Evaluation and Verification Unit (EVU). It displays forecast fields from hosted Zarr v2 datasets using MapLibre GL JS and autumnplot-gl. Map geography is served from local GeoJSON files; plots are rendered in the browser.
 
@@ -9,7 +9,7 @@ A browser-based, multi-panel weather-model viewer for the Office of Modeling and
 - Compare multiple models and ensemble members in a synchronized grid (default: 3 × 3, configurable up to 20 panels).
 - Select a forecast field, model initialization cycle, and forecast hour; step or animate through available forecast times.
 - Pan and zoom synchronized maps in **2D** or **Globe** mode. Each mode remembers its own center and zoom while the page is open.
-- Display local state, country, coastline, lake, and zoom-dependent county boundaries.
+- Display local state, country, coastline, lake, and zoom-dependent county boundaries. Expanded panels adjust county visibility to account for their larger geographic viewport, without altering multi-panel thresholds.
 - Use light or dark mode, expand an individual panel, and inspect data under the cursor. On desktop, switch the controls between the top toolbar (default) and a left sidebar using the icon beside the theme button; the layout choice is saved in the browser.
 - Save an individual panel or the full comparison as a PNG in **16:9** or **4:3**, with **Fill** or **Fit** framing. Exports prepare the applicable geographic detail before capture.
 - Prefetch upcoming forecast data, with bounded browser caches and adaptive network use.
@@ -17,7 +17,7 @@ A browser-based, multi-panel weather-model viewer for the Office of Modeling and
 
 ## Desktop control placement
 
-On desktop-width browsers (over 800 px), the layout button beside the light/dark switch toggles between **Top** (default) and **Left**. The chosen placement is saved using browser `localStorage` and restored on later visits. The left-side controls scroll independently when the window is short. The existing mobile control layout is unaffected and does not display this toggle.
+On desktop-width browsers (over 800 px), the layout button beside the light/dark switch toggles between **Top** (default) and **Left**. The chosen placement is saved using browser `localStorage` and restored on later visits. When left placement is selected, the navigation tips, live panel status counts, and autumnplot-gl attribution also move into the sidebar. The left-side controls scroll independently when the window is short. The existing mobile control layout is unaffected and does not display this toggle.
 
 ## Default panel arrangement
 
@@ -63,6 +63,7 @@ Edit `config.json` to change model catalog locations, panel order, default field
 | `maxActiveMaps` | Maximum active MapLibre maps (default 9) |
 | `countyMinZoom` / `globeCountyMinZoom` | County visibility thresholds in 2D / Globe (4.25 / 4.30) |
 | `countyPreloadLeadZoom` | Preload county geography ahead of visibility (0.35) |
+| Expanded panel county threshold | Automatically delays county boundaries based on enlarged viewport area; normal panel zoom thresholds remain unchanged |
 | `prefetchHours` | Forecast hours to consider for ahead-of-time downloading (24) |
 | `prefetchDiskCacheMB` | Target compressed browser cache budget (512 MB) |
 | `exportPanelWidth` / `exportAllWidth` | Output PNG widths for 16:9 exports (1920 / 2560 pixels) |

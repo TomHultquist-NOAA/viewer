@@ -144,6 +144,12 @@ function layout(){
  el.viewerGrid.style.setProperty('--cols',cols);
  el.viewerGrid.classList.remove('vertical-legends');
  st.columnCount=cols;el.viewerGrid.classList.toggle('one-panel',n===1);
+ // Remember each panel's normal viewport size for matching county detail when
+ // an expanded panel occupies substantially more of the plotting workspace.
+ if(!st.expandedPanel)for(const p of st.panels){
+  const w=p.view?.clientWidth||0,h=p.view?.clientHeight||0;
+  if(w>20&&h>20)p.normalViewportSize={width:w,height:h};
+ }
  updateSharedLegend();
  // MapLibre must never resize a temporarily hidden panel to 0 x 0.
  for(const p of st.panels){if(p.map&&(!st.expandedPanel||st.expandedPanel===p))p.map.resize();}
@@ -158,9 +164,20 @@ function mapStyle(){
 // Same visibility threshold for county lines and high-detail shorelines/borders.
 // High-detail basemap is now used at every zoom; counties retain their own threshold.
 function detailThreshold(){return Math.max(0,Number(st.cfg?.display?.detailMinZoom??0)||0);}
-function countyThreshold(){
+function countyThreshold(p=null){
  const d=st.cfg?.display||{};
- return Number(d[st.mode==='globe'?'globeCountyMinZoom':'countyMinZoom']??(st.mode==='globe'?4.30:4.25));
+ const base=Number(d[st.mode==='globe'?'globeCountyMinZoom':'countyMinZoom']??(st.mode==='globe'?4.30:4.25));
+ // The same map zoom covers a larger geographic footprint in an expanded
+ // viewport. Delay counties in proportion to its increased *map area* so
+ // their perceived scale is closer to the ordinary multi-panel layout.
+ // Do not change any other panel, model camera, or 2D/Globe saved zoom.
+ if(!p||st.expandedPanel!==p||!p.normalViewportSize)return base;
+ const w=p.view?.clientWidth||0,h=p.view?.clientHeight||0;
+ const original=p.normalViewportSize;
+ if(w<=0||h<=0||original.width<=0||original.height<=0)return base;
+ const widthRatio=Math.max(1,w/original.width),heightRatio=Math.max(1,h/original.height);
+ const extra=Math.max(0,Math.min(2,Math.log2(Math.sqrt(widthRatio*heightRatio))));
+ return base+extra;
 }
 function detailMaskData(){
  const ring=[[-173,4],[-43,4],[-43,82],[-173,82],[-173,4]];
@@ -218,6 +235,8 @@ const EXPAND_ICON='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" strok
 const COLLAPSE_ICON='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>';
 function setExpandedPanel(panel,activatePanel=true){
  if(st.expandedPanel===panel)return;
+ if(panel&&!st.expandedPanel){const w=panel.view?.clientWidth||0,h=panel.view?.clientHeight||0;
+  if(w>20&&h>20)panel.normalViewportSize={width:w,height:h};}
  st.expandedPanel=panel||null;
  el.viewerGrid.classList.toggle('focus-panel',!!panel);
  for(const p of st.panels){
@@ -231,11 +250,14 @@ function setExpandedPanel(panel,activatePanel=true){
  if(st.hover)clearSynchronizedHover();
  if(panel)selectPanel(panel);
  layout();
+ // Re-apply the county zoom range after the focused panel's size changes.
+ // MapLibre does not automatically reconsider a custom zoom threshold when
+ // the canvas is resized without changing its numeric zoom.
  // Browser layout has to settle before resizing the WebGL surface (and wind
  // overlay). Do not ask MapLibre to render a hidden, zero-width canvas.
  requestAnimationFrame(()=>{
   for(const p of st.panels){if(p.map&&(!st.expandedPanel||st.expandedPanel===p)){
-   p.map.resize();scheduleWindRedraw(p);
+   p.map.resize();geographyZoom(p);scheduleWindRedraw(p);
   }}
   if(activatePanel&&panel&&!panel.cfg.placeholder&&st.expandedPanel===panel)
    activate(panel).catch(err=>fail(panel,err));
@@ -413,12 +435,23 @@ function bind(){
   catch(err){console.error('PNG export failed',err);el.exportBusyStatus.textContent='Export failed: '+String(err?.message||err);}
   finally{st.exporting=false;el.exportConfirmBtn.disabled=false;el.exportCancelBtn.disabled=false;el.exportCloseBtn.disabled=false;el.exportConfirmBtn.textContent='Download PNG';}
  });
- window.addEventListener('resize',layout);window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;if(['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();if(e.key==='ArrowRight')step(1);if(e.key==='ArrowLeft')step(-1);if(e.key===' '){e.preventDefault();st.playing?stop():play();}if(e.key==='ArrowUp'||e.key==='ArrowDown'){const a=st.cycles,idx=a.indexOf(st.ref)+(e.key==='ArrowUp'?-1:1);if(a[idx]){st.runPinned=true;st.ref=a[idx];refreshHours();syncUI();renderAll();}}});}
+ window.addEventListener('resize',()=>{syncHelperPlacement();layout();if(st.expandedPanel&&st.expandedPanel.map)geographyZoom(st.expandedPanel);});window.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;if(['ArrowRight','ArrowLeft','ArrowUp','ArrowDown'].includes(e.key))e.preventDefault();if(e.key==='ArrowRight')step(1);if(e.key==='ArrowLeft')step(-1);if(e.key===' '){e.preventDefault();st.playing?stop():play();}if(e.key==='ArrowUp'||e.key==='ArrowDown'){const a=st.cycles,idx=a.indexOf(st.ref)+(e.key==='ArrowUp'?-1:1);if(a[idx]){st.runPinned=true;st.ref=a[idx];refreshHours();syncUI();renderAll();}}});}
+// Keep one live helper/status strip; moving the DOM node preserves its
+// status text and avoids diverging counters or duplicate live regions.
+function syncHelperPlacement(){
+ const helper=document.querySelector('body > .helper, header.toolbar > .helper');
+ const toolbar=document.querySelector('header.toolbar');
+ if(!helper||!toolbar)return;
+ const sidebar=document.documentElement.dataset.controlsPosition==='left'&&window.matchMedia('(min-width:801px)').matches;
+ if(sidebar){if(helper.parentElement!==toolbar)toolbar.appendChild(helper);}
+ else if(helper.previousElementSibling!==toolbar||helper.parentElement!==document.body){toolbar.after(helper);}
+}
 const CONTROLS_LEFT_ICON='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>';
 const CONTROLS_TOP_ICON='<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>';
 function setControlsPosition(requested,persist=false){
  const position=requested==='left'?'left':'top';
  document.documentElement.dataset.controlsPosition=position;
+ syncHelperPlacement();
  // The icon shows the destination, like the dark/light theme toggle.
  el.controlsPositionBtn.innerHTML=position==='left'?CONTROLS_TOP_ICON:CONTROLS_LEFT_ICON;
  const action=position==='left'?'top':'left';
@@ -491,7 +524,7 @@ function updateGeographyVisibility(p){
  for(const id of ['land-detail-mask','land-detail-fill','lakes-detail-fill']){
   if(m.getLayer(id))m.setLayerZoomRange(id,ready?detail:24,24);
  }
- if(m.getLayer('counties'))m.setLayerZoomRange('counties',countyThreshold(),24);
+ if(m.getLayer('counties'))m.setLayerZoomRange('counties',countyThreshold(p),24);
 }
 function maybeDetailedGeography(p){
  const m=p.map,d=st.cfg?.display||{};
@@ -505,7 +538,7 @@ function maybeCounties(p){
  // Warm the shared GeoJSON cache before the layer becomes visible, so county
  // lines can appear promptly once the configured threshold is crossed.
  const lead=Math.max(0,Math.min(1,Number(d.countyPreloadLeadZoom??0.35)||0));
- if(m&&d.showCountiesOnZoom!==false&&m.getZoom()>=countyThreshold()-lead)void installGeo(p,'counties');
+ if(m&&d.showCountiesOnZoom!==false&&m.getZoom()>=countyThreshold(p)-lead)void installGeo(p,'counties');
 }
 function geographyZoom(p){updateGeographyVisibility(p);maybeCounties(p);maybeDetailedGeography(p);}
 function startGeography(p){
@@ -640,7 +673,6 @@ function applyProjection(map,camera=null){
  if(!globe){map.__evuExtentFitted=false;fitDataExtent(map);}
  const target=camera||(globe?makeViewBounds():cameraFromMap(map)||makeViewBounds());
  map.jumpTo(target);
- if(map.getLayer('counties'))map.setLayerZoomRange('counties',countyThreshold(),24);
  for(const p of st.active)if(p.map===map){geographyZoom(p);scheduleWindRedraw(p);}
  return cameraFromMap(map);
 }
@@ -1653,7 +1685,7 @@ async function ensureExportGeography(p,zoom){
  if(d.showStateBoundaries!==false)jobs.push(installGeo(p,'states'));
  if(d.showCountryBoundaries!==false){jobs.push(installGeo(p,'country'));if(targetZoom>=detailThreshold())jobs.push(installGeo(p,'country_detail'));}
  if(d.showLandFill!==false){jobs.push(installGeo(p,'land'));if(targetZoom>=detailThreshold()){jobs.push(installGeo(p,'land_detail'));jobs.push(installGeo(p,'lakes_detail'));}}
- if(d.showCountiesOnZoom!==false&&targetZoom>=countyThreshold())jobs.push(installGeo(p,'counties'));
+ if(d.showCountiesOnZoom!==false&&targetZoom>=countyThreshold(p))jobs.push(installGeo(p,'counties'));
  if(jobs.length)await Promise.all(jobs);
  updateGeographyVisibility(p);
  await waitPaint(map);
@@ -1668,7 +1700,7 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
  // MapLibre zoom; that artificial zoom must NOT reveal counties that were
  // hidden in the live panel. Use the original zoom to decide county visibility.
  // This applies equally in 2D and Globe and is restored in finally on errors.
- const hideExportCounties=sharpIndividual&&oldZoom<countyThreshold()&&!!map.getLayer?.('counties');
+ const hideExportCounties=sharpIndividual&&oldZoom<countyThreshold(p)&&!!map.getLayer?.('counties');
  const originalCountyVisibility=hideExportCounties
   ? (map.getLayoutProperty?.('counties','visibility')||'visible') : null;
  const screenW=node.clientWidth||canvas.clientWidth,screenH=node.clientHeight||canvas.clientHeight;
