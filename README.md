@@ -11,7 +11,7 @@ A browser-based, multi-panel weather-model viewer for the Office of Modeling and
 - Pan and zoom synchronized maps in **2D** or **Globe** mode. Each mode remembers its own center and zoom while the page is open. On mouse-equipped devices, the glowing master cursor uses a native cursor graphic (no animation-frame trailing); matching geographic crosshairs remain synchronized across the other panels.
 - Display local state, country, coastline, lake, and zoom-dependent county boundaries. Expanded panels adjust county visibility to account for their larger geographic viewport, without altering multi-panel thresholds.
 - Use light or dark mode, expand an individual panel, and inspect data under the cursor. On desktop, switch the controls between the top toolbar and a left sidebar (default for new visitors) using the icon beside the theme button; the layout choice is saved in the browser.
-- Save an individual panel or the full comparison as a PNG in **16:9** or **4:3**, with **Fill** or **Fit** framing. Exports prepare the applicable geographic detail before capture.
+- Save an individual panel or the full comparison as a PNG in **16:9** or **4:3**, with **Fill** or **Fit** framing. Exports prepare the applicable geographic detail before capture. **Individual PNG wind-barb density and symbol size are scaled for presentation** to resemble an expanded viewer panel; multi-panel PNG exports and on-screen barbs remain unchanged.
 - Toggle **Contours** on supported continuous fields (temperature, moisture, winds, precipitation, snow amounts, and reflectivity). Contours are rendered in the current map projection for 2D and Globe views, and included in PNG exports. While panning, zooming, or rotating, the contour overlay is temporarily hidden and no CPU-intensive contour calculations are performed; it redraws at full quality when movement has stopped. Conventional field-specific intervals adapt to map zoom, data range, and panel dimensions; continuous, interpolated paths have readable, rotated, non-overlapping labels even in normal-size panels. Categorical fields have no contour control. The choice is remembered by the browser; contour lines are off by default.
 - Compare **1-hour precipitation** or **accumulated precipitation since the selected model cycle initialization**. The model F001 one-hour amount equals its F001 cumulative total (no F000 file required); at F002 and beyond the one-hour amount is derived from consecutive model running totals; the Analysis panel uses MRMS 1-hour QPE directly or adds consecutive hourly MRMS QPE valid times for the matching cycle-to-date total. Missing MRMS hours prevent displaying an incomplete running total. The MRMS sum is computed on demand in the browser, which can be slow or memory-intensive for long forecast leads at native MRMS grid resolution.
 - Prefetch nearby forecast data **ahead and behind** the selected hour across all model/analysis panels, with balanced background download slots, playback-safe scheduling, dependency warming for 1-hour precipitation and wind barbs, and bounded browser caches. Active plotting requests always take priority.
@@ -54,7 +54,7 @@ Serve the viewer over HTTP(S) rather than opening `index.html` as a local file. 
 | `diagnostics.html` | WebGL, MapLibre, worker, and multi-panel diagnostics |
 | `vendor_dependencies.py` | Third-party browser library setup helper |
 
-The verification acquisition, conversion, and publishing scripts are distributed separately from the web viewer. No WCOSS2 converter update is needed for v7.45.1; both MRMS precipitation modes use the already published native-hourly `mrms_apcp` Zarr stores. A future server-side prefix-sum product could accelerate very long lead-time totals.
+The verification acquisition, conversion, and publishing scripts are distributed separately from the web viewer. No WCOSS2 converter update is needed for v7.46; both MRMS precipitation modes use the already published native-hourly `mrms_apcp` Zarr stores. A future server-side prefix-sum product could accelerate very long lead-time totals.
 
 ## Configuration
 
@@ -69,6 +69,7 @@ Edit `config.json` to change model catalog locations, panel order, default field
 | `prefetchHours` / `prefetchBehindHours` | Speculative window ahead / behind the selected forecast hour (12 / 4) |
 | `prefetchDiskCacheMB` / `prefetchDiskMaxChunks` | Target compressed browser cache budget and maximum chunks (768 MB / 550) |
 | `exportPanelWidth` / `exportAllWidth` | Output PNG widths for 16:9 exports (1920 / 2560 pixels) |
+| `exportWindBarbSpacingPx` / `exportWindBarbSizePx` | Individual-panel PNG barb spacing and shaft size in final image pixels (60 / 26); 9-panel exports and viewer unaffected |
 
 The available fields, runs, and hours are determined by the published model catalogs. Model data may legitimately be unavailable for some selections.
 

@@ -138,6 +138,8 @@
     "prefetchDelayMs": 100,
     "windBarbSizePx": 18,
     "windBarbMinSpacingPx": 22,
+    "exportWindBarbSpacingPx": 60,
+    "exportWindBarbSizePx": 26,
     "exportMaxPixelRatio": 4,
     "synchronizedCursors": true,
     "detailMinZoom": 0,

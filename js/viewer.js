@@ -1760,7 +1760,9 @@ function scheduleContourRedraw(p,settleMs=0){
  else afterQuiet();
 }
 
-function drawWindBarbs(p){
+// Optional individual-PNG rendering overrides are expressed in the temporary
+// export viewport's CSS pixels. Normal and nine-panel drawing is unchanged.
+function drawWindBarbs(p,exportStyle=null){
  const c=p.windCanvas,m=p.map;if(!c||!m)return;
  const w=m.getCanvas().clientWidth||p.view.clientWidth,h=m.getCanvas().clientHeight||p.view.clientHeight;
  if(!(w>0&&h>0))return;
@@ -1770,7 +1772,9 @@ function drawWindBarbs(p){
  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
  if(!p.wind||st.field!=='wspd10')return;
  const {u,v}=p.wind;
- const zoom=m.getZoom(),spacing=barbSpacing(zoom),size=Number(st.cfg?.display?.windBarbSizePx??18);
+ const zoom=m.getZoom();
+ const spacing=exportStyle?.spacingPx>0?exportStyle.spacingPx:barbSpacing(zoom);
+ const size=exportStyle?.sizePx>0?exportStyle.sizePx:Number(st.cfg?.display?.windBarbSizePx??18);
  const columns=Math.ceil(w/spacing),rows=Math.ceil(h/spacing);
  const stepX=w/Math.max(1,columns),stepY=h/Math.max(1,rows);
  // The strokes use dark ink with a slim white keyline, not diffuse shadows.
@@ -1783,7 +1787,7 @@ function drawWindBarbs(p){
   let uu,vv;try{uu=Number(u.sampleField(lon,lat));vv=Number(v.sampleField(lon,lat));}catch(_){continue;}
   if(!Number.isFinite(uu)||!Number.isFinite(vv)||uu < -1e9||vv < -1e9)continue;
   const speed=Math.hypot(uu,vv);
-  if(speed<2.5){barbGeometry(ctx,x,y,0,-1,speed,size);continue;}
+  if(speed<2.5){paintBarb(ctx,x,y,0,-1,speed,size);continue;}
   // Calculate compass directions from local projected east and north vectors;
   // remains correct under map rotation, Mercator, and globe projection.
   let e,n;
@@ -1796,9 +1800,19 @@ function drawWindBarbs(p){
   if(el<1e-5||nl<1e-5)continue;
   const dx=-uu*e[0]/el-vv*n[0]/nl,dy=-uu*e[1]/el-vv*n[1]/nl;
   if(!Number.isFinite(dx+dy)||Math.hypot(dx,dy)<.00001)continue;
-  barbGeometry(ctx,x,y,dx,dy,speed,size);
+  paintBarb(ctx,x,y,dx,dy,speed,size);
  }
  ctx.shadowBlur=0;
+}
+// Keep tiny temporary-CSS glyphs legible after the output PNG is scaled.
+function paintBarb(ctx,x,y,dx,dy,speed,size){
+ if(size>=14){barbGeometry(ctx,x,y,dx,dy,speed,size);return;}
+ ctx.save();
+ ctx.translate(x,y);
+ const scale=size/18;
+ ctx.scale(scale,scale);
+ barbGeometry(ctx,0,0,dx,dy,speed,18);
+ ctx.restore();
 }
 function scheduleWindRedraw(p){
  if(!p?.windCanvas||p.windFrameRequested)return;
@@ -2208,6 +2222,24 @@ async function ensureExportGeography(p,zoom){
  await waitPaint(map);
  await waitPaint(map);
 }
+// Individual exports temporarily enlarge the WebGL viewport to get sharp
+// textures. Its artificial zoom would make normal zoom-based wind sampling
+// excessively dense. Instead, express barb density and glyph size in pixels
+// of the final *presentation image* (after its Fit/Fill framing transform).
+// The nine-panel export deliberately continues using normal barbSpacing().
+function individualExportWindStyle(viewW,viewH,targetW,targetH,framing){
+ const d=st.cfg?.display||{};
+ const ratioW=targetW/Math.max(1,viewW),ratioH=targetH/Math.max(1,viewH);
+ const outputPerCss=framing==='fit'?Math.min(ratioW,ratioH):Math.max(ratioW,ratioH);
+ const scale=Number.isFinite(outputPerCss)&&outputPerCss>0?outputPerCss:1;
+ const configuredSpacing=Number(d.exportWindBarbSpacingPx);
+ const configuredSize=Number(d.exportWindBarbSizePx);
+ // Presentation-sized symbols, comparable in apparent density to an enlarged
+ // panel rather than a 9-up screenshot blown up to fill the page.
+ const targetSpacing=Number.isFinite(configuredSpacing)&&configuredSpacing>=40&&configuredSpacing<=120?configuredSpacing:60;
+ const targetSize=Number.isFinite(configuredSize)&&configuredSize>=18&&configuredSize<=40?configuredSize:26;
+ return {spacingPx:targetSpacing/scale,sizePx:targetSize/scale};
+}
 async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividual=false){
  const map=p.map,canvas=map.getCanvas(),node=map.getContainer();
  const oldStyle=node.getAttribute('style')||'';
@@ -2288,7 +2320,13 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
    drawContours(p);contourPNG=p.contourCanvas.toDataURL('image/png');
   }
   if(p.wind&&st.field==='wspd10'&&p.windCanvas){
-   drawWindBarbs(p);windPNG=p.windCanvas.toDataURL('image/png');
+   // Match the appearance of an enlarged viewer panel; do not use the
+   // export-only MapLibre zoom to choose density or unscaled glyph sizes.
+   const exportBarbs=sharpIndividual
+    ? individualExportWindStyle(cssW,cssH,targetW,targetH,framing)
+    : null;
+   drawWindBarbs(p,exportBarbs);
+   windPNG=p.windCanvas.toDataURL('image/png');
   }
  }finally{
   if(changedRatio){try{map.setPixelRatio(oldRatio);}catch(err){console.warn('Could not restore pixel ratio',err);}}
