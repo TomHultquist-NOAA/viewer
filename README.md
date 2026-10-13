@@ -1,6 +1,6 @@
 # OMD EVU Model Viewer
 
-**Version 7.39 · October 13, 2026**
+**Version 7.40 · October 13, 2026**
 
 A browser-based, multi-panel weather-model viewer for the Office of Modeling and Development (OMD), Evaluation and Verification Unit (EVU). It displays forecast fields from hosted Zarr v2 datasets using MapLibre GL JS and autumnplot-gl. Map geography is served from local GeoJSON files; plots are rendered in the browser.
 
@@ -8,7 +8,7 @@ A browser-based, multi-panel weather-model viewer for the Office of Modeling and
 
 - Compare multiple models and ensemble members in a synchronized grid (default: 3 × 3, configurable up to 20 panels).
 - Select a forecast field, model initialization cycle, and forecast hour; step or animate through available forecast times.
-- Pan and zoom synchronized maps in **2D** or **Globe** mode. Each mode remembers its own center and zoom while the page is open.
+- Pan and zoom synchronized maps in **2D** or **Globe** mode. Each mode remembers its own center and zoom while the page is open. On mouse-equipped devices, the glowing master cursor uses a native cursor graphic (no animation-frame trailing); matching geographic crosshairs remain synchronized across the other panels.
 - Display local state, country, coastline, lake, and zoom-dependent county boundaries. Expanded panels adjust county visibility to account for their larger geographic viewport, without altering multi-panel thresholds.
 - Use light or dark mode, expand an individual panel, and inspect data under the cursor. On desktop, switch the controls between the top toolbar (default) and a left sidebar using the icon beside the theme button; the layout choice is saved in the browser.
 - Save an individual panel or the full comparison as a PNG in **16:9** or **4:3**, with **Fill** or **Fit** framing. Exports prepare the applicable geographic detail before capture.
@@ -46,7 +46,7 @@ Serve the viewer over HTTP(S) rather than opening `index.html` as a local file. 
 | --- | --- |
 | `index.html` | Viewer entry point |
 | `js/viewer.js` | Rendering, navigation, data access, prefetching, and PNG exports |
-| `css/styles.css` | Responsive layout and visual styling |
+| `css/styles.css`, `css/cursor-master-glow.svg` | Responsive layout, visual styling, and the native master-pointer graphic |
 | `config.json` | Model sources, panels, display, cache, and export options |
 | `data/map_*.geojson` | Geographic boundaries and fills |
 | `diagnostics.html` | WebGL, MapLibre, worker, and multi-panel diagnostics |

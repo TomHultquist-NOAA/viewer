@@ -736,12 +736,12 @@ function paintSynchronizedHover(){
   let xy;try{xy=map.project([h.lon,h.lat]);}catch(_){xy=null;}
   const visible=xy&&Number.isFinite(xy.x)&&Number.isFinite(xy.y)&&xy.x>=0&&xy.y>=0&&
     xy.x<=w&&xy.y<=height&&globeFrontVisible(map,h.lon,h.lat);
-  // The native mouse pointer stays fully functional. Overlay a brighter
-  // noninteractive white halo *under* it in the active panel, while other
-  // panels retain subdued cyan geographic crosshairs.
-  p.ghost.classList.toggle('master-crosshair',p===h.master);
-  p.ghost.hidden=!visible;
-  if(visible){p.ghost.style.left=xy.x+'px';p.ghost.style.top=xy.y+'px';}
+  // v7.40: never draw an animation-frame-driven overlay on top of the
+  // master pointer. Its white crosshair + glow are one native CSS cursor, so
+  // they cannot drift apart. Keep geographic counterparts in other panels.
+  const isMaster=p===h.master;
+  p.ghost.hidden=isMaster||!visible;
+  if(visible&&!isMaster){p.ghost.style.left=xy.x+'px';p.ghost.style.top=xy.y+'px';}
   // Even when the field is missing, show the coordinates and lack of data.
   if(!visible){p.info.hidden=true;continue;}
   let reading='No data';

@@ -295,14 +295,18 @@ body{grid-template-rows:auto auto minmax(0,1fr);}
 }
 
 
-/* v7.22: emphasize the active (real) cursor without affecting map clicks. */
-.sync-crosshair.master-crosshair{width:29px;height:29px;z-index:7;
- background:radial-gradient(circle,rgba(255,255,255,.92) 0 1.4px,rgba(255,255,255,.24) 2px,transparent 6px);
- filter:drop-shadow(0 0 3px rgba(255,255,255,.95)) drop-shadow(0 0 9px rgba(78,197,255,.82));}
-.sync-crosshair.master-crosshair::before,.sync-crosshair.master-crosshair::after{background:#fff;
- box-shadow:0 0 0 1px #072c41,0 0 4px 2px rgba(255,255,255,.8),0 0 12px 3px rgba(57,188,255,.52);}
-.sync-crosshair.master-crosshair::before{top:13.5px;left:0;width:29px;height:2px}
-.sync-crosshair.master-crosshair::after{left:13.5px;top:0;height:29px;width:2px}
+/* v7.40: keep the glowing master crosshair locked to the actual mouse.
+   The previous white/glowing DOM overlay was painted one or more animation
+   frames after the OS pointer and could visibly trail it during movement.
+   Use a single native cursor image with a center-accurate (24,24) hotspot.
+   Geographic counterparts remain DOM overlays in the other panels. */
+@media (pointer: fine) {
+  .panel-viewport {cursor:url('cursor-master-glow.svg') 24 24,crosshair;}
+  .map-frame .maplibregl-canvas,
+  .map-frame .maplibregl-canvas:active {
+    cursor:url('cursor-master-glow.svg') 24 24,crosshair !important;
+  }
+}
 /* The native hand remains the only click target; a halo highlights it. */
 .panel-viewport .panel-save:hover:not(:disabled){
  box-shadow:0 0 0 1px rgba(255,255,255,.9),0 0 9px 3px rgba(255,255,255,.50),
