@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const js=fs.readFileSync(path.join(__dirname,'../js/viewer.js'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const c=vm.createContext({});
+vm.runInContext(js.slice(0,js.indexOf('const PTYPE_LABELS=')),c);
+const groups=Array.from(vm.runInContext('FIELD_MENU_GROUPS',c),g=>({key:g.key,fields:Array.from(g.fields,f=>f.key)}));
+assert.deepEqual(groups.find(g=>g.key==='surface').fields,['mslp','t2m','dpt2m','rh2m','wspd10','gust']);
+assert(!groups.some(g=>['thermo','surfacewind'].includes(g.key)));
+assert.equal(vm.runInContext('FIELDS.mslp.convert',c),'PaToHpa');
+assert.match(js,/case 'PaToHpa':return x\/100/);
+assert.match(js,/const alwaysMSLP=plottedField==='mslp'/);
+assert.match(js,/if\(st\.overlayMSLP\)\{drawContours\(p,\{always:true\}\)/);
+assert.match(js,/if\(heightVariableName\(p.cfg\?\.field\|\|st.field\)\)await prepareHeightContours/);
+assert.match(html,/css\/styles\.css\?v=1\.1\.10-20261030/);
+assert.match(html,/js\/viewer\.js\?v=1\.1\.10-20261030/);
+console.log('PASS Surface weather, MSLP conversion and contours, RAP analysis overlays, versioned assets');

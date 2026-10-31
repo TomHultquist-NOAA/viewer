@@ -1,0 +1,14 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const js=fs.readFileSync(path.join(__dirname,'../js/viewer.js'),'utf8');
+const css=fs.readFileSync(path.join(__dirname,'../css/styles.css'),'utf8');
+assert.match(html, /id="shareLinkToast" class="share-link-toast" hidden/);
+assert.match(html, /id="shareLinkStatus"[^>]*role="status"/);
+assert.match(css, /\.share-link-toast\[hidden\]/);
+assert.match(css, /\.share-link-toast\{position:fixed/);
+assert.match(js, /shareFeedback\('success','Link copied'\)/);
+assert.match(js, /shareFeedback\('error','Unable to copy link/);
+assert.match(html, /css\/styles\.css\?v=1\.1\.10-20261030/);
+assert.match(html, /js\/viewer\.js\?v=1\.1\.10-20261030/);
+console.log('PASS: visible share success/error, accessible live announcement and 1.0.6 assets');

@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#09111f">
+<title>OMD EVU Model Viewer | autumnplot-gl</title>
+<link rel="stylesheet" href="css/styles.css?v=1.1.10-20261030">
+<!-- WebGL comes from the browser. MapLibre uses a separately hosted worker for CSP-safe startup. -->
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<script src="vendor/maplibre-gl-csp.js"></script>
+<script src="vendor/autumnplot-gl.js"></script>
+<script src="js/gif-export.js?v=1.0.20-20261030"></script>
+<script src="js/viewer.js?v=1.1.10-20261030" defer></script>
+<script src="js/sounding-profiles.js?v=1.1.10-20261030" defer></script>
+<script src="js/point-inspector.js?v=1.1.10-20261030" defer></script>
+</head>
+<body>
+<header class="toolbar">
+  <div class="toolbar-brandline">
+    <div class="brand"><div class="brandmark">EVU</div><div><strong>OMD EVU Model Viewer</strong><small>Evaluation and Verification Unit</small></div></div>
+    <div class="toolbar-brand-actions">
+      <button id="mobileControlsBtn" class="utility mobile-controls-btn" aria-controls="viewerControls" aria-expanded="false" title="Show viewer controls">☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span></button>
+      <button id="themeToggleBtn" class="utility theme-toggle" aria-label="Switch to light mode" title="Switch to light mode"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></button>
+      <button id="controlsPositionBtn" class="utility controls-position-toggle" type="button" aria-label="Move controls to left side" aria-pressed="false" title="Move controls to left side"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></button>
+      <button id="copyLinkBtn" class="utility share-link-btn" type="button" aria-label="Copy share link" title="Copy share link"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.55 6.6-4.1M8.7 13.45l6.6 4.1"/></svg></button><span id="shareLinkStatus" class="sr-only" role="status" aria-live="polite"></span>
+    </div>
+  </div>
+  <div id="viewerControls" class="toolbar-controls">
+    <div class="control model-set-control"><label for="modelSetSelect">Model set</label><select id="modelSetSelect" aria-label="Model set"><option value="rrfs-refs">RRFS / REFS</option><option value="gfs-versions" disabled>GFSv16 / GFSv17 (coming soon)</option><option value="ai-models" disabled>AIGFS / AIGEFS / HGEFS (coming soon)</option></select></div>
+    <div class="control field-control field-nested-control"><label for="fieldMenuBtn">Field</label><button id="fieldMenuBtn" class="field-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="fieldMenuPopup" aria-label="Choose meteorological field" disabled><span id="fieldMenuSelected">Loading…</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
+    <div class="control cycle-control"><label for="cycleSelect">Cycle (UTC)</label><select id="cycleSelect" disabled></select></div>
+    <div class="control forecast-control"><label for="fcstSelect">F-hour</label><select id="fcstSelect" disabled></select></div>
+    <div class="transport" aria-label="Forecast navigation"><button id="stepBackBtn" class="round" disabled title="Previous hour">◀◀</button><button id="playBtn" class="round" disabled title="Play">▶</button><button id="pauseBtn" class="round active" disabled title="Pause">Ⅱ</button><button id="stepForwardBtn" class="round" disabled title="Next hour">▶▶</button></div>
+    <div class="control speed-control"><label>Speed</label><div class="speed-buttons" role="group" aria-label="Loop playback speed"><button id="speedDownBtn" type="button" title="Slower playback" aria-label="Slower playback">−</button><output id="speedValue" aria-live="polite" title="Playback speed relative to normal">1×</output><button id="speedUpBtn" type="button" title="Faster playback" aria-label="Faster playback">+</button></div></div>
+    <div id="contourControl" class="control contour-control overlays-control" hidden>
+      <label id="overlaysLabel">Overlays</label>
+      <div class="overlays-switches" role="group" aria-labelledby="overlaysLabel">
+        <label id="heightOption" class="contour-switch" hidden title="Display geopotential height contours"><input type="checkbox" id="heightToggleBtn" checked><span>Height</span></label>
+        <label id="windOption" class="contour-switch" hidden title="Display meteorological wind barbs"><input type="checkbox" id="windToggleBtn" checked><span>Wind</span></label>
+        <label id="contourOption" class="contour-switch" hidden title="Display optional shaded-field contours"><input type="checkbox" id="contourToggleBtn"><span>Contours</span></label>
+        <label id="mslp850Option" class="contour-switch" hidden title="Display dashed 850-hPa temperature isolines on MSLP"><input type="checkbox" id="mslp850ToggleBtn" checked><span>850-hPa Temp</span></label>
+        <div id="obsControl" class="obs-switches" hidden>
+          <label class="contour-switch" title="Synoptic Data METAR / ASOS / AWOS station observations"><input type="checkbox" id="obsSynoptic" checked><span>METARs</span></label>
+          <label class="contour-switch" title="mPING crowd-sourced precipitation reports"><input type="checkbox" id="obsMping" checked><span>mPING</span></label>
+        </div>
+        <div id="spcControl" class="spc-switches" hidden>
+          <label class="contour-switch" title="SPC preliminary tornado, wind, and hail reports"><input type="checkbox" id="spcToggleBtn"><span>SPC reports</span></label>
+        </div>
+      </div>
+      <small id="spcCount" class="obs-count" aria-live="polite" hidden></small>
+      <small id="obsCount" class="obs-count" aria-live="polite" hidden></small>
+      <small id="obsAttribution" class="obs-attribution" hidden>Data: <a href="https://synopticdata.com/" target="_blank" rel="noopener noreferrer">Synoptic Data</a> · <a href="https://mping.ou.edu/" target="_blank" rel="noopener noreferrer">mPING (OU/NSSL)</a></small>
+    </div>
+    <div class="control opacity-control" title="Meteorological image shading opacity; contours, barbs, and reports remain fully visible">
+      <label for="imageOpacity">Image opacity <output id="imageOpacityLabel">100%</output></label>
+      <input type="range" id="imageOpacity" min="0" max="100" step="5" value="100" aria-label="Image opacity percent">
+    </div>
+    <div class="control map-view-control"><label for="mapViewSelect">Map view</label><select id="mapViewSelect"><option value="lambert">2D</option><option value="globe">Globe</option></select></div>
+    <div class="toolbar-utilities"><button id="resetViewBtn" class="utility">Reset view</button><button id="saveAllPngBtn" class="utility" title="Export all panels as a PNG image or animated GIF" disabled>Export all panels</button></div>
+  </div>
+</header>
+<div id="shareLinkToast" class="share-link-toast" hidden aria-hidden="true"></div>
+<!-- Floating outside the clipped optional left toolbar; still anchored to its Field button. -->
+<div id="fieldMenuPopup" class="field-menu-popup" hidden>
+  <div id="fieldMenuCategories" class="field-menu-categories" role="menu" aria-label="Meteorological field categories"></div>
+  <div id="fieldMenuBranch" class="field-menu-branch" role="menu" aria-label="Fields in selected category" hidden>
+    <button id="fieldMenuBack" class="field-menu-back" type="button" aria-label="Back to field categories"><span aria-hidden="true">‹</span> Categories</button>
+    <div id="fieldMenuBranchTitle" class="field-menu-branch-title" aria-hidden="true"></div>
+    <div id="fieldMenuItems" class="field-menu-items"></div>
+  </div>
+</div>
+<div class="helper"><button type="button" id="userGuideBtn" class="helper-guide" aria-haspopup="dialog" aria-controls="userGuideDialog">User guide</button><span class="helper-status"><span id="dataStatus" role="status" aria-live="polite">Starting…</span><span class="helper-credit">Plotting powered by <a href="https://github.com/tsupinie/autumnplot-gl" target="_blank" rel="noopener noreferrer">autumnplot-gl</a></span></span></div>
+<div class="viewer-workspace">
+  <main id="viewerGrid" class="viewer-grid" aria-label="Model comparison plots"><div class="startup">Initializing rendering engine…</div></main>
+  <section id="sharedLegend" class="shared-legend" aria-label="Shared field color legend">
+    <div class="shared-legend-heading">
+      <div id="sharedLegendTitle" class="shared-legend-title">Field color scale</div>
+      <button type="button" id="legendResetBtn" class="legend-reset" hidden title="Reset color scale to default" aria-label="Reset color scale to default">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v5h5"/></svg>
+      </button>
+    </div>
+    <div class="shared-legend-track">
+      <canvas id="sharedLegendCanvas" class="shared-legend-canvas" width="1024" height="20" title="Click to customize numeric color scale"></canvas>
+      <div id="sharedLegendLabels" class="shared-legend-labels" aria-label="Color scale values, categorical fields show No and Yes"></div>
+    </div>
+  </section>
+  <dialog id="legendRangePopup" class="legend-range-popup" aria-labelledby="legendRangeTitle" aria-describedby="legendRangeMessage" hidden>
+    <form id="legendRangeForm" method="dialog" novalidate>
+      <h2 id="legendRangeTitle">Customize color scale</h2>
+      <p id="legendRangeMessage">Adjust the displayed minimum and maximum. Model data are unchanged.</p>
+      <div class="legend-range-pair">
+        <label for="legendMinSlider">Minimum</label>
+        <div class="legend-range-controls"><input id="legendMinSlider" type="range" aria-label="Color scale minimum slider"><input id="legendMinNumber" type="number" aria-label="Color scale minimum value"></div>
+      </div>
+      <div class="legend-range-pair">
+        <label for="legendMaxSlider">Maximum</label>
+        <div class="legend-range-controls"><input id="legendMaxSlider" type="range" aria-label="Color scale maximum slider"><input id="legendMaxNumber" type="number" aria-label="Color scale maximum value"></div>
+      </div>
+      <p id="legendRangeError" class="legend-range-error" role="alert" hidden>The maximum must be greater than the minimum.</p>
+      <div class="legend-range-actions"><button id="legendRangeResetBtn" type="button">Reset default</button><span class="legend-range-spacer"></span><button id="legendCancelBtn" type="button">Cancel</button><button id="legendRangeApplyBtn" type="submit">Apply</button></div>
+    </form>
+  </dialog>
+</div>
+
+<dialog id="userGuideDialog" class="user-guide-dialog" aria-labelledby="userGuideTitle">
+  <div class="user-guide-head"><div><small>Model guidance visualization</small><h2 id="userGuideTitle">Model Viewer User Guide</h2><p>Interactive forecast and analysis comparisons</p></div><div class="user-guide-head-actions"><a class="guide-pdf-link" href="USER_GUIDE.pdf" target="_blank" rel="noopener noreferrer" aria-label="Open User Guide PDF in a new tab" title="Open PDF User Guide in a new tab"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v6h6"/><path d="M8.5 15h7M8.5 18h5"/></svg><span class="sr-only">Open PDF</span></a><button id="userGuideClose" type="button" aria-label="Close user guide">×</button></div></div>
+  <!-- user-guide-source-sha256: f16171bc97066ae5fbd3ff2c331b867309b8ea44326bb05b4ed98a3c4d6bd60a -->
+  <!-- user-guide-source-sha256: af1618454bd095507162374dbe1374ac3ae96e5896911b679722a7af92e64b56 -->
+  <div class="user-guide-scroll">
+   <nav class="guide-index" aria-label="Guide contents">
+    <a href="#guide-start">Getting started</a>
+    <a href="#guide-map">Map controls</a>
+    <a href="#guide-inspect">Point charts</a>
+    <a href="#guide-fields">Fields and snowfall</a>
+    <a href="#guide-colors">Color scales</a>
+    <a href="#guide-overlays">Overlays</a>
+    <a href="#guide-obs">Observations</a>
+    <a href="#guide-diff">Differences</a>
+    <a href="#guide-export">Exports</a>
+    <a href="#guide-data">Data and limitations</a>
+   </nav>
+   <div class="guide-intro">
+<p><strong>Viewer version 1.1.10 · October 30, 2026</strong></p>
+<p>The OMD EVU Model Viewer displays weather model forecasts and available verifying analyses side by side. The panels share a geographic view, making it easier to compare different models and forecast hours. The default layout includes RRFS, HRRR, REFS members, REFS Mean, and an Analysis panel.</p>
+   </div>
+  <section id="guide-start">
+    <h3>Getting started</h3>
+<ol>
+<li>Choose a <strong>Model set</strong>, <strong>Field</strong>, and model <strong>Cycle</strong> (initialization time, in UTC).</li>
+<li>Choose an <strong>F-hour</strong> to display the forecast. For example, F024 is 24 hours after initialization. Each panel displays its valid time.</li>
+<li>Zoom or pan any map to focus on an area. The other panels follow the same view.</li>
+<li>Use <strong>Previous</strong>, <strong>Next</strong>, <strong>Play/Pause</strong>, and <strong>Speed</strong> to move through the forecast. A panel indicates when the requested data are unavailable.</li>
+</ol>
+<p>The Field menu groups related weather variables, including radar, precipitation type, surface weather, snowfall, upper air, and severe-weather parameters.</p>
+  </section>
+  <section id="guide-map">
+    <h3>Map controls and shortcuts</h3>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>How to do it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Change forecast hour</td>
+<td>Left/Right arrows or Previous/Next controls</td>
+</tr>
+<tr>
+<td>Play or pause</td>
+<td>Spacebar or Play/Pause</td>
+</tr>
+<tr>
+<td>Change model cycle</td>
+<td>Up/Down arrows (when not typing in a control)</td>
+</tr>
+<tr>
+<td>Zoom and pan</td>
+<td>Scroll/trackpad and drag; touch gestures where supported</td>
+</tr>
+<tr>
+<td>Change projection</td>
+<td>Choose <strong>2D</strong> or <strong>Globe</strong></td>
+</tr>
+<tr>
+<td>Return to the original map</td>
+<td>Select <strong>Reset view</strong></td>
+</tr>
+<tr>
+<td>Focus on one model</td>
+<td>Use its panel-expand control</td>
+</tr>
+<tr>
+<td>Close an open menu</td>
+<td>Press <strong>Escape</strong>, where supported</td>
+</tr>
+</tbody>
+</table>
+<p>You can switch between dark and light appearance. On desktop, the controls can be placed at the top or left side. <strong>Share</strong> copies a link to the current field, forecast hour, and map view.</p>
+  </section>
+  <section id="guide-inspect">
+    <h3>Right-click: time series and sounding</h3>
+<p><strong>Right-click a location on a model or analysis map</strong> and select one of these tools. Both open a floating chart window that you can move or resize. Use the <strong>download icon</strong> in the chart header to save a PNG.</p>
+<p><strong>Time series</strong> plots the current field at the clicked location across the full forecast cycle. It stays tied to the chosen model, field, location, and cycle, even if you subsequently change what is displayed in the viewer. Instantaneous quantities and run-to-date totals are shown as <strong>lines</strong>; time-period precipitation and snowfall accumulations (such as 1-, 3-, 6-, and 24-hour totals) are shown as <strong>bars</strong>. Rolling accumulation intervals can overlap, so adjacent bars should not be added together. Unavailable hours are not zero. It may take a moment to load the full series; progress is shown in the chart window. For Reflectivity with Ptype, the series plots reflectivity (dBZ), not the precipitation-type category.</p>
+<p><strong>Sounding</strong> displays a Skew-T / Log-P sounding at the clicked location, with <strong>continuous red temperature</strong>, <strong>continuous green dewpoint</strong>, <strong>wind barbs</strong>, and a compact <strong>diagnostics box</strong>. When available, it uses the newer pressure-level profiles collected by the converter, extending up to 100 hPa. The diagnostics box can include sampled CAPE, helicity, and shear values when those fields are available, along with basic surface and level-summary information. The sounding <strong>updates automatically when the forecast hour or cycle changes</strong>, including during playback. Its chosen location and model remain the same.</p>
+<p>The sounding window reports how many temperature, dewpoint, and wind levels are available. <strong>REFS Mean uses its own operational ensemble-mean profile</strong>, including time-lagged members, but has relatively few available pressure levels. REFS member profiles may also have gaps. RAP analysis soundings are available at their corresponding hourly valid times when published.</p>
+<p><strong>Sounding limitations:</strong> Full profiles may not yet be available for older cases or every forecast hour. In that situation the viewer uses the earlier, limited-level sounding when possible, and labels it as a sparse fallback. Profile data are sampled from a coarser geographic grid than the maps, so they may not represent local terrain or sharp weather boundaries. Some diagnostics may be unavailable, and any shown values are only as good as the published fields for that source and hour. Low levels below terrain are not automatically screened; missing levels are not invented. These soundings are best used for visual case-study exploration, <strong>not operational parcel diagnostics or safety-critical decisions</strong>. Right-click is primarily intended for desktop devices with a mouse.</p>
+  </section>
+  <section id="guide-fields">
+    <h3>Fields, precipitation type, and snowfall</h3>
+<p><strong>Reflectivity with Ptype</strong> appears below Precipitation type in the Radar menu. It colors model reflectivity by forecast precipitation type: green progressing into yellow/orange for stronger rain echoes, blue for snow, pink for freezing rain, purple for sleet, and amber for mixed precipitation. Both reflectivity and precipitation type must be available for the chosen hour.</p>
+<p>Snowfall and precipitation fields include hourly, multi-hour, and accumulated options where available. Some totals need a complete sequence of earlier data, so a missing input can make a later accumulation unavailable. Missing data are <strong>not</strong> treated as zero.</p>
+<p>For <strong>NOHRSC snowfall</strong> in the Analysis panel, 6-hour analyses are generally valid at 00/06/12/18 UTC and 24-hour analyses at 00/12 UTC. A 48-hour total uses two available 24-hour periods; the accumulated total adds consecutive 6-hour periods beginning after model initialization. There are no native 1-hour or 3-hour NOHRSC plots. Small, isolated snowfall artifacts are filtered from the map shading, without changing reported values.</p>
+  </section>
+  <section id="guide-colors">
+    <h3>Adjust the numerical colorbar</h3>
+<p>You can change the displayed range on most <strong>numerical</strong> colorbars without changing the underlying values.</p>
+<ol>
+<li><strong>Click the numerical colorbar</strong> to open the color-scale editor.</li>
+<li>Move the <strong>Minimum</strong> and <strong>Maximum</strong> sliders, or type precise values into their adjacent entry boxes.</li>
+<li>Select <strong>Apply</strong> to update the shading, <strong>Cancel</strong> (or Escape) to leave it unchanged, or <strong>Reset default</strong> to restore the original range. After applying a custom range, use the <strong>circular-arrow reset icon</strong> beside the colorbar title to restore defaults without opening the editor.</li>
+</ol>
+<p>The full color palette stretches across the selected interval. The new scale applies to panels showing that field and is included in exports. It remains while stepping through forecast hours but resets when the page is reloaded. <strong>CAPE colorbars use familiar round labels (such as 500, 1000, and 1500 J/kg)</strong>. <strong>Categorical precipitation-type legends cannot be adjusted</strong> this way.</p>
+  </section>
+  <section id="guide-overlays">
+    <h3>Overlays and transparency</h3>
+<p>Depending on the field, you can enable height or pressure contours, wind barbs, and contours of the shaded field. <strong>Numerical CAPE, shear, storm-relative helicity, updraft helicity, and severe-weather composite fields also support shaded-field contours</strong>, with conventional rounded value intervals that become finer at close zoom. Categorical precipitation-type fields do not support these numerical contours. <strong>For 500-hPa absolute-vorticity shading, RRFS and individual REFS members use a modest display-only smooth, while HRRR and REFS Mean use an even lighter smooth</strong> to make plots easier to compare. The stored fields and point-sampled values are unchanged. <strong>Zero or very weak values are transparent</strong> for fields where a clear background is useful (including CAPE, shear, SRH, wind speeds, severe-weather indices, and near-zero 500-hPa vorticity). Difference maps also become transparent close to zero. This lets the underlying map background show through in dark and light modes, without changing the meteorological data. Temperature and MSLP shading remain continuous because zero is not a no-weather threshold for those fields. The available overlay checkboxes share compact rows when space permits and wrap when necessary. Report counts appear below the switches. The available options appear with the field controls. Use <strong>Image opacity</strong> to fade the weather shading without fading geographic outlines, contours, wind barbs, or observation markers. Applicable overlays are also included when exporting plots.</p>
+  </section>
+  <section id="guide-obs">
+    <h3>Weather observations and storm reports</h3>
+<p>On precipitation-type maps, enable <strong>METAR</strong> to display colored circles or <strong>mPING</strong> to display triangles. Their colors indicate reported rain, snow, freezing rain, sleet, or mixed precipitation. Reports are usually selected from within about 30 minutes of the forecast valid time.</p>
+<p>On supported radar or severe-weather maps, enable <strong>SPC reports</strong> to display preliminary tornado (red), wind (blue), and hail (green) circles. The selected reports are shared by <strong>all active panels</strong>, including RRFS, HRRR, REFS members, REFS Mean, and Analysis, for the common forecast valid time. Select a report to see any available details. Reports are hidden by default.</p>
+<p><strong>Limitations:</strong> Reports may be delayed, incomplete, revised, or absent. Future forecast hours cannot yet have verifying observations. A blank area does not mean no weather occurred. Some accumulated severe-weather fields display reports over a longer period than the most recent hour.</p>
+  </section>
+  <section id="guide-diff">
+    <h3>Compare two panels</h3>
+<p>Select the comparison checkboxes beside <strong>two compatible panel titles</strong> to open a <strong>Difference</strong> map. The result is <strong>first selected panel minus second selected panel</strong>. The difference follows changes to the forecast hour and view. You can inspect the values and use the window's download icon to save a PNG. Incompatible or missing fields cannot be compared.</p>
+  </section>
+  <section id="guide-export">
+    <h3>Save PNGs and animated GIFs</h3>
+<p>Use a panel's <strong>download icon</strong> to export one plot, or <strong>Export all panels</strong> for a comparison image or animation. Choose the image proportions (<strong>16:9</strong> or <strong>4:3</strong>) and whether to <strong>Fit</strong> the entire map area or <strong>Fill</strong> the frame (which can crop edges). Titles, times, legends, and applicable overlays are included.</p>
+<p>Select <strong>Large labels</strong> when preparing images for presentations. It enlarges the model or analysis title and time information in exported PNGs and GIFs, without changing the live viewer.</p>
+<p>For animated GIFs, the defaults are:</p>
+<table>
+<thead>
+<tr>
+<th>Resolution</th>
+<th>Default range</th>
+<th style="text-align:right">Maximum frames</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Standard (1200 px)</td>
+<td>F000–F024</td>
+<td style="text-align:right"><strong>25</strong></td>
+</tr>
+<tr>
+<td>High (1600 px)</td>
+<td>F000–F018</td>
+<td style="text-align:right"><strong>19</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The default delay is <strong>700 milliseconds per frame</strong>. You can change the forecast-hour range, step, and delay. The final frame stays visible slightly longer. Larger or longer GIFs may take more time to export.</p>
+<p>Analysis panels use titles such as <strong>Analysis · NOHRSC · 24-hour snowfall</strong>, with the <strong>valid time</strong> alone on the subtitle.</p>
+  </section>
+  <section id="guide-data">
+    <h3>Data availability and troubleshooting</h3>
+<ul>
+<li><strong>A panel says missing:</strong> The selected model, variable, hour, or verifying analysis may not be available. Try another hour or source. Some accumulated totals require every contributing period.</li>
+<li><strong>An analysis is missing:</strong> Its valid time may not be supported, the analysis may not be published yet, or an earlier required period may be missing. RAP is an hourly model analysis and is only shown for supported fields at valid hours that have been collected and published. The site administrator can check a specific case with the RAP diagnostic page.</li>
+<li><strong>Changes do not appear after deployment:</strong> Refresh the page to load the latest viewer.</li>
+<li><strong>A plot or map fails to load:</strong> The viewer includes a <strong>Diagnostics</strong> page for technical troubleshooting; contact the site maintainer if the issue persists.</li>
+</ul>
+<p>The viewer is intended for forecast evaluation and comparison, not for issuing official warnings. <strong>All displayed times are UTC.</strong></p>
+  </section>
+  </div>
+  <div class="user-guide-footer"><span>Press Esc or Close to return to the viewer</span><button id="userGuideDone" type="button">Close guide</button></div>
+</dialog>
+<dialog id="differenceDialog" class="difference-confirm" aria-labelledby="differenceDialogTitle">
+ <form method="dialog"><h2 id="differenceDialogTitle">Compare two panels</h2>
+ <p id="differenceDialogPair"></p>
+ <p class="difference-confirm-hint">The live difference map is <strong>first selected − second selected</strong>, using geographically matched values. It updates with the selected field, forecast hour, cycle, and map view.</p>
+ <div class="difference-dialog-actions"><button value="cancel" id="differenceCancelBtn">Cancel</button><button value="open" id="differenceOpenBtn">Open difference map</button></div></form>
+</dialog>
+<section id="differenceWindow" class="difference-window" hidden aria-label="Live panel difference map">
+ <div class="difference-window-header" id="differenceDragHandle"><div class="difference-window-heading"><strong id="differenceWindowTitle">Difference map</strong><small id="differenceWindowSubtitle">First − second</small></div><div class="difference-window-actions"><button id="differenceSaveBtn" class="difference-window-save" type="button" title="Download difference map PNG" aria-label="Download difference map PNG" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg></button><button id="differenceCloseBtn" class="difference-window-close" type="button" title="Close difference window" aria-label="Close difference window">×</button></div></div>
+ <div id="differenceMap" class="difference-map" aria-label="Geographic difference visualization"><div id="differenceSample" class="difference-sample" hidden aria-live="off"></div></div>
+ <div id="differenceMessage" class="difference-message" role="status" aria-live="polite">Preparing difference map…</div>
+ <div class="difference-window-legend"><div class="difference-legend-ramp" aria-hidden="true"></div><div class="difference-legend-ticks" aria-label="Fixed field-specific difference color scale"></div><div id="differenceLegendUnit" class="difference-legend-unit">Difference</div></div>
+</section>
+<dialog id="exportDialog" class="export-dialog" aria-labelledby="exportDialogTitle" aria-describedby="exportDialogHelp">
+  <form id="exportForm">
+    <div class="export-heading"><h2 id="exportDialogTitle">Save PNG</h2><button type="button" id="exportCloseBtn" class="export-close" aria-label="Close export options">×</button></div>
+    <div class="export-scroll" id="exportScroll">
+    <p id="exportDialogHelp">Choose PNG or GIF, an aspect ratio, and whether the map should fill the frame or fit entirely.</p>
+    <fieldset class="export-kind" id="exportKindFieldset"><legend>Format</legend>
+      <label><input type="radio" name="exportKind" value="png" checked> Still image (PNG)</label>
+      <label id="exportGifChoice"><input type="radio" name="exportKind" value="gif"> Animated GIF</label>
+    </fieldset>
+    <fieldset class="export-gif-options" id="exportGifOptions" hidden><legend>Animation</legend>
+      <div class="export-gif-row"><label for="exportGifStart">First forecast hour <output id="exportGifStartLabel">F000</output></label><input type="range" id="exportGifStart" min="0" max="84" step="1" value="0"></div>
+      <div class="export-gif-row"><label for="exportGifEnd">Last forecast hour <output id="exportGifEndLabel">F018</output></label><input type="range" id="exportGifEnd" min="0" max="84" step="1" value="18"></div>
+      <div class="export-gif-row"><label for="exportGifStep">Forecast-hour step</label><select id="exportGifStep"><option value="1">Every 1 hour</option><option value="2">Every 2 hours</option><option value="3">Every 3 hours</option><option value="6">Every 6 hours</option></select></div>
+      <div class="export-gif-row"><label for="exportGifDelay">Delay between frames <output id="exportGifDelayLabel">700 ms</output></label><input type="range" id="exportGifDelay" min="100" max="2000" step="100" value="700"></div>
+      <div class="export-gif-row"><label for="exportGifQuality">GIF resolution</label><select id="exportGifQuality"><option value="high" selected>High · 1600 px wide</option><option value="standard">Standard · 1200 px wide</option></select></div>
+      <small id="exportGifSummary" role="status" aria-live="polite"></small>
+      <small>Final frame holds for an additional 0.5 second. GIF colors use a frame-adaptive 256-color palette; larger frames take longer to encode.</small>
+    </fieldset>
+    <fieldset class="export-label-options"><legend>Labels</legend><label><input type="checkbox" id="exportLargeLabels"> <strong>Large labels</strong> <small>(larger model/source names and time information for presentations)</small></label></fieldset>
+    <fieldset class="export-ratios"><legend>Aspect ratio</legend>
+      <label class="export-choice"><input type="radio" name="exportRatio" value="16:9" checked><span><strong>16:9 widescreen</strong><small id="exportSize169">1920 × 1080</small></span></label>
+      <label class="export-choice"><input type="radio" name="exportRatio" value="4:3"><span><strong>4:3 standard</strong><small id="exportSize43">1600 × 1200</small></span></label>
+    </fieldset>
+    <fieldset class="export-framing"><legend>Map framing</legend>
+      <label><input type="radio" name="exportFraming" value="fill" checked> Fill the plot area <small>(may crop map edges)</small></label>
+      <label><input type="radio" name="exportFraming" value="fit"> Fit entire map <small>(show surrounding geography)</small></label>
+    </fieldset>
+    </div>
+    <div class="export-actions"><p id="exportBusyStatus" role="status" aria-live="polite" class="export-busy"></p><button type="button" id="exportCancelBtn">Cancel</button><button type="submit" id="exportConfirmBtn" class="export-primary">Download PNG</button></div>
+  </form>
+</dialog>
+</body></html>

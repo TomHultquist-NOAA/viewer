@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const src=fs.readFileSync(path.join(__dirname,'../js/point-inspector.js'),'utf8');
+const p=src.indexOf('function intervalAccumulationHours('),end=src.indexOf('function plotSeries(',p);
+assert(p>0&&end>p);
+const context=vm.createContext({Number,Math});
+vm.runInContext(src.slice(p,end)+'\nthis.intervalAccumulationHours=intervalAccumulationHours;',context);
+const f=context.intervalAccumulationHours;
+for(const field of ['apcp1h','apcp3h','apcp6h','apcp24h','apcp48h','snow1h','snow3h','snow6h','snow24h','snow48h'])assert(f(field)>0,field);
+for(const field of ['t2m','wspd10','refc','asnow','apcp','tsnowp','snod','h500'])assert.equal(f(field),0,field);
+assert.match(src,/if\(bars\).*?ctx\.fillStyle=color/s);
+assert.match(src,/ctx\.fillRect\(xx,Math\.min\(start,end\)/);
+assert.match(src,/rolling intervals may overlap/);
+assert.match(src,/Gaps are unavailable data, not zero/);
+const guide=fs.readFileSync(path.join(__dirname,'../USER_GUIDE.md'),'utf8');
+assert.match(guide,/accumulations.*shown as \*\*bars\*\*/);
+console.log('PASS: interval accumulations use bars; instantaneous and run totals use lines');

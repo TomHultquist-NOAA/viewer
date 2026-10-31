@@ -1,0 +1,18 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const css=fs.readFileSync(path.join(root,'css/styles.css'),'utf8');
+const js=fs.readFileSync(path.join(root,'js/viewer.js'),'utf8');
+const start=html.indexOf('<div class="overlays-switches"');
+const spc=html.indexOf('<div id="spcControl"',start);
+const count=html.indexOf('<small id="spcCount"',spc);
+const close=html.indexOf('      </div>\n      <small id="spcCount"',spc);
+assert.ok(start>=0&&spc>start&&close>spc,'SPC toggle must be inside shared overlay row');
+assert.ok(count>close,'SPC report count must be outside shared overlay row');
+assert.match(css,/\.overlays-switches[^\n]*display:flex;flex-wrap:wrap/);
+assert.match(css,/\.overlays-switches>\.spc-switches\{flex:0 0 auto;white-space:nowrap\}/);
+assert.match(css,/#spcCount\[hidden\]/);
+assert.match(js,/el\.spcCount\.hidden=!spcAvailable/);
+assert.match(html,/css\/styles\.css\?v=1\.1\.10-/);
+console.log('PASS SPC Reports and Contours share a wrap-aware row; count remains below; hidden state follows field.');

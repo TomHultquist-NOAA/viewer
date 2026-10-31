@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OMD EVU — RAP analysis diagnostic</title>
+<style>body{font:15px/1.55 system-ui,sans-serif;max-width:1000px;margin:2.3rem auto;padding:0 1.2rem;color:#e7eef8;background:#0b1421}h1{font-size:1.65rem}h2{font-size:1.15rem;margin:1.5rem 0 .4rem}a{color:#9dd7ff}button,input{font:inherit;padding:.45rem .7rem}button{cursor:pointer;background:#184e7a;border:1px solid #4780a9;border-radius:6px;color:white}input{background:#132638;border:1px solid #52748f;color:white;border-radius:6px;width:130px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#142336;padding:1rem;border-radius:8px;border:1px solid #36485b;min-height:70px}small{color:#bdcadd}label{display:inline-flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem .5rem .5rem 0}</style></head><body>
+<h1>RAP analysis browser diagnostic</h1>
+<p>Read-only checks for the hourly RAP F000 analyses used by the Analysis panel. The two catalogs are queried over HTTP as the browser sees them; processing-server local stores and unpublished data cannot be inspected from here.</p>
+<p><label>UTC valid hour <input id="hour" value="2026102812" maxlength="10" aria-label="UTC valid hour YYYYMMDDHH"></label><button id="check" type="button">Check RAP products</button></p>
+<pre id="status" role="status" aria-live="polite">Select Check RAP products.</pre>
+<p><small>RAP is a model analysis. The Analysis panel chooses data only when its selected field is present at the exact verifying UTC hour. It cannot display a RAP product that was not converted and published, even when forecast-model data for the cycle are complete.</small></p>
+<p><a href="index.html">Return to viewer</a></p>
+<script>
+'use strict';
+const out=document.querySelector('#status');
+function validateHour(s){if(!/^\d{10}$/.test(s))throw Error('Enter a UTC hour as YYYYMMDDHH');const d=new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T${s.slice(8,10)}:00:00Z`);if(!Number.isFinite(d.getTime())||d.toISOString().replace(/[-:T]/g,'').slice(0,10)!==s)throw Error('Invalid UTC date/hour');return d;}
+async function readJSON(url){const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status+' '+r.url);return r.json();}
+async function checkChunk(catalogUrl,ds,field){const url=new URL(ds.path+'/'+field+'/0.0.0',new URL('.',catalogUrl));try{const r=await fetch(url.href,{method:'GET',headers:{Range:'bytes=0-0'},cache:'no-store'});await r.body?.cancel?.();return `${r.status} ${r.ok?'readable':'not readable'} (${url.pathname})`;}catch(e){return 'request failed: '+e.message;}}
+async function run(){const log=[],say=s=>{log.push(s);out.textContent=log.join('\n')};out.textContent='Checking published RAP catalogs…';try{const target=validateHour(document.querySelector('#hour').value.trim()).getTime();
+const cfg=await readJSON('config.json');const source=(cfg.sources||[]).find(x=>x.id==='analysis');if(!source)throw Error('No analysis source in viewer config');
+const tasks=[['Native analysis',source.catalogUrl],['Aligned analysis',cfg.alignedAnalysisCatalogUrl||'data/catalog_aligned_analysis.json']];
+for(const [label,raw] of tasks){const url=new URL(raw,document.baseURI);say(`\n${label}: ${url.href}`);let cat;try{cat=await readJSON(url.href);}catch(e){say('Catalog unavailable: '+e.message);continue;}const data=Array.isArray(cat.datasets)?cat.datasets:[];say(`Catalog updated: ${cat.updated_at||'not supplied'}; datasets: ${data.length}`);
+for(const product of ['rap_surface','rap_pressure']){const ds=data.filter(x=>x.product===product&&Date.parse(x.init_time)===target);if(!ds.length){say(`  ${product}: NO CATALOG RECORD`);continue;}for(const d of ds){const vars=(d.variables||[]).filter(v=>v.available_hours?.includes(0));const names=vars.map(v=>v.name);say(`  ${product}: ${vars.length} usable fields; ${names.join(', ')||'none'}`);const preferred=product==='rap_pressure'?['t850','sbcape','mlcape','mucape','srh01','srh03','shear06']:['mslp','snod','weasd'];const chosen=preferred.find(x=>names.includes(x));if(chosen)say('    Example '+chosen+' Zarr chunk: '+await checkChunk(url.href,d,chosen));}}
+}
+say('\nIf native RAP is absent, first inspect and backfill hourly verification on processing-server. If native data are present but aligned missing, inspect the separate alignment job. If both catalogs contain the requested field/hour and the chunk is readable, refresh the viewer and confirm its selected field and F-hour.');
+}catch(e){say('ERROR: '+e.message);}}
+document.querySelector('#check').addEventListener('click',run);run();
+</script></body></html>

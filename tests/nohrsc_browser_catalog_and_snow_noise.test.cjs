@@ -1,0 +1,27 @@
+"use strict";
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root=path.join(__dirname,'..'),src=fs.readFileSync(path.join(root,'js/viewer.js'),'utf8');
+function section(a,b){const start=src.indexOf(a),end=src.indexOf(b,start);assert(start>=0&&end>start);return src.slice(start,end);}
+const context={Number,Date,Math,Float32Array,JSON,console,st:{colorRanges:new Map()},fmt:s=>new Date(s).toISOString(),cycleKey:s=>new Date(s).toISOString()};
+vm.createContext(context);
+vm.runInContext(section('function snowfallShadeData(data,field,metadata,shape)','function vorticityShadeData(p,ds,v,h,m,raw)'),context);
+const original=Float32Array.from([0,.00001,.0099,.01,.1,1,-1e10,NaN]);context.original=original;
+const filtered=vm.runInContext('snowfallShadeData(original,"snow1h",{levels:[.01,.1,1]})',context);
+assert.deepEqual(Array.from(filtered.slice(0,3)),[-1e10,-1e10,-1e10]);
+assert.equal(filtered[3],original[3]);
+assert.equal(filtered[4],original[4]);assert.equal(filtered[6],-1e10);
+assert.deepEqual(Array.from(original.slice(0,4)),Array.from(Float32Array.from([0,.00001,.0099,.01])),'original data not modified');
+assert.equal(vm.runInContext('snowfallShadeData(original,"apcp",{levels:[.01]})',context),original,'rain unaffected');
+assert.equal(vm.runInContext('snowfallShadeData(original,"asnow",{levels:[.1]})',context)[3],-1e10);
+vm.runInContext(section('function nohrscCatalogDetail(source,product,validTime,field)','function choose(p,hourOverride=st.hour)'),context);
+const ds={product:'nohrsc_24h',init_time:'2026-10-27T00:00:00Z',variables:[{name:'snow24h',available_hours:[0]}]};
+context.source={url:{href:'https://example.org/data/catalog_analysis.json'},catalogUpdatedAt:'2026-10-30T12:00:00Z',datasets:[ds]};
+context.dsTime='2026-10-27T00:00:00Z';
+let status=vm.runInContext('nohrscCatalogDetail(source,"nohrsc_24h",dsTime,"snow24h")',context);
+assert.match(status,/1 NOHRSC datasets/);assert.match(status,/usable snow24h: yes/);
+context.source.datasets=[];
+status=vm.runInContext('nohrscCatalogDetail(source,"nohrsc_24h",dsTime,"snow24h")',context);
+assert.match(status,/0 NOHRSC datasets/);assert.match(status,/nohrsc_diagnostics.html/);
+const html=fs.readFileSync(path.join(root,'nohrsc_diagnostics.html'),'utf8');
+assert.match(html,/catalogUrl/);assert.match(html,/cache:'no-store'/);assert.match(html,/Sample Zarr chunk/);
+console.log('PASS browser-catalog diagnostics and display-only snowfall trace masking');

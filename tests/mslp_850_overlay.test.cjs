@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'index.html'),'utf8'),js=fs.readFileSync(path.join(root,'js/viewer.js'),'utf8');
+assert.match(html,/id="mslp850Option"[^>]*hidden[^>]*><input type="checkbox" id="mslp850ToggleBtn" checked/);
+assert.match(js,/overlayMSLP:true,overlayMSLP850:true/);
+assert.match(js,/localStorage\.getItem\('omd_evu_mslp_850temp'\)/);
+assert.match(js,/el\.mslp850ToggleBtn\.onchange/);
+assert.match(js,/const isobarContour=plottedField==='mslp'/);
+assert.match(js,/const dashedScalar=.*upperAirScalar/);
+assert.match(js,/drawContours\(p,\{field:p\.temperature850Field,key:'t850',always:true,append:drew\}\)/);
+assert.match(js,/const withMSLP850=plottedField==='mslp'&&st\.overlayMSLP850/);
+assert.match(js,/const matching=candidates\.find\(d=>cycleKey\(d\.init_time\)===time/);
+assert.match(js,/overlayPlotDescriptor\(p\)/);
+assert.match(js,/p\.title\.textContent=panelDisplayTitle\(p,overlayPlotDescriptor\(p\)\)/);
+assert.match(js,/MSLP shading.*MSLP isobars/);
+console.log('PASS solid dark MSLP, dashed 850-hPa temperature with independent persistence and time matching, export layer descriptions');

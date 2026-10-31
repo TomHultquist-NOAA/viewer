@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OMD EVU — NOHRSC browser catalog diagnostic</title>
+<style>body{font:15px/1.5 system-ui,sans-serif;max-width:1000px;margin:3rem auto;padding:0 1.2rem;color:#e7eef8;background:#0b1421}h1{font-size:1.65rem}a{color:#9dd7ff}button,input{font:inherit;padding:.45rem .7rem}button{cursor:pointer;background:#184e7a;border:1px solid #4780a9;border-radius:6px;color:white}input{background:#132638;border:1px solid #52748f;color:white;border-radius:6px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#142336;padding:1rem;border-radius:8px;border:1px solid #36485b}small{color:#bdcadd}label{display:inline-flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.5rem .5rem .5rem 0}</style></head><body>
+<h1>NOHRSC browser catalog diagnostic</h1><p>This is read-only. It checks the exact catalog served to the web browser; the processing-server/web-server publishing audit checks a different path. No forecast data are modified.</p>
+<p><label>Model cycle UTC <input id="cycle" value="2026102600" maxlength="10" size="13" aria-label="Cycle YYYYMMDDHH"></label>
+<button id="check" type="button">Check browser catalog</button></p>
+<pre id="status" role="status" aria-live="polite">Select Check browser catalog.</pre>
+<p><small>Compare these results with <code>repair_case_publication.py</code>. If the publication audit reports 23 entries but this page shows zero, investigate the web-served catalog path and caching. If the catalog entries match but chunks fail, inspect HTTP access permissions and Zarr paths.</small></p>
+<p><a href="index.html">Return to viewer</a></p>
+<script>
+'use strict';
+const output=document.querySelector('#status');
+const fetchJson=async(url)=>{const response=await fetch(url,{cache:'no-store',headers:{'Cache-Control':'no-cache'}});if(!response.ok)throw Error(`HTTP ${response.status}: ${response.url}`);return response.json();};
+function isoHour(s){if(!/^\d{10}$/.test(s))throw Error('Use YYYYMMDDHH');const d=new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T${s.slice(8,10)}:00:00Z`);if(!Number.isFinite(d.getTime())||d.toISOString().slice(0,13).replace(/[-T]/g,'')!==s)throw Error('Invalid cycle date');return d;}
+async function diagnose(){const lines=[];const log=x=>{lines.push(x);output.textContent=lines.join('\n');};output.textContent='Loading…';try{
+ const origin=isoHour(document.querySelector('#cycle').value.trim());const config=await fetchJson('config.json');
+ const source=(config.sources||[]).find(s=>s.id===(config.panels||[]).find(p=>p.timeMode==='analysis')?.source)||(config.sources||[]).find(s=>s.id==='analysis');
+ if(!source)throw Error('config.json lacks a configured analysis source');
+ const url=new URL(source.catalogUrl,document.baseURI);log('Analysis catalog URL: '+url.href);
+ const cat=await fetchJson(url.href);log('Schema: '+cat.schema+'; updated_at: '+(cat.updated_at||'not supplied'));const data=Array.isArray(cat.datasets)?cat.datasets:[];
+ const snow=data.filter(d=>['nohrsc_6h','nohrsc_24h'].includes(d.product));log('All datasets: '+data.length+'; NOHRSC datasets: '+snow.length);
+ const targets=[];
+ for(let h=0;h<=84;h+=6){const t=new Date(origin.getTime()+h*3600000),iso=t.toISOString();targets.push([t,'nohrsc_6h','snow6h']);if(t.getUTCHours()%12===0)targets.push([t,'nohrsc_24h','snow24h']);}
+ let ok=0,bad=0,probe=null;
+ for(const [time,product,field] of targets){const found=data.filter(d=>d.product===product&&Date.parse(d.init_time)===time.getTime());const usable=found.find(d=>d.variables?.some(v=>v.name===field&&v.available_hours?.includes(0)));
+ const line=time.toISOString().slice(0,16).replace('T',' ')+' '+product+': '+(usable?'MATCH':found.length?'RECORD WITH WRONG FIELD/HOUR':'MISSING');if(usable){ok++;if(!probe)probe={ds:usable,field};}else bad++;log(line);
+ }
+ log(`\nMatches: ${ok}/${targets.length}; missing or unusable: ${bad}`);
+ if(probe){const base=new URL('.',url),relative=`${probe.ds.path}/${probe.field}/0.0.0`,check=new URL(relative,base);
+ log('\nSample Zarr chunk URL: '+check.href);
+ try{const r=await fetch(check,{method:'GET',headers:{Range:'bytes=0-0'},cache:'no-store'});log('Sample Zarr chunk HTTP status: '+r.status+(r.ok?' (readable)':' (not readable)'));await r.body?.cancel?.();}catch(e){log('Sample Zarr chunk request failed: '+e.message);}
+ }
+ if(!snow.length)log('\nNo NOHRSC products in this HTTP catalog. Compare URL above with web-server target.');
+ }catch(e){log('ERROR: '+e.message);}}
+document.querySelector('#check').addEventListener('click',diagnose);diagnose();
+</script></body></html>
