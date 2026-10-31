@@ -45,8 +45,9 @@ const FIELDS = {
   bandColors:['#4965a8','#7d91bb','#b6c5d8','#e5e7ed','#eeeead','#f9d46a','#f5ab4a','#ed8039','#df5934','#cb3139','#a51a48','#86175e','#6c1773','#50236e']},
 
  rh2m:{label:'2-m relative humidity',unit:'%',min:0,max:100,colors:[[0,'#a25b37'],[.2,'#dc9d46'],[.4,'#e7d78b'],[.6,'#a3c788'],[.8,'#42989b'],[1,'#24558a']],fraction:true},
- // PRATE input is kg m-2 s-1; the GPU sees mm/hour after the ONE conversion.
- prate:{label:'Precipitation rate',unit:'mm h⁻¹',convert:'perhour',levels:[.05,.25,.5,1,2.5,5,7.5,10,15,20,30,40,50,75,100,125,150,175,200],bandColors:RAIN_COLORS},
+ // PRATE input is kg m-2 s-1 (equivalent to mm/s); the GPU displays in/hr.
+ // Fixed inch/hour bins track the previous physical intensity bands.
+ prate:{label:'Precipitation rate',unit:'in/hr',convert:'rateToInHr',levels:[.002,.01,.02,.04,.1,.2,.3,.4,.6,.8,1.2,1.6,2,3,4,5,6,7,8],bandColors:RAIN_COLORS},
  // Zarr accumulation amounts are kg m-2 = mm of water; display as inches.
  apcp1h:{label:'1-hour precipitation',unit:'in',convert:'mmtoin',levels:[.005,.01,.03,.05,.1,.2,.3,.5,.75,1,1.5,2,3,4,5,7,10,15,20],bandColors:RAIN_COLORS},
  apcp3h:{label:'3-hour precipitation',unit:'in',convert:'mmtoin',levels:[.005,.01,.03,.05,.1,.2,.3,.5,.75,1,1.5,2,3,4,5,7,10,15,20],bandColors:RAIN_COLORS},
@@ -80,7 +81,7 @@ for(const pressure of [925,850,700,500,300]){
  for(const dir of ['u','v']) FIELDS[dir+pressure]={label:pressure+'-hPa '+dir.toUpperCase()+' wind',unit:'kt',convert:'mpsToKt'};
 }
 for(const [key,label,unit,min,max] of [
- ['shear01','0–1 km bulk shear','kt',0,100],['shear06','0–6 km bulk shear','kt',0,140],
+ ['shear01','0–1 km bulk shear','kt',0,60],['shear06','0–6 km bulk shear','kt',0,90],
  ['srh01','0–1 km storm-relative helicity','m² s⁻²',-200,650],['srh03','0–3 km storm-relative helicity','m² s⁻²',-200,850],
  ['sbcape','Surface-based CAPE','J kg⁻¹',0,6000],['mlcape','Mixed-layer CAPE','J kg⁻¹',0,6000],['mucape','Most-unstable CAPE','J kg⁻¹',0,7000],
  ['mxuphl','1-hour maximum updraft helicity (2–5 km)','m² s⁻²',-200,400],
@@ -377,7 +378,7 @@ async function refreshSPCReports(){
 'use strict';
 const $=id=>document.getElementById(id);
 const el=Object.fromEntries(['userGuideBtn','userGuideDialog','userGuideClose','userGuideDone','imageOpacity','imageOpacityLabel','spcControl','spcToggleBtn','spcCount','obsControl','obsSynoptic','obsMping','obsCount','obsAttribution','contourOption','mslp850Option','mslp850ToggleBtn','exportKindFieldset','exportGifChoice','exportGifOptions','exportGifStart','exportGifStartLabel','exportGifEnd','exportGifEndLabel','exportGifStep','exportGifDelay','exportGifQuality','exportLargeLabels','exportScroll','exportGifDelayLabel','exportGifSummary','modelSetSelect','differenceDialog','differenceDialogPair','differenceOpenBtn','differenceCancelBtn','differenceWindow','differenceMap','differenceMessage','differenceDragHandle','differenceWindowTitle','differenceWindowSubtitle','differenceCloseBtn','differenceSaveBtn','differenceSample','differenceLegendUnit','contourControl','contourToggleBtn','heightOption','heightToggleBtn','windOption','windToggleBtn','fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportDialogHelp','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels','legendResetBtn','legendRangePopup','legendRangeForm','legendRangeMessage','legendRangeError','legendMinSlider','legendMaxSlider','legendMinNumber','legendMaxNumber','legendRangeApplyBtn','legendRangeResetBtn','legendCancelBtn'].map(x=>[x,$(x)]));
-const st={spcEnabled:false,spcCache:new Map(),spcCurrent:[],spcLoadToken:0,imageOpacity:1,overlayMSLP:true,overlayMSLP850:true,cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,difference:{selected:[],open:false,map:null,layer:null,component:null,grid:null,token:0,timer:null,resizeObserver:null,geo:null,fieldKey:null,snapshot:null,saveBusy:false,mouseSampling:false,liveCanvas:null,liveToken:0,liveTimer:null,outlineCache:null,warmKey:null,warmSerial:0},mrmsAccumCache:null,alignedAccumCache:null,alignedSource:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,lastFieldByGroup:new Map(),hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0,obsCache:new Map(),obsCurrent:null,obsLoadToken:0,obsEnabled:{synoptic:true,mping:true},colorRanges:new Map(),legendSelection:null};
+const st={spcEnabled:false,spcCache:new Map(),spcCurrent:[],spcLoadToken:0,imageOpacity:1,overlayMSLP:true,overlayMSLP850:true,cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,overlaySevereWind:true,difference:{selected:[],open:false,map:null,layer:null,component:null,grid:null,token:0,timer:null,resizeObserver:null,geo:null,fieldKey:null,snapshot:null,saveBusy:false,mouseSampling:false,liveCanvas:null,liveToken:0,liveTimer:null,outlineCache:null,warmKey:null,warmSerial:0},mrmsAccumCache:null,alignedAccumCache:null,alignedSource:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,lastFieldByGroup:new Map(),hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0,obsCache:new Map(),obsCurrent:null,obsLoadToken:0,obsEnabled:{synoptic:true,mping:true},colorRanges:new Map(),legendSelection:null};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -395,6 +396,58 @@ function sharedCameraFromQuery(){
    lat< -85||lat>85||lon< -540||lon>540||zoom<0||zoom>maxZoom||
    Math.abs(bearing)>360||pitch<0||pitch>85)return null;
  return {center:[lon,lat],zoom,bearing,pitch};
+}
+// Convert the panel camera to the floating difference map's viewport size.
+// A MapLibre zoom is pixels per geographical distance: copying the numeric
+// zoom into a different-sized window does not copy the geographic footprint.
+function differenceReferencePanel(){
+ return st.difference.selected.find(p=>p?.map)||st.active.find(p=>p?.map)||null;
+}
+// A numeric zoom alone cannot make both map edges match when the popup has
+// a different aspect ratio. On first open, scale the window's MAP area to
+// the same aspect ratio as the source panel (within its existing size limits).
+// The user can resize it freely after opening; no aspect lock is imposed.
+function differenceInitialMapFootprint(sourceW,sourceH,availableW,availableH){
+ if(![sourceW,sourceH,availableW,availableH].every(v=>Number.isFinite(v)&&v>0))return null;
+ const factor=Math.min(availableW/sourceW,availableH/sourceH);
+ return {width:sourceW*factor,height:sourceH*factor};
+}
+function matchInitialDifferenceWindow(){
+ const panel=differenceReferencePanel();
+ const panelEl=panel?.map?.getContainer?.()||panel?.view;
+ const sourceW=panelEl?.clientWidth||0,sourceH=panelEl?.clientHeight||0;
+ const win=el.differenceWindow,map=el.differenceMap;
+ const fitted=differenceInitialMapFootprint(sourceW,sourceH,map.clientWidth,map.clientHeight);
+ if(!fitted)return false;
+ // Preserve the header, legend, borders and any additional chrome. Only the
+ // geographic map's aspect ratio is adjusted, not its styling or content.
+ const frameW=Math.max(0,win.offsetWidth-map.clientWidth);
+ const frameH=Math.max(0,win.offsetHeight-map.clientHeight);
+ const width=fitted.width+frameW,height=fitted.height+frameH;
+ // Min CSS window sizes on narrow mobile devices may prevent an exact match.
+ // In that case retain responsive sizing and use the zoom fit as a fallback.
+ const computed=typeof getComputedStyle==='function'?getComputedStyle(win):null;
+ const minW=Number.parseFloat(computed?.minWidth)||0;
+ const minH=Number.parseFloat(computed?.minHeight)||0;
+ if(width+0.5<minW||height+0.5<minH)return false;
+ win.style.width=width.toFixed(2)+'px';
+ win.style.height=height.toFixed(2)+'px';
+ return true;
+}
+function differenceViewportZoomAdjustment(target,reference=differenceReferencePanel()){
+ const targetEl=target?.getContainer?.()||target;
+ const sourceEl=reference?.map?.getContainer?.()||reference?.view;
+ const dw=targetEl?.clientWidth||0,dh=targetEl?.clientHeight||0;
+ const sw=sourceEl?.clientWidth||0,sh=sourceEl?.clientHeight||0;
+ if(!(dw>0&&dh>0&&sw>0&&sh>0))return 0;
+ // Fit the entire reference footprint. When aspect ratios differ, the
+ // floating map includes modest additional geography along one dimension.
+ return Math.max(-4,Math.min(4,Math.log2(Math.min(dw/sw,dh/sh))));
+}
+function differenceCameraForViewport(camera,target){
+ if(!camera)return camera;
+ const maxZoom=Number(st.cfg?.display?.maxZoom)||12;
+ return {...camera,zoom:Math.max(0,Math.min(maxZoom,camera.zoom+differenceViewportZoomAdjustment(target)))};
 }
 function currentSharedCamera(){
  const master=st.hover?.master?.map;
@@ -460,7 +513,7 @@ function fieldInfo(v,requested=st.field,sourceModel=''){
 }
 // A raw Zarr chunk is converted ONCE into the display units used by the GPU
 // field, its color map and its hover readout. Never convert sampled GPU values.
-function convert(x,m){switch(m.convert){case 'F':return(x-273.15)*1.8+32;case 'C':return x-273.15;case 'mmtoin':return x/25.4;case 'mtoin':return x*39.37007874;case 'perhour':return x*3600;case 'mpsToKt':return x*1.9438444924406;case 'vort1e5':return x*1e5;case 'PaToHpa':return x/100;default:return x;}}
+function convert(x,m){switch(m.convert){case 'F':return(x-273.15)*1.8+32;case 'C':return x-273.15;case 'mmtoin':return x/25.4;case 'mtoin':return x*39.37007874;case 'rateToInHr':return x*3600/25.4;case 'mpsToKt':return x*1.9438444924406;case 'vort1e5':return x*1e5;case 'PaToHpa':return x/100;default:return x;}}
 function formatReadout(x,m){
  if(!Number.isFinite(x)||x < -1e9)return '—';
  if(m.ptypeReflectivity){
@@ -474,7 +527,7 @@ function formatReadout(x,m){
   return Math.abs(x-code)<.01&&code>=0&&code<PTYPE_LABELS.length?PTYPE_LABELS[code]:'Unknown';
  }
  // Extra decimals for small rates/accumulations, without converting again.
- const smallUnits=m.convert==='mmtoin'||m.convert==='mtoin'||m.convert==='perhour';
+ const smallUnits=m.convert==='mmtoin'||m.convert==='mtoin'||m.convert==='rateToInHr';
  const digits=smallUnits&&Math.abs(x)<0.1?3:smallUnits&&Math.abs(x)<1?2:2;
  return x.toFixed(digits);
 }
@@ -510,6 +563,13 @@ function detailThreshold(){return Math.max(0,Number(st.cfg?.display?.detailMinZo
 function countyThreshold(p=null){
  const d=st.cfg?.display||{};
  const base=Number(d[st.mode==='globe'?'globeCountyMinZoom':'countyMinZoom']??(st.mode==='globe'?4.30:4.25));
+ // The difference map is its own resizable viewport. Translate the threshold
+ // into the selected panel's pixel/geographic scale, rather than revealing
+ // counties merely because the floating window has a different footprint.
+ if(p&&p===st.difference.geo&&p.map){
+  const reference=differenceReferencePanel();
+  return countyThreshold(reference)+differenceViewportZoomAdjustment(p.map,reference);
+ }
  // The same map zoom covers a larger geographic footprint in an expanded
  // viewport. Delay counties in proportion to its increased *map area* so
  // their perceived scale is closer to the ordinary multi-panel layout.
@@ -682,7 +742,7 @@ async function boot(){try{
  st.overlayMSLP850=saved850!=='0';
  // Independent, persistent choices for height contours, pressure-level wind,
  // and 10-m wind; all three are enabled on first use.
- for(const [key,storage] of [['overlayHeight','omd_evu_height_overlay'],['overlayUpperWind','omd_evu_upper_wind_overlay'],['overlaySurfaceWind','omd_evu_surface_wind_overlay']]){
+ for(const [key,storage] of [['overlayHeight','omd_evu_height_overlay'],['overlayUpperWind','omd_evu_upper_wind_overlay'],['overlaySurfaceWind','omd_evu_surface_wind_overlay'],['overlaySevereWind','omd_evu_severe_wind_overlay']]){
   let saved=null;try{saved=localStorage.getItem(storage);}catch(_){}
   st[key]=saved!=='0';
  }
@@ -1027,9 +1087,8 @@ function bind(){
   for(const p of st.panels){updatePanelPlotTitle(p);scheduleContourRedraw(p);}
  };
  el.windToggleBtn.onchange=()=>{
-  const upper=Boolean(heightVariableName(st.field));
-  const key=upper?'overlayUpperWind':'overlaySurfaceWind';
-  const storage=upper?'omd_evu_upper_wind_overlay':'omd_evu_surface_wind_overlay';
+  const key=overlayWindSetting(st.field);
+  const storage=key==='overlayUpperWind'?'omd_evu_upper_wind_overlay':key==='overlaySurfaceWind'?'omd_evu_surface_wind_overlay':'omd_evu_severe_wind_overlay';
   st[key]=el.windToggleBtn.checked;
   try{localStorage.setItem(storage,st[key]?'1':'0');}catch(_){}
   for(const p of st.panels){updatePanelPlotTitle(p);scheduleWindRedraw(p);}
@@ -1179,6 +1238,9 @@ function setTheme(theme,save){
    }
    if(m.getLayer?.('evu-observed-mping'))refreshMpingTriangleTheme(m);
  }
+ // Repaint already-open Skew-T and point-series canvases as well. Their
+ // rendered pixels do not respond to CSS theme variables on their own.
+ window.EVUPointInspector?.refreshTheme?.();
 }
 // Geography is advisory: an outage or slow connection must never stop the forecast map.
 async function geoData(key){
@@ -1452,7 +1514,7 @@ function switchProjection(mode,{reset=false}={}){
  clearSynchronizedHover();
  if(st.difference.open&&st.difference.map){
   try{st.difference.map.setProjection({type:st.mode==='globe'?'globe':'mercator'});
-   st.difference.map.jumpTo(st.mapView||makeViewBounds());
+   st.difference.map.jumpTo(differenceCameraForViewport(st.mapView||makeViewBounds(),st.difference.map));
    if(st.difference.geo)geographyZoom(st.difference.geo);
   }catch(e){console.warn('Difference map projection update',e);}
  }
@@ -1466,7 +1528,10 @@ function syncViews(source){
   st.mapView=camera;
   st.mapViews[st.mode]=camera;
   for(const p of st.active)if(p.map&&p.map!==source)p.map.jumpTo(camera);
-  if(st.difference.open&&st.difference.map)st.difference.map.jumpTo(camera);
+  if(st.difference.open&&st.difference.map){
+   st.difference.map.jumpTo(differenceCameraForViewport(camera,st.difference.map));
+   if(st.difference.geo)geographyZoom(st.difference.geo);
+  }
  }finally{st.syncing=false;}
 }
 // Cursor position is shared geographically, never as a pixel coordinate; each
@@ -2548,9 +2613,14 @@ function contoursAvailable(field=st.field){return Boolean(field&&!NO_CONTOURS.ha
 function contourTier(zoom){return zoom<3.6?0:zoom<6?1:2;}
 function contourInterval(field,zoom){const steps=CONTOUR_STEPS[field];return steps?steps[contourTier(zoom)]:null;}
 function overlayHeightVisible(field=st.field){return Boolean(heightVariableName(field)&&st.overlayHeight);}
-function overlayWindVisible(field=st.field){
- return Boolean(heightVariableName(field)?st.overlayUpperWind:field==='wspd10'&&st.overlaySurfaceWind);
+function overlayWindSetting(field=st.field){
+ return ['shear01','shear06','srh01','srh03'].includes(field)?'overlaySevereWind':
+    heightVariableName(field)?'overlayUpperWind':'overlaySurfaceWind';
 }
+function overlayWindVisible(field=st.field){
+ return Boolean(windComponentNames(field) && st[overlayWindSetting(field)]);
+}
+
 function updateContourControl(){
  if(!el.contourControl)return;
  const linesAvailable=contoursAvailable();
@@ -2571,7 +2641,12 @@ function updateContourControl(){
  el.obsCount.hidden=!reportsAvailable;
  el.obsAttribution.hidden=!reportsAvailable;
  el.heightToggleBtn.checked=st.overlayHeight;
- el.windToggleBtn.checked=heightAvailable?st.overlayUpperWind:st.overlaySurfaceWind;
+ el.windToggleBtn.checked=st[overlayWindSetting(st.field)]!==false;
+ const windLabel=el.windOption?.querySelector?.('span');
+ if(windLabel)windLabel.textContent=st.field.startsWith('shear')?'Shear barbs':
+   st.field.startsWith('srh')?'Storm motion barbs':'Wind';
+ if(el.windOption)el.windOption.title=st.field.startsWith('shear')?'Display 0–1/0–6 km shear-vector wind barbs (knots)':
+   st.field.startsWith('srh')?'Display native Bunkers right-moving storm-motion barbs':'Display meteorological wind barbs';
  el.contourToggleBtn.checked=st.field==='mslp'?st.overlayMSLP:st.contours;
  const interval=contourInterval(st.field,st.active?.find(p=>p.map)?.map?.getZoom?.()??3);
  const m=FIELDS[st.field];
@@ -2919,8 +2994,10 @@ function drawWindBarbs(p,exportStyle=null){
   if(!Number.isFinite(lon)||!Number.isFinite(lat)||Math.abs(lat)>88||!globeFrontVisible(m,lon,lat))continue;
   let uu,vv;try{uu=Number(u.sampleField(lon,lat));vv=Number(v.sampleField(lon,lat));}catch(_){continue;}
   if(!Number.isFinite(uu)||!Number.isFinite(vv)||uu < -1e9||vv < -1e9)continue;
-  const speed=Math.hypot(uu,vv);
-  if(speed<2.5){paintBarb(ctx,x,y,0,-1,speed,size);continue;}
+  const isShear=String(p.cfg?.field||st.field).startsWith('shear');
+  const speed=Math.hypot(uu,vv)*1.94384449; // m/s to meteorological knots
+  if(!isShear&&speed<2.5){paintBarb(ctx,x,y,0,-1,speed,size);continue;}
+  if(isShear&&speed<1)continue;
   // Calculate compass directions from local projected east and north vectors;
   // remains correct under map rotation, Mercator, and globe projection.
   let e,n;
@@ -2933,6 +3010,10 @@ function drawWindBarbs(p,exportStyle=null){
   if(el<1e-5||nl<1e-5)continue;
   const dx=-uu*e[0]/el-vv*n[0]/nl,dy=-uu*e[1]/el-vv*n[1]/nl;
   if(!Number.isFinite(dx+dy)||Math.hypot(dx,dy)<.00001)continue;
+  // The shear components represent an upper-minus-lower wind difference,
+  // rather than an actual wind at a height. Use the same conventional
+  // wind-barb geometry (5/10/50 kt) for the vector difference, with the
+  // shaft opposite the downshear vector, just as for a wind vector.
   paintBarb(ctx,x,y,dx,dy,speed,size);
  }
  ctx.shadowBlur=0;
@@ -2955,7 +3036,9 @@ function scheduleWindRedraw(p){
 function clearWindBarbs(p){p.wind=null;if(p.windCanvas){const ctx=p.windCanvas.getContext('2d');ctx?.clearRect(0,0,p.windCanvas.width,p.windCanvas.height);}}
 function windComponentNames(field){
  const level=field==='t925'?925:field==='t850'?850:field==='t700'?700:field==='absv500'?500:field==='wspd300'?300:0;
- return level?['u'+level,'v'+level]:field==='wspd10'?['u10','v10']:null;
+ return level?['u'+level,'v'+level]:field==='wspd10'?['u10','v10']:
+  field==='shear01'?['shru01','shrv01']:field==='shear06'?['shru06','shrv06']:
+  field==='srh01'||field==='srh03'?['ustm','vstm']:null;
 }
 function heightVariableName(field){return field==='t925'?'h925':field==='t850'?'h850':field==='t700'?'h700':field==='absv500'?'h500':field==='wspd300'?'h300':null;}
 // Secondary MSLP overlay: temperature is selected from a compatible source
@@ -2988,7 +3071,7 @@ function overlayPlotDescriptor(p){
  }
  const parts=[FIELDS[field]?.label||field];
  if(heightVariableName(field)&&st.overlayHeight&&p?.heightField)parts.push('height');
- if(windComponentNames(field)&&overlayWindVisible(field)&&p?.wind)parts.push('wind barbs');
+ if(windComponentNames(field)&&overlayWindVisible(field)&&p?.wind)parts.push(field.startsWith('shear')?'shear barbs':field.startsWith('srh')?'right-mover barbs':'wind barbs');
  if(st.contours&&contoursAvailable(field))parts.push('shaded-field contours');
  return parts.join(' + ');
 }
@@ -3008,6 +3091,26 @@ async function prepareHeightContours(p,ds,h,seq){
   scheduleContourRedraw(p);
  }catch(e){console.warn(name+' height overlay unavailable',e);}
 }
+// Legacy forecast shear components retain their native VUCSH/VVCSH units.
+// RAP analysis v2 components are explicitly normalized to m/s. Detect from
+// paired data so both new and older already-published forecasts display well.
+function shearOverlayScale(u,v,depth){
+ const sample=[];const step=Math.max(1,Math.floor(u.length/2048));
+ for(let i=0;i<u.length;i+=step){
+  const a=u[i],b=v[i];
+  if(Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a)<1e9&&Math.abs(b)<1e9)
+   sample.push(Math.hypot(a,b));
+ }
+ if(!sample.length)return null;
+ sample.sort((a,b)=>a-b);
+ const median=sample[Math.floor(sample.length/2)];
+ if(median>=.2)return 1;
+ if(median<=.03)return depth;
+ return null; // source units ambiguous; do not draw mislabeled barbs
+}
+function scaledShearField(data,scale){
+ return Float32Array.from(data,v=>Number.isFinite(v)&&Math.abs(v)<1e9&&Math.abs(v*scale)<=125?v*scale:NaN);
+}
 async function prepareWindBarbs(p,ds,h,seq){
  const names=windComponentNames(p.cfg?.field||st.field);
  if(!p.map||!names)return;
@@ -3015,11 +3118,16 @@ async function prepareWindBarbs(p,ds,h,seq){
  if(!u||!v||!u.available_hours.includes(h)||!v.available_hours.includes(h))return;
  try{
   const [ud,vd]=await Promise.all([
-   getDisplayData(p.src,ds,u,h,fieldInfo(u),()=>{}),
-   getDisplayData(p.src,ds,v,h,fieldInfo(v),()=>{})
+   getDisplayData(p.src,ds,u,h,{convert:null},()=>{}),
+   getDisplayData(p.src,ds,v,h,{convert:null},()=>{})
   ]);
   if(seq!==st.seq||!p.map||!windComponentNames(p.cfg?.field||st.field))return;
-  p.wind={u:new apgl.RawScalarField(gridForPanel(p,ds,u),ud),v:new apgl.RawScalarField(gridForPanel(p,ds,v),vd)};
+  const fieldName=p.cfg?.field||st.field;
+  const depth=fieldName==='shear01'?1000:fieldName==='shear06'?6000:null;
+  const scale=depth?shearOverlayScale(ud,vd,depth):1;
+  if(scale===null){console.warn('Ambiguous native bulk-shear component units',p.cfg.label);return;}
+  p.wind={u:new apgl.RawScalarField(gridForPanel(p,ds,u),depth?scaledShearField(ud,scale):ud),
+          v:new apgl.RawScalarField(gridForPanel(p,ds,v),depth?scaledShearField(vd,scale):vd)};
   scheduleWindRedraw(p);
  }catch(e){console.warn('Wind barbs unavailable for '+p.cfg.label+':',e);}
 }
@@ -3506,9 +3614,21 @@ async function play(){if(st.playing)return;st.playing=true;el.playBtn.classList.
 function stop(){st.playing=false;el.pauseBtn.classList.add('active');el.playBtn.classList.remove('active');}
 function rounded(ctx,x,y,w,h,r=11){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
 function clipText(ctx,s,width){s=String(s||'');while(ctx.measureText(s).width>width&&s.length>2)s=s.slice(0,-2)+'…';return s;}
+// Download names include their valid-run context AND a unique export stamp.
+// Browser auto-renaming as (1), (2), ... obscured distinct exports, particularly
+// difference PNGs. Keep a per-page session token and counter for same-ms clicks.
+const EXPORT_SESSION_TOKEN=Math.random().toString(36).slice(2,8).padEnd(6,'0');
+let exportSequence=0;
+function uniqueExportName(name){
+ const stamp=new Date().toISOString().replace(/[-:.]/g,'');
+ const suffix=`_${stamp}_${EXPORT_SESSION_TOKEN}_${(++exportSequence).toString(36)}`;
+ const match=/^(.*?)(\.[A-Za-z0-9]+)$/.exec(String(name));
+ return match?`${match[1]}${suffix}${match[2]}`:`${name}${suffix}`;
+}
+window.OMDEVUUniqueExportName=uniqueExportName;
 function canvasPNG(c,name){return new Promise((resolve,reject)=>{
  c.toBlob(blob=>{if(!blob){reject(new Error('Canvas export failed; not enough memory?'));return;}
-  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),15000);resolve();
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=uniqueExportName(name);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),15000);resolve();
  },'image/png');
 });}
 // MapLibre draws its basemap and autumnplot-gl weather textures with WebGL.
@@ -3646,7 +3766,7 @@ function observationMarkerAtZoom(style,zoom){
 }
 function exportObservationMarkerScale(renderScale,oldZoom,exportZoom,original,sharpIndividual){
  const configured=Number(st.cfg?.display?.exportObservationMarkerScale??1);
- const gain=Number.isFinite(configured)?Math.max(.5,Math.min(2.5,configured)):1;
+ const gain=1.12*(Number.isFinite(configured)?Math.max(.5,Math.min(2.5,configured)):1);
  // Single-panel output gains an additional 20% for readability. Multi-panel
  // plots do not enlarge the capture viewport and use a fixed, prominent size.
  const base=sharpIndividual?1.2*Math.max(1,renderScale):1.7;
@@ -3670,7 +3790,8 @@ function scaledObservationZoomSize(value,factor){
  return null; // Unknown expressions are left untouched instead of risking invalid styles.
 }
 function applyExportObservationMarkerSize(map,renderScale,oldZoom,exportZoom,sharpIndividual){
- if(!observationVisible()||!map)return ()=>{};
+ const obs=observationVisible(),spc=spcVisible();
+ if((!obs&&!spc)||!map)return ()=>{};
  const changes=[];
  const restore=()=>{
   for(const {layer,kind,property,original} of changes.reverse()){
@@ -3681,12 +3802,14 @@ function applyExportObservationMarkerSize(map,renderScale,oldZoom,exportZoom,sha
   }
  };
  try{
-  for(const [layer,kind,property] of [
-   ['evu-observed-metar','paint','circle-radius'],
-   ['evu-observed-metar','paint','circle-stroke-width'],
-   ['evu-observed-mping','layout','icon-size']
+  for(const [layer,kind,property,enabled] of [
+   ['evu-observed-metar','paint','circle-radius',obs],
+   ['evu-observed-metar','paint','circle-stroke-width',obs],
+   ['evu-observed-mping','layout','icon-size',obs],
+   ['evu-spc-lsr','paint','circle-radius',spc],
+   ['evu-spc-lsr','paint','circle-stroke-width',spc]
   ]){
-   if(!map.getLayer?.(layer))continue;
+   if(!enabled||!map.getLayer?.(layer))continue;
    const original=kind==='paint'?map.getPaintProperty(layer,property):map.getLayoutProperty(layer,property);
    const factor=exportObservationMarkerScale(renderScale,oldZoom,exportZoom,original,sharpIndividual);
    if(!(factor>1.001))continue;
@@ -3914,7 +4037,7 @@ function drawIndividualExportObservations(ctx,observations,mapRect,mapImage,plot
  const ih=mapImage.naturalHeight||mapImage.height;
  if(!(iw>0&&ih>0))return;
  const configured=Number(st.cfg?.display?.exportObservationMarkerScale??1);
- const gain=Number.isFinite(configured)?Math.max(.5,Math.min(2.5,configured)):1;
+ const gain=1.12*(Number.isFinite(configured)?Math.max(.5,Math.min(2.5,configured)):1);
  // At 1920px, METAR/SPC circles have ~12px radius and mPING triangles
  // are ~29px wide. At GIF resolutions, scale proportionally.
  const radius=Math.max(7,Math.min(20,plotWidth/158))*gain;
@@ -3954,6 +4077,16 @@ function panelMapRatio(p){
  if(c?.width>0&&c?.height>0)return c.width/c.height;
  const rect=p.view?.getBoundingClientRect?.();
  return rect?.width>0&&rect?.height>0?rect.width/rect.height:null;
+}
+// Keep the PNG plot aperture and header typography identical for
+// standalone panel and difference-map exports. Different apertures were
+// causing a small geographic crop mismatch at the same output dimensions.
+function standaloneExportLayout(w,h,largeLabels){
+ const headerTop=largeLabels?100:60;
+ return {headerTop,mapX:14,mapY:headerTop,mapW:w-28,mapH:h-headerTop-77,
+  titleFont:Math.round(Math.max(15,Math.min(25,w/40))*(largeLabels?1.7:1)),
+  subtitleFont:Math.round(Math.max(11,Math.min(15,w/70))*(largeLabels?1.7:1)),
+  titleY:largeLabels?30:19,subtitleY:largeLabels?73:43};
 }
 async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
  if(sharedMode){
@@ -3995,16 +4128,16 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
  const light=st.theme==='light',fg=light?'#1d2e42':'#eef4fa',muted=light?'#54687e':'#aebfd1';
  ctx.fillStyle=light?'#fff':'#101d2e';rounded(ctx,x,y,w,h,12);
  ctx.fillStyle=fg;const largeLabels=!!st.exportLargeLabels;
- const headerTop=largeLabels?100:60;
- ctx.font=`bold ${Math.round(Math.max(15,Math.min(25,w/40))*(largeLabels?1.7:1))}px Arial`;
+ const layout=standaloneExportLayout(w,h,largeLabels),headerTop=layout.headerTop;
+ ctx.font=`bold ${layout.titleFont}px Arial`;
  ctx.textBaseline='middle';ctx.textAlign='left';
- ctx.fillText(clipText(ctx,p.title.textContent,w-36),x+18,y+(largeLabels?30:19));
- ctx.font=`${Math.round(Math.max(11,Math.min(15,w/70))*(largeLabels?1.7:1))}px Arial`;ctx.fillStyle=muted;
- ctx.fillText(clipText(ctx,p.sub.textContent,w-36),x+18,y+(largeLabels?73:43));
+ ctx.fillText(clipText(ctx,p.title.textContent,w-36),x+18,y+layout.titleY);
+ ctx.font=`${layout.subtitleFont}px Arial`;ctx.fillStyle=muted;
+ ctx.fillText(clipText(ctx,p.sub.textContent,w-36),x+18,y+layout.subtitleY);
  // In large comparison grids, a narrow vertical bar gives the map noticeably
  // more height. Individual/short-grid exports retain a horizontal colorbar.
  const side=verticalLegend?Math.max(75,Math.min(102,Math.round(w*.09))):0;
- const boxX=x+14,boxY=y+headerTop,boxW=w-28-side,boxH=h-(verticalLegend?headerTop+14:headerTop+77);
+ const boxX=x+layout.mapX,boxY=y+layout.mapY,boxW=layout.mapW-side,boxH=verticalLegend?h-(headerTop+14):layout.mapH;
  ctx.fillStyle=light?'#d6e6ee':'#0b2238';ctx.fillRect(boxX,boxY,boxW,boxH);
  const captured=await panelImage(p,boxW,boxH,st.lastExportFraming,true);
  if(captured.map&&p.status==='ready'){
@@ -4127,7 +4260,7 @@ async function exportAnimationGif(selection,ratio,framing){
   }
   const bytes=encoder.finish(),blob=new Blob([bytes],{type:'image/gif'}),url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;
-  a.download=`omd_evu_${st.field}_${st.ref?.id?.replace(/[^0-9A-Za-z]/g,'')||'run'}_f${pad3(opt.hours[0])}-f${pad3(opt.hours.at(-1))}_${selection.type}.gif`;
+  a.download=uniqueExportName(`omd_evu_${st.field}_${st.ref?.id?.replace(/[^0-9A-Za-z]/g,'')||'run'}_f${pad3(opt.hours[0])}-f${pad3(opt.hours.at(-1))}_${selection.type}.gif`);
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),120000);
  }finally{
   st.hour=original;syncUI();await renderAll();
@@ -4264,13 +4397,13 @@ function differenceZeroOpacity(value,range){
  return amount<=neutral?0:amount>=fadeEnd?1:(amount-neutral)/(fadeEnd-neutral);
 }
 const DIFFERENCE_LIMITS={mslp:12,t2m:15,dpt2m:15,t925:10,t850:10,t700:10,rh2m:40,
- wspd10:30,gust:40,refc:30,prate:30,apcp:3,apcp1h:1.5,apcp3h:2,apcp6h:3,apcp24h:5,apcp48h:8,snow1h:6,snow3h:12,snow6h:18,
+ wspd10:30,gust:40,refc:30,prate:1.2,apcp:3,apcp1h:1.5,apcp3h:2,apcp6h:3,apcp24h:5,apcp48h:8,snow1h:6,snow3h:12,snow6h:18,
  snod:24,asnow:24,weasd:4,frzr:2,frozr:2,tsnowp:3,
- cpofp:40,snowc:40,sden:150};
+ cpofp:40,snowc:40,sden:150,shear01:20,shear06:30};
 const DIFFERENCE_TICK_STEPS={mslp:4,t2m:5,dpt2m:5,t925:5,t850:5,t700:5,rh2m:10,
- wspd10:10,gust:10,refc:10,prate:10,apcp:1,apcp1h:.5,apcp3h:.5,apcp6h:1,apcp24h:2,apcp48h:3,snow1h:2,snow3h:3,snow6h:6,
+ wspd10:10,gust:10,refc:10,prate:.4,apcp:1,apcp1h:.5,apcp3h:.5,apcp6h:1,apcp24h:2,apcp48h:3,snow1h:2,snow3h:3,snow6h:6,
  snod:6,asnow:6,weasd:1,frzr:.5,frozr:.5,tsnowp:1,
- cpofp:10,snowc:10,sden:50};
+ cpofp:10,snowc:10,sden:50,shear01:5,shear06:10};
 function differenceAnalysisSource(p){
  if(p?.cfg?.timeMode!=='analysis')return '';
  const source=String(p.ds?.product||p.ds?.source||'').toLowerCase();
@@ -4395,6 +4528,10 @@ async function openDifferenceWindow(){
  const diff=st.difference;if(diff.open||diff.selected.length!==2)return;
  if(DIFFERENCE_BLOCKED_FIELDS.has(st.field))return;
  diff.open=true;diff.fieldKey=null;diff.snapshot=null;el.differenceWindow.hidden=false;el.differenceSaveBtn.disabled=true;el.differenceSample.hidden=true;
+ // Start from the CSS default every time, so a previous manual resize does
+ // not determine the next popup's initial geographic extent.
+ el.differenceWindow.style.width='';el.differenceWindow.style.height='';
+ matchInitialDifferenceWindow();
  showDifferenceMessage('Initializing difference map…');
  const camera=currentSharedCamera()||makeViewBounds();
  try{
@@ -4403,8 +4540,9 @@ async function openDifferenceWindow(){
   // window (v0.48.2), leaving a blank view and a stalled PNG capture.
   const host=document.createElement('div');host.className='difference-map-host';
   el.differenceMap.prepend(host);
+  const fittedCamera=differenceCameraForViewport(camera,host);
   const map=new maplibregl.Map({container:host,style:mapStyle(),
-   center:camera.center,zoom:camera.zoom,bearing:camera.bearing||0,pitch:camera.pitch||0,
+   center:fittedCamera.center,zoom:fittedCamera.zoom,bearing:fittedCamera.bearing||0,pitch:fittedCamera.pitch||0,
    projection:{type:st.mode==='globe'?'globe':'mercator'},minZoom:0,
    maxZoom:st.cfg.display.maxZoom||12,keyboard:false,attributionControl:false,preserveDrawingBuffer:true,fadeDuration:0});
   diff.map=map;map.keyboard?.disable?.();
@@ -4420,12 +4558,19 @@ async function openDifferenceWindow(){
   map.on('mousemove',paintDifferenceSample);
   map.on('mouseout',()=>{el.differenceSample.hidden=true;});
   map.on('touchstart',()=>{el.differenceSample.hidden=true;});
-  if(typeof ResizeObserver==='function'){diff.resizeObserver=new ResizeObserver(()=>{if(diff.open&&diff.map)diff.map.resize();if(diff.snapshot){setDifferenceLegend(diff.snapshot.fieldKey,diff.snapshot.range,diff.snapshot.unit);scheduleDifferenceLiveRender();}});
+  if(typeof ResizeObserver==='function'){diff.resizeObserver=new ResizeObserver(()=>{
+   if(diff.open&&diff.map){diff.map.resize();if(diff.geo)geographyZoom(diff.geo);}
+   if(diff.snapshot){setDifferenceLegend(diff.snapshot.fieldKey,diff.snapshot.range,diff.snapshot.unit);scheduleDifferenceLiveRender();}
+  });
    diff.resizeObserver.observe(el.differenceWindow);}
   await new Promise((resolve,reject)=>{
    if(map.loaded())resolve();else{map.once('load',resolve);map.once('error',e=>reject(e.error||new Error('Difference map did not load')));}
   });
   if(!diff.open||diff.map!==map)return;
+  // Re-measure after MapLibre has laid out the container, so even a popup
+  // opened while CSS sizing settles inherits the panel's geographic footprint.
+  map.resize();
+  map.jumpTo(differenceCameraForViewport(camera,map));
   addGeographySkeleton(map);
   diff.geo={map,geoApplied:new Set(),geoPending:new Set(),geoTimer:null};
   startGeography(diff.geo);
@@ -4942,29 +5087,30 @@ async function exportDifferencePNG(ratio='16:9',framing='fill'){
  diff.saveBusy=true;el.differenceSaveBtn.disabled=true;
  try{
   const {width:W,height:H}=exportDimensions(false,ratio);
-  const scale=H/1080;
-  const head=Math.round(120*scale),foot=Math.round(105*scale),innerH=H-head-foot;
-  if(innerH<100)throw Error('Difference export has insufficient plot height.');
-  const {image,overlay,outlines}=await captureSharpDifferenceFrame(diff.map,snap,W,innerH,framing);
+  const layout=standaloneExportLayout(W,H,!!st.exportLargeLabels);
+  if(layout.mapH<100)throw Error('Difference export has insufficient plot height.');
+  const {image,overlay,outlines}=await captureSharpDifferenceFrame(diff.map,snap,layout.mapW,layout.mapH,framing);
   if(!diff.open||snap!==diff.snapshot||snap.seq!==st.seq)
    throw Error('Difference changed while exporting. Retry with the current data.');
   const c=document.createElement('canvas');c.width=W;c.height=H;const cx=c.getContext('2d');
   const dark=st.theme!=='light',fg=dark?'#e8f0fb':'#24394e',bg=dark?'#09111f':'#f0f5fa';
   cx.fillStyle=bg;cx.fillRect(0,0,W,H);
   cx.fillStyle=fg;cx.textAlign='left';cx.textBaseline='middle';
-  cx.font=`bold ${Math.round(39*scale*(st.exportLargeLabels?1.4:1))}px Arial`;
-  cx.fillText(clipText(cx,`Difference · ${FIELDS[snap.fieldKey]?.label||snap.fieldKey}`,W-64),32,Math.round(43*scale));
-  cx.font=`${Math.round(25*scale*(st.exportLargeLabels?1.4:1))}px Arial`;
-  cx.fillText(clipText(cx,`${snap.labelA} − ${snap.labelB} · Init ${fmt(snap.init)} · F${pad3(snap.hour)} · Valid ${snap.valid}`,W-64),32,Math.round(94*scale));
+  cx.font=`bold ${layout.titleFont}px Arial`;
+  cx.fillText(clipText(cx,`Difference · ${FIELDS[snap.fieldKey]?.label||snap.fieldKey}`,W-36),18,layout.titleY);
+  cx.font=`${layout.subtitleFont}px Arial`;
+  cx.fillText(clipText(cx,`${snap.labelA} − ${snap.labelB} · Init ${fmt(snap.init)} · F${pad3(snap.hour)} · Valid ${snap.valid}`,W-36),18,layout.subtitleY);
   // Draw one combined map with identical framing for background, raster,
   // and bright boundaries. The shared panel helper preserves aspect ratio.
   const combined=document.createElement('canvas');
   combined.width=image.naturalWidth;combined.height=image.naturalHeight;
   const cc=combined.getContext('2d');
   cc.drawImage(image,0,0);cc.drawImage(overlay,0,0);cc.drawImage(outlines,0,0);
-  drawMapFramed(cx,combined,0,head,W,innerH,framing);
-  const y=H-foot+Math.round(17*scale),left=Math.round(115*W/1920),right=W-left,rampW=right-left;
-  const rampH=Math.max(17,Math.round(24*scale));
+  drawMapFramed(cx,combined,layout.mapX,layout.mapY,layout.mapW,layout.mapH,framing);
+  const y=H-42,left=18,right=W-18,rampW=right-left;
+  const rampH=13;
+  cx.fillStyle=fg;cx.font=`bold ${Math.max(12,Math.min(16,W/58))}px Arial`;
+  cx.fillText(clipText(cx,snap.unit?`Difference (${snap.unit})`:'Difference',W-36),18,H-61);
   const gradient=cx.createLinearGradient(left,0,right,0);
   // Mirror the real difference raster, including its transparent zero band.
   const rgb=DIFFERENCE_COLORS.map(hex=>[1,3,5].map(k=>parseInt(hex.slice(k,k+2),16)));
@@ -4975,14 +5121,12 @@ async function exportDifferencePNG(ratio='16:9',framing='fill'){
   }
   cx.fillStyle=gradient;cx.fillRect(left,y,rampW,rampH);
   cx.strokeStyle=fg;cx.lineWidth=1;cx.strokeRect(left,y,rampW,rampH);
-  cx.fillStyle=fg;cx.font=`${Math.max(14,Math.round(20*scale))}px Arial`;cx.textAlign='center';
+  cx.fillStyle=fg;cx.font='11px Arial';cx.textAlign='center';
   for(const t of differenceTicks(snap.fieldKey,snap.range)){
    const x=left+((t+snap.range)/(snap.range*2))*rampW;
-   cx.fillRect(x-1,y+rampH,2,7*scale);
-   cx.fillText(differenceNumber(t),x,y+rampH+Math.round(23*scale));
+   cx.fillRect(x-.5,y+rampH,1,5);
+   cx.fillText(differenceNumber(t),x,H-15);
   }
-  cx.font=`${Math.max(13,Math.round(18*scale))}px Arial`;
-  cx.fillText(snap.unit?`Difference (${snap.unit})`:'Difference',W/2,H-Math.round(13*scale));
   await canvasPNG(c,`evu_difference_${snap.fieldKey}_${snap.init.replace(/\D/g,'')}_f${pad3(snap.hour)}_${ratio.replace(':','x')}_${framing}.png`);
  }catch(err){
   console.error('Difference PNG export failed',err);

@@ -36,7 +36,7 @@ for(const color of Object.values(spcColor))assert.ok(calls.some(x=>x[0]==='fill'
 assert.equal(calls.filter(x=>x[0]==='stroke'&&x[1]==='#ffffff').length,3,'retains dark-theme contrast outlines');
 const circle=calls.find(x=>x[0]==='arc');
 assert.ok(Math.abs(circle[1]-220)<1e-6&&Math.abs(circle[2]-170)<1e-6,'geographically projected in final PNG pixels');
-assert.ok(circle[3]>=11.9&&circle[3]<=12.1,'LSR circle matches METAR final-image radius at 1920px');
+assert.ok(circle[3]>=13.3&&circle[3]<=13.6,'LSR circle matches METAR final-image radius at 1920px');
 const small=[];
 context.drawIndividualExportObservations({...canvas,arc:(...a)=>small.push(a)},snapshot,rect,im,1180);
 assert.ok(small[0][2]<circle[3],'GIF symbols scale down proportionally');

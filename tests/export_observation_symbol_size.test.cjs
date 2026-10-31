@@ -7,7 +7,7 @@ assert.equal(config.display.exportObservationMarkerScale,1);
 const begin=src.indexOf('// The single-panel export expands its real CSS map viewport');
 const end=src.indexOf('async function captureMapPNG(',begin);
 assert.ok(begin>0&&end>begin,'export-specific observation scaling helpers exist');
-const c=vm.createContext({st:{cfg:{display:{exportObservationMarkerScale:1}}},observationVisible:()=>true,console});
+const c=vm.createContext({st:{cfg:{display:{exportObservationMarkerScale:1}}},observationVisible:()=>true,spcVisible:()=>false,console});
 vm.runInContext(src.slice(begin,end),c);
 const radius=['interpolate',['linear'],['zoom'],2,3.8,5,5,9,6];
 const icon=['interpolate',['linear'],['zoom'],2,.59,5,.73,9,.9];
@@ -28,16 +28,16 @@ for(const scale of [1.5,2.5,4,6]){
  const z0=2.7,z1=z0+Math.log2(scale);
  for(const symbol of [radius,icon]){
   const output=at(symbol,z1)*factor(scale,z0,z1,symbol,true);
-  const wanted=at(symbol,z0)*scale*1.2;
+  const wanted=at(symbol,z0)*scale*1.2*1.12;
   assert.ok(Math.abs(output-wanted)<1e-9,`size matches map enlargement for scale ${scale}`);
  }
 }
 assert.ok(factor(4,3,5,radius)>3,'single PNG symbols scale substantially');
 const all=factor(1,3,3,radius,false);
-assert.ok(Math.abs(all-1.7)<1e-9,'comparison grid export symbols are 70% larger');
+assert.ok(Math.abs(all-1.7*1.12)<1e-9,'comparison grid export symbols are 70% larger');
 c.st.cfg.display.exportObservationMarkerScale=1.5;
 const gainFactor=factor(3,3,3+Math.log2(3),radius,true);
-assert.ok(Math.abs(gainFactor*at(radius,3+Math.log2(3))-1.8*3*at(radius,3))<1e-9,'config multiplier is applied');
+assert.ok(Math.abs(gainFactor*at(radius,3+Math.log2(3))-1.8*1.12*3*at(radius,3))<1e-9,'config multiplier is applied');
 c.st.cfg.display.exportObservationMarkerScale=1;
 const scaled=c.scaledObservationZoomSize(radius,2);
 assert.equal(scaled[0],'interpolate');
@@ -59,8 +59,8 @@ const exportZoom=3+Math.log2(4);
 const restore=c.applyExportObservationMarkerSize(map,4,3,exportZoom,true);
 const rExport=at(style['evu-observed-metar'].paint['circle-radius'],exportZoom);
 const iExport=at(style['evu-observed-mping'].layout['icon-size'],exportZoom);
-assert.ok(Math.abs(rExport-at(radius,3)*4*1.2)<1e-9,'METAR exported radius scales with viewport');
-assert.ok(Math.abs(iExport-at(icon,3)*4*1.2)<1e-9,'mPING exported size scales with viewport');
+assert.ok(Math.abs(rExport-at(radius,3)*4*1.2*1.12)<1e-9,'METAR exported radius scales with viewport');
+assert.ok(Math.abs(iExport-at(icon,3)*4*1.2*1.12)<1e-9,'mPING exported size scales with viewport');
 assert.ok(style['evu-observed-metar'].paint['circle-stroke-width']>1.25,'outline scales as well');
 restore();
 assert.equal(style['evu-observed-metar'].paint['circle-radius'],radius,'METAR style restored exactly');

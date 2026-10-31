@@ -23,5 +23,5 @@ for (const expected of [
 assert.equal((js.match(/new maplibregl\.Popup\(/g)||[]).length,2);
 assert.equal((js.match(/new maplibregl\.Popup\(\{[^}]*className:'evu-report-popup'/g)||[]).length,2);
 assert.equal((js.match(/\.setText\(/g)||[]).length,2,'report data must not be injected as HTML');
-assert.match(html,/css\/styles\.css\?v=1\.1\.10-20261030/);
+assert.match(html,/css\/styles\.css\?v=1\.1\.11-20261031(?:b)?/);
 console.log('PASS theme-aware MapLibre popup surfaces, text, line breaks, close controls and pointer triangles');

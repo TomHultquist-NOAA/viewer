@@ -1,3 +1,45 @@
+## 1.1.17 — October 31, 2026
+- All PNG and GIF export paths (single-panel, multi-panel, differences, soundings and point time series) generate unique timestamped filenames, including a short per-page token and counter. Preserve the descriptive export filename base and file extension.
+
+## 1.1.16 — October 31, 2026: Export layout consistency
+
+- Match difference-map normal and Large label typography to standalone panel exports at the same output size. Previously the difference Large title could be approximately 55 px versus 43 px in an individual panel PNG.
+- Use the identical plot aperture/margins and legend vertical allocation in difference and standalone exports, reducing geographic cropping differences for the same initial view and Fit/Fill setting.
+- Preserve independently zoomed/resized difference-window camera, live counties visibility, map sampling, and all earlier severe-weather and sounding features. No converter changes or data reprocessing are necessary.
+
+## 1.1.15 — October 31, 2026: Better bulk-shear shading defaults
+
+- Change 0–1 km bulk-shear default shading to 0–60 kt and 0–6 km to 0–90 kt. Add matching fixed difference-map defaults and labels. No changes to stored field values.
+- Supports native RAP 0–1 km shear components when published by Converter v1.4.1.
+
+## 1.1.14 — October 31, 2026: Chart theme sync, matched difference footprints and export report markers
+
+- Repaint open sounding Skew-T / Log-P canvases immediately whenever the viewer switches between light and dark mode, in either direction; background, axes, reference guides, hodograph, labels, diagnostics, and traces all use the active theme.
+- Apply the same immediate theme repaint to open point time-series canvases; the currently displayed chart PNG captures the new theme.
+- Reuse the last plotted native rows, diagnostics, and point values, avoiding network requests, profile decoding, or restarting an in-progress plot; new results arriving after the theme switch use the current theme as before.
+- Fit the difference-map window to the same geographic aspect ratio as the selected panel on first open; its projection and scale then match both horizontal and vertical extents, with manual resize and existing county/export parity preserved.
+- Slightly enlarge METAR, mPING and SPC LSR symbols only in exported images (built-in 12% increase, existing configuration multiplier retained); include SPC-only multi-panel exports and restore all on-screen styles afterward.
+- No changes to data formats, server-side processing, Zarr catalogs, or converter dependencies. Adds focused theme, difference-window and export-marker regression coverage.
+
+## 1.1.13 — October 31, 2026: Difference-map framing and county-scale parity
+
+- Match the selected panel's geographic footprint when opening a difference map, scaling the camera for the difference window's actual width and height rather than copying a numeric zoom into a different viewport.
+- Translate the county-boundary threshold into equivalent panel zoom, including after difference-window resize and synchronized map changes. PNG exports preserve the live set of visible geographic boundaries even at increased capture resolution.
+- No change to model data, difference calculations, panel scale/zoom settings, or Zarr catalogs. Includes a targeted viewport and county-export regression test.
+
+## 1.1.12 — October 31, 2026: Bulk-shear barb presentation
+
+- Replace downshear arrows on bulk-shear maps with standard 5/10/50-kt wind-barb glyphs representing the 0–1/0–6 km shear vector difference. Shafts use the meteorological from-direction convention (opposite the downshear direction).
+- Keep native right-moving storm-motion wind barbs on both SRH fields, with updated field-specific overlay labels and documentation.
+- Preserve component-unit normalization, data sampling, map rotation/projection behavior, PNG/GIF exports and all other plotting functionality. No converter or data-format changes.
+
+## 1.1.11 — October 31, 2026: Severe-weather overlays
+
+- Show downshear vector arrows over 0–1/0–6 km bulk shear and Bunkers right-moving storm-motion barbs over 0–1/0–3 km SRH, when native paired components are present in the catalog.
+- Add a separate persistent severe-weather overlay switch, with context-sensitive labels and export support.
+- Normalize the mixed source conventions of legacy native bulk-shear components in the overlay without changing published model Zarr; use native m/s components for barbs with knot-based glyphs.
+- Document converter v1.3.7 dependency for new RAP analysis data and corrected previously published RAP shear.
+
 ## 1.1.9 (2026-10-30)
 - Fixed LSR marker synchronization across all model and analysis panels, including REFS members and REFS Mean, when maps initialize after the SPC report feed is fetched.
 - Reapply the current report collection and visibility when an individual panel becomes map-ready and after its asynchronous weather shading finishes, not just when the reports are first loaded.

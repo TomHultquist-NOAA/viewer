@@ -894,3 +894,10 @@ html[data-theme] .maplibregl-popup-anchor-right .maplibregl-popup-tip {border-le
    Counts/attribution live below, not inside a toggle item that could force wrapping. */
 .overlays-switches>.spc-switches{flex:0 0 auto;white-space:nowrap}
 .overlays-switches>.spc-switches>.contour-switch{margin:0;white-space:nowrap}
+
+/* Sounding analysis windows: larger canvas while preserving mobile layout. */
+.evu-inspect-window.evu-inspect-sounding{width:min(1020px,calc(100vw - 24px));height:min(750px,calc(100vh - 28px))}
+.evu-inspect-sounding .evu-inspect-body{padding:6px 10px 10px;gap:5px}
+.evu-inspect-sounding .evu-inspect-canvas{max-height:none;object-fit:contain;width:100%;flex:1}
+.evu-inspect-sounding .evu-inspect-status{font-size:12px;line-height:1.4;white-space:normal}
+@media(max-width:560px){.evu-inspect-window.evu-inspect-sounding{width:calc(100vw - 20px);height:min(70vh,585px);top:64px!important;left:10px!important}}

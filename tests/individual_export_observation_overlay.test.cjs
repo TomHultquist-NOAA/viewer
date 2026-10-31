@@ -38,7 +38,7 @@ const circle=ops.find(a=>a[0]==='circle');
 assert.ok(circle,'METAR circle drawn');
 assert.ok(Math.abs(circle[1]-(10+(400-200)))<.00001,'latitude/longitude projected through captured crop');
 assert.ok(Math.abs(circle[2]-(50+400))<.00001,'correct Y after capture transform');
-assert.ok(circle[3]>=11.9&&circle[3]<=12.1,'standalone PNG radius ~12 presentation pixels, regardless of CSS panel size');
+assert.ok(circle[3]>=13.3&&circle[3]<=13.6,'standalone PNG radius ~12 presentation pixels, regardless of CSS panel size');
 assert.ok(ops.some(a=>a[0]==='move'),'mPING triangle drawn');
 assert.ok(ops.some(a=>a[0]==='fill'&&a[1]==='#4bc86c'));
 assert.ok(ops.some(a=>a[0]==='fill'&&a[1]==='#55b2f0'));

@@ -38,7 +38,7 @@
  document.addEventListener('pointerdown',e=>{if(menu&&!menu.contains(e.target))closeMenu();},true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu();});
  function makeWindow(type,data){
-  const win=document.createElement('section');win.className='evu-inspect-window';win.setAttribute('role','dialog');win.setAttribute('aria-label',type==='series'?'Point time series':'Point sounding');
+  const win=document.createElement('section');win.className='evu-inspect-window'+(type==='sounding'?' evu-inspect-sounding':'');win.setAttribute('role','dialog');win.setAttribute('aria-label',type==='series'?'Point time series':'Point sounding');
   const head=document.createElement('header');head.className='evu-inspect-head';
   const text=document.createElement('div');text.className='evu-inspect-title';
   const title=document.createElement('strong');title.textContent=type==='series'?'Point time series':'Skew-T / Log-P sounding';
@@ -49,12 +49,12 @@
   head.append(save,close);
   const body=document.createElement('div');body.className='evu-inspect-body';
   const progress=document.createElement('p');progress.className='evu-inspect-status';progress.setAttribute('role','status');progress.setAttribute('aria-live','polite');
-  const canvas=document.createElement('canvas');canvas.width=1100;canvas.height=735;canvas.className='evu-inspect-canvas';
+  const canvas=document.createElement('canvas');canvas.width=type==='sounding'?1260:1100;canvas.height=type==='sounding'?810:735;canvas.className='evu-inspect-canvas';
   body.append(progress,canvas);win.append(head,body);document.body.append(win);
   const n=WINDOWS.size;win.style.left=Math.min(50+n*35,Math.max(8,window.innerWidth-400))+'px';win.style.top=Math.min(120+n*38,Math.max(8,window.innerHeight-320))+'px';win.style.zIndex=String(++nextZ);
   win.addEventListener('pointerdown',()=>{win.style.zIndex=String(++nextZ);});
   close.addEventListener('click',()=>{state.cancelled=true;state.token++;WINDOWS.delete(state);win.remove();});
-  save.addEventListener('click',()=>{const a=document.createElement('a');a.download=`EVU_${type}_${data.modelLabel.replace(/[^\w-]+/g,'_')}_${data.lat.toFixed(2)}_${data.lon.toFixed(2)}.png`;a.href=canvas.toDataURL('image/png');a.click();});
+  save.addEventListener('click',()=>{const a=document.createElement('a');a.download=window.OMDEVUUniqueExportName(`EVU_${type}_${data.modelLabel.replace(/[^\w-]+/g,'_')}_${data.lat.toFixed(2)}_${data.lon.toFixed(2)}.png`);a.href=canvas.toDataURL('image/png');a.click();});
   let drag=null;
   head.addEventListener('pointerdown',e=>{
    if(e.button!==0||e.target.closest('button'))return;
@@ -62,7 +62,9 @@
   });
   head.addEventListener('pointermove',e=>{if(!drag)return;win.style.left=Math.max(0,Math.min(window.innerWidth-110,drag.left+e.clientX-drag.x))+'px';win.style.top=Math.max(0,Math.min(window.innerHeight-70,drag.top+e.clientY-drag.y))+'px';});
   head.addEventListener('pointerup',()=>{drag=null;});head.addEventListener('pointercancel',()=>{drag=null;});
-  const state={win,canvas,progress,type,data,token:0,cancelled:false,prevKey:null};WINDOWS.add(state);
+  // Cache the most recently drawn chart so changing theme never triggers a
+  // pressure-profile download (or resets a streaming point time series).
+  const state={win,canvas,progress,type,data,token:0,cancelled:false,prevKey:null,lastPlot:null};WINDOWS.add(state);
   return state;
  }
  function frame(ctx,canvas,title,subtitle){
@@ -80,6 +82,7 @@
   return match?Number(match[1]):0;
  }
  function plotSeries(s,points){
+  s.lastPlot={kind:'series',points};
   const {canvas,data}=s,ctx=canvas.getContext('2d'),validPoints=points.filter(x=>isGood(x.value));
   const unit=FIELDS[data.field]?.unit||'';const ink=frame(ctx,canvas,`${data.modelLabel} · ${fieldName(data.field)}`,`Init ${data.timeMode==='analysis'?fmt(data.referenceCycle):cycleLabel(data.dataset)} · ${data.lat.toFixed(3)}°, ${data.lon.toFixed(3)}° · ${unit||'units not specified'}`);
   const x0=95,x1=1039,y0=136,y1=644;
@@ -155,67 +158,149 @@
   ctx.fillStyle=ink;ctx.textAlign='right';ctx.fillText(value,x+170,y);
  }
  function plotSounding(s,rows,validTime,summary={}){
-  const {canvas,data}=s,ctx=canvas.getContext('2d');const ink=frame(ctx,canvas,`Skew-T / Log-P sounding · ${data.modelLabel}`,`Valid ${fmt(validTime)} · ${data.lat.toFixed(3)}°, ${data.lon.toFixed(3)}°`);
-  const x0=88,x1=774,y0=134,y1=646;
-  const boxX=828,boxY=138,boxW=236,boxH=334;
-  const barbX=1008;
+  s.lastPlot={kind:'sounding',rows,validTime,summary};
+  const {canvas,data}=s,ctx=canvas.getContext('2d');
+  // A readable operational sounding display, deliberately rendered locally in
+  // the browser. No interpolation is used to create missing thermodynamic data.
+  const ink=frame(ctx,canvas,`${data.modelLabel}  /  Vertical profile`,
+    `Valid ${fmt(validTime)}   •   ${Math.abs(data.lat).toFixed(3)}° ${data.lat>=0?'N':'S'}, ${Math.abs(data.lon).toFixed(3)}° ${data.lon>=0?'E':'W'}`);
+  const light=st.theme==='light', W=canvas.width,H=canvas.height;
+  const fg=ink.ink, muted=ink.muted, grid=ink.grid;
+  const tint=light?'#f4f7fb':'#15263a',edge=light?'#dce4ec':'#38516b';
+  const goodRows=rows.filter(r=>r&&isGood(r.p)&&r.p>=100&&r.p<=1050).sort((a,b)=>b.p-a.p);
+  const sparse=!!summary.sparse;
+  const p0=1050,ptop=100;
+  const x0=101,x1=775,y0=160,y1=687;
+  const barbX=813;
+  // Preserve standard skew-T log-P pressure scaling.
   const Y=p=>y1-Math.log(1000/p)/Math.log(1000/100)*(y1-y0);
-  const X=(t,p)=>x0+((t+86+SKEW*Math.log(1000/p))/200)*(x1-x0);
-  ctx.font='16px system-ui';
-  for(const p of [1000,925,850,700,600,500,400,300,250,200,150,100]){const y=Y(p);axis(ctx,x0,y,x1,y,ink.grid);ctx.fillStyle=ink.muted;ctx.textAlign='right';ctx.fillText(String(p),x0-12,y+6);}
-  for(let t=-80;t<=60;t+=10){ctx.strokeStyle=t===0?(st.theme==='light'?'#9db1c5':'#55708a'):ink.grid;ctx.lineWidth=t===0?1.7:1;ctx.beginPath();ctx.moveTo(X(t,1000),Y(1000));ctx.lineTo(X(t,100),Y(100));ctx.stroke();ctx.fillStyle=ink.muted;ctx.textAlign='center';if(t>=-60&&t<=60)ctx.fillText(`${t}`,X(t,1000),y1+26);}
-  ctx.textAlign='center';ctx.fillStyle=ink.ink;ctx.fillText('Temperature (°C) · Skewed isotherms',x0+((x1-x0)/2),y1+62);
-  ctx.save();ctx.translate(29,(y0+y1)/2);ctx.rotate(-Math.PI/2);ctx.fillText('Pressure (hPa)',0,0);ctx.restore();
-  const drawProfile=(key,color)=>{ctx.lineWidth=4;ctx.strokeStyle=color;ctx.beginPath();let open=false;for(const r of rows){if(!isGood(r[key])){open=false;continue;}const x=X(r[key],r.p),y=Y(r.p);if(!open){ctx.moveTo(x,y);open=true;}else ctx.lineTo(x,y);}ctx.stroke();};
-  drawProfile('t','#ea5f55');drawProfile('td','#27bc83');
+  const X=(t,p)=>x0+((t+50+SKEW*Math.log(1000/p)/Math.log(1000/100))/130)*(x1-x0);
+  const card=(x,y,w,h,r=12)=>{ctx.fillStyle=tint;ctx.strokeStyle=edge;ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();};
+  const label=(txt,x,y,size=16,color=muted,weight='400',align='left')=>{
+    ctx.textAlign=align;ctx.font=`${weight} ${size}px system-ui`;ctx.fillStyle=color;ctx.fillText(txt,x,y);
+  };
+  const path=(points,color,width=1,dash=[])=>{if(points.length<2)return;ctx.save();ctx.lineWidth=width;ctx.strokeStyle=color;ctx.setLineDash(dash);ctx.beginPath();
+    for(let i=0;i<points.length;i++)i?ctx.lineTo(...points[i]):ctx.moveTo(...points[i]);ctx.stroke();ctx.restore();};
+  // Plot backing and reference axes. All curves are clipped inside the plot.
+  card(x0-14,y0-30,x1-x0+32,y1-y0+67);
+  ctx.save();ctx.beginPath();ctx.rect(x0,y0,x1-x0,y1-y0);ctx.clip();
+  // Dry adiabats: potential temperature, K, referenced to 1000 hPa.
+  for(let theta=260;theta<=430;theta+=20){const points=[];
+   for(let p=1000;p>=100;p-=15){let t=theta*Math.pow(p/1000,.2854)-273.15;points.push([X(t,p),Y(p)]);}
+   path(points,light?'#e2ebf1':'#243c4c',1.0);
+  }
+  // Mixing-ratio guides in g/kg. Do not portray these as observed dewpoints.
+  for(const q of [1,2,4,8,12,16,20]){const points=[];
+   for(let p=1000;p>=450;p-=15){const w=q/1000,e=w*p/(.622+w),ratio=Math.log(e/6.112);
+    const t=243.5*ratio/(17.67-ratio);if(Number.isFinite(t))points.push([X(t,p),Y(p)]);}
+   path(points,light?'#d9eade':'#29473f',1,[4,8]);
+  }
+  for(const p of [1000,925,850,700,600,500,400,300,250,200,150,100]){
+   path([[x0,Y(p)],[x1,Y(p)]],p===700||p===500?edge:grid,p===700||p===500?1.5:1);
+  }
+  for(let t=-120;t<=80;t+=10){const z=[];for(let p=1000;p>=100;p-=25)z.push([X(t,p),Y(p)]);
+   path(z,t===0?(light?'#b5cce6':'#54738f'):grid,t===0?1.8:1);
+  }
+  // Connect successive native levels in the sounding trace; do not require
+  // every intermediate 25-hPa slot to be populated. Large gaps are dashed.
+  const profile=(key,color)=>{
+   const validRows=goodRows.filter(r=>isGood(r[key])&&r[key]>-140&&r[key]<90);
+   if(validRows.length===1){const r=validRows[0];dot(ctx,X(r[key],r.p),Y(r.p),color,4);return;}
+   for(let i=1;i<validRows.length;i++){
+    const a=validRows[i-1],b=validRows[i];
+    path([[X(a[key],a.p),Y(a.p)],[X(b[key],b.p),Y(b.p)]],color,3.7, a.p-b.p>175?[7,6]:[]);
+   }
+   for(const r of validRows)dot(ctx,X(r[key],r.p),Y(r.p),color,2.6);
+  };
+  profile('t','#fa696c');profile('td','#3ed3ad');
+  ctx.restore();
+  // Pressure and temperature ticks outside of plot clip.
+  for(const p of [1000,925,850,700,600,500,400,300,250,200,150,100]){
+   label(String(p),x0-23,Y(p)+5,14,muted,'500','right');
+  }
+  for(let t=-50;t<=70;t+=10){const x=X(t,1000);if(x<x0+6||x>x1-6)continue;
+   label(String(t),x,Y(1000)+28,14,muted,'500','center');
+  }
+  label('Temperature (°C)',(x0+x1)/2,755,16,fg,'650','center');
+  ctx.save();ctx.translate(34,(y0+y1)/2);ctx.rotate(-Math.PI/2);label('Pressure (hPa)',0,0,16,fg,'650','center');ctx.restore();
+  label('Skew-T / Log-P',x0-2,y0-9,18,fg,'650');
+  label('T',x0+410,128,16,'#fa696c','700');label('Td',x0+449,128,16,'#3ed3ad','700');
+  label('Dry adiabats  ·  mixing-ratio guides',x0+494,129,11,muted,'400');
+  // Sparse profiles are a transparent fallback, not a purported full sounding.
+  if(sparse){ctx.fillStyle=light?'rgba(255,246,225,.96)':'rgba(71,48,26,.96)';
+   ctx.fillRect(x0+8,y0+13,x1-x0-16,42);
+   label('SPARSE FALLBACK — full profile unavailable',x0+22,y0+40,17,light?'#804d0a':'#ffda92','700');
+  }
+  if(!goodRows.some(r=>isGood(r.t))){label('No usable temperature profile was published for this point.',x0+55,440,19,muted,'500');}
+  // Native wind barbs in knots, selected to avoid overlap and clutter.
+  label('WIND',barbX,y0-9,13,muted,'700','center');
   const drawBarb=(r)=>{
    if(!isGood(r.u)||!isGood(r.v))return;
    const x=barbX,y=Y(r.p),knots=Math.hypot(r.u,r.v)*1.94384449,angle=Math.atan2(-r.u,-r.v);
-   const dirX=Math.sin(angle),dirY=-Math.cos(angle),len=57;
-   const ex=x+len*dirX,ey=y+len*dirY;axis(ctx,x,y,ex,ey,ink.ink);
+   const dirX=Math.sin(angle),dirY=-Math.cos(angle),len=43;
+   const ex=x+len*dirX,ey=y+len*dirY;path([[x,y],[ex,ey]],fg,1.7);
    let fifty=Math.floor((knots+2.5)/50),ten=Math.floor((knots+2.5-50*fifty)/10),five=(knots+2.5-50*fifty-10*ten)>=5?1:0;
    let offset=2;
-   ctx.strokeStyle=ink.ink;ctx.lineWidth=2;ctx.fillStyle=ink.ink;
-   const feather=(length,flag=false)=>{
-    const baseX=ex-offset*dirX,baseY=ey-offset*dirY;
-    const tipX=baseX+length*dirY,tipY=baseY-length*dirX;
-    if(flag){ctx.beginPath();ctx.moveTo(baseX,baseY);ctx.lineTo(tipX,tipY);ctx.lineTo(baseX-11*dirX,baseY-11*dirY);ctx.closePath();ctx.fill();offset+=15;}
-    else{axis(ctx,baseX,baseY,tipX,tipY,ink.ink);offset+=9;}
-   };
-   for(let k=0;k<Math.min(fifty,4);k++)feather(25,true);
-   for(let k=0;k<Math.min(ten,5);k++)feather(24);
-   if(five)feather(12);
+   const feather=(length,flag=false)=>{const bx=ex-offset*dirX,by=ey-offset*dirY;
+    const tx=bx+length*dirY,ty=by-length*dirX;
+    if(flag){ctx.fillStyle=fg;ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(tx,ty);ctx.lineTo(bx-10*dirX,by-10*dirY);ctx.closePath();ctx.fill();offset+=13;}
+    else{path([[bx,by],[tx,ty]],fg,1.7);offset+=8;}};
+   for(let k=0;k<Math.min(fifty,4);k++)feather(19,true);
+   for(let k=0;k<Math.min(ten,5);k++)feather(18);
+   if(five)feather(10);
+   if(knots<2.5){ctx.strokeStyle=fg;ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.stroke();}
   };
-  let lastBarbY=-Infinity;for(const r of rows){const y=Y(r.p);if(Math.abs(y-lastBarbY)>=19&&isGood(r.u)&&isGood(r.v)){drawBarb(r);lastBarbY=y;}}
-  const derived=deriveSurfaceMetrics(rows);
-  const diag=summary?.diagnostics||{};
-  const surface=derived.surface||null;
-  ctx.fillStyle=st.theme==='light'?'rgba(248,250,252,0.96)':'rgba(18,31,49,0.96)';
-  ctx.strokeStyle=ink.grid;ctx.lineWidth=1.2;ctx.fillRect(boxX,boxY,boxW,boxH);ctx.strokeRect(boxX,boxY,boxW,boxH);
-  ctx.fillStyle=ink.ink;ctx.textAlign='left';ctx.font='bold 17px system-ui';ctx.fillText('Diagnostics',boxX+14,boxY+25);
-  ctx.font='15px system-ui';
-  const v=(n,s='')=>Number.isFinite(n)?`${Math.round(n)}${s}`:'—';
-  const tval=(n)=>Number.isFinite(n)?`${Math.round(n)} °C`:'—';
-  let yy=boxY+50;
-  textRow(ctx,'SBCAPE',v(diag.sbcape,' J/kg'),boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'MLCAPE',v(diag.mlcape,' J/kg'),boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'MUCAPE',v(diag.mucape,' J/kg'),boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'0–1 km SRH',v(diag.srh01,' m²/s²'),boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'0–3 km SRH',v(diag.srh03,' m²/s²'),boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'0–6 km shear',v(diag.shear06,' kt'),boxX+14,yy,ink.ink,ink.muted);yy+=28;
-  ctx.strokeStyle=ink.grid;ctx.beginPath();ctx.moveTo(boxX+14,yy-12);ctx.lineTo(boxX+boxW-14,yy-12);ctx.stroke();
-  textRow(ctx,'Surface T',tval(surface?.t),boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'Surface Td',tval(surface?.td),boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'Surface wind',formatWind(surface?.u,surface?.v),boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'LCL',Number.isFinite(derived.lclPressure)?`${Math.round(derived.lclPressure)} hPa`:'—',boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'Freezing level',Number.isFinite(derived.freezingPressure)?`${Math.round(derived.freezingPressure)} hPa`:'—',boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'Grid sample',summary?.gridKm?`~${Math.round(summary.gridKm)} km`:'native',boxX+14,yy,ink.ink,ink.muted);yy+=23;
-  textRow(ctx,'Profile levels',`${summary?.levels?.temperature??0}/${summary?.levels?.dewpoint??0}/${summary?.levels?.wind??0}`,boxX+14,yy,ink.ink,ink.muted);yy+=22;
-  ctx.fillStyle=ink.muted;ctx.textAlign='left';ctx.font='13px system-ui';
-  ctx.fillText('Levels: temperature / dewpoint / wind',boxX+14,boxY+boxH-14);
-  ctx.textAlign='left';ctx.fillStyle='#ea5f55';ctx.fillRect(97,700,26,5);ctx.fillStyle=ink.ink;ctx.fillText('Temperature',129,705);
-  ctx.fillStyle='#27bc83';ctx.fillRect(295,700,26,5);ctx.fillStyle=ink.ink;ctx.fillText('Dewpoint',327,705);
-  ctx.fillStyle=ink.muted;ctx.fillText('Wind barbs (kt)',915,705);
+  let lastBarbY=-Infinity;
+  for(const r of goodRows){const y=Y(r.p);if(Math.abs(y-lastBarbY)>=19&&isGood(r.u)&&isGood(r.v)){
+   drawBarb(r);lastBarbY=y;}}
+  label('kt',barbX,750,13,muted,'500','center');
+  // Hodograph — wind component axes in kt, native isobaric levels identified.
+  const hx=876,hy=131,hw=352,hh=292;card(hx,hy,hw,hh);
+  label('HODOGRAPH',hx+17,hy+31,17,fg,'700');label('isobaric levels',hx+hw-19,hy+31,12,muted,'400','right');
+  const windRows=goodRows.filter(r=>isGood(r.u)&&isGood(r.v)&&Math.hypot(r.u,r.v)<130);
+  const maxK=Math.max(50,...windRows.map(r=>Math.hypot(r.u,r.v)*1.94384449));
+  const axisMax=Math.ceil(maxK/20)*20,ox=hx+hw/2,oy=hy+174,scale=108/axisMax;
+  const hxy=r=>[ox+r.u*1.94384449*scale,oy-r.v*1.94384449*scale];
+  for(let speed=20;speed<=axisMax;speed+=20){ctx.strokeStyle=grid;ctx.lineWidth=1;
+   ctx.beginPath();ctx.arc(ox,oy,speed*scale,0,Math.PI*2);ctx.stroke();
+   label(String(speed),ox+speed*scale+3,oy-6,11,muted);}
+  path([[ox-112,oy],[ox+112,oy]],grid,1);path([[ox,oy-112],[ox,oy+112]],grid,1);
+  label('N',ox,oy-115,12,muted,'600','center');label('E',ox+119,oy+4,12,muted,'600');
+  label('S',ox,oy+125,12,muted,'600','center');label('W',ox-122,oy+4,12,muted,'600','right');
+  const hcolor=p=>p>=700?'#39c8aa':p>=400?'#f7b956':'#e57c9c';
+  for(let i=1;i<windRows.length;i++){
+   const a=windRows[i-1],b=windRows[i];const c=hcolor((a.p+b.p)/2);
+   path([hxy(a),hxy(b)],c,2.8,a.p-b.p>175?[5,5]:[]);
+  }
+  for(const r of windRows){if([1000,925,850,700,500,300,200].includes(r.p)){
+   const [xx,yy]=hxy(r);dot(ctx,xx,yy,hcolor(r.p),3.1);
+   if([850,700,500,300].includes(r.p))label(String(r.p),xx+6,yy-5,10,muted);
+  }}
+  if(!windRows.length)label('Winds unavailable',ox,oy,17,muted,'500','center');
+  // Compact diagnostics and profile provenance; avoid pretending these
+  // environmental values are derived from sparse Skew-T data.
+  const dx=876,dy=438,dw=352,dh=287;card(dx,dy,dw,dh);
+  label('MODEL DIAGNOSTICS',dx+16,dy+30,16,fg,'700');
+  const diag=summary.diagnostics||{}, v=(x,unit)=>isGood(x)?`${Math.round(x)} ${unit}`:'—';
+  const stats=[['SBCAPE',v(diag.sbcape,'J/kg')],['MLCAPE',v(diag.mlcape,'J/kg')],
+   ['MUCAPE',v(diag.mucape,'J/kg')],['SRH 0–1',v(diag.srh01,'m²/s²')],
+   ['SRH 0–3',v(diag.srh03,'m²/s²')],['Shear 0–6',isGood(diag.shear06)&&diag.shear06<=250?v(diag.shear06,'kt'):'—']];
+  const yy0=dy+59;
+  for(let i=0;i<stats.length;i++){
+   const yy=yy0+i*29;label(stats[i][0],dx+18,yy,14,muted);
+   label(stats[i][1],dx+dw-17,yy,14,fg,'600','right');
+  }
+  path([[dx+17,dy+238],[dx+dw-17,dy+238]],edge,1);
+  const n=summary.levels||{
+   temperature:goodRows.filter(r=>isGood(r.t)).length,
+   dewpoint:goodRows.filter(r=>isGood(r.td)).length,
+   wind:windRows.length};
+  label('Available levels  T / Td / Wind',dx+18,dy+254,12,muted);
+  label(`${n.temperature} / ${n.dewpoint} / ${n.wind}`,dx+dw-17,dy+254,13,fg,'700','right');
+  const met=deriveSurfaceMetrics(goodRows);
+  label(`Surface: ${isGood(met.surface?.t)?Math.round(met.surface.t)+'°C':'—'} / ${isGood(met.surface?.td)?Math.round(met.surface.td)+'°C':'—'}  ·  ${formatWind(met.surface?.u,met.surface?.v)}`,x0,794,14,fg,'500');
+  label(`${summary.gridKm?'~'+Math.round(summary.gridKm)+'-km grid  ·  ':''}${sparse?'Sparse fallback  ·  ':''}Native pressure data only; levels below terrain are not screened`,hx+dw/2,794,12,muted,'400','center');
  }
  async function soundingDiagnostics(selected,record,validTime){
   const out={diagnostics:{sbcape:null,mlcape:null,mucape:null,srh01:null,srh03:null,shear06:null}};
@@ -342,6 +427,8 @@
   const complete=rows.filter(r=>isGood(r.t)||isGood(r.u));
   s.progress.textContent=complete.length?`${reason?reason+' · ':''}Sparse fallback · ${fmt(tm)} · ${complete.length} available levels · upper-level dewpoint unavailable · surface pressure nominal 1000 hPa`:'No published profile or usable sparse upper-air values for this hour.';
   const summary=await soundingDiagnostics(s.data,record,tm);
+  summary.sparse=true;summary.sparseReason=reason||'Full profile unavailable';
+  summary.levels={temperature:rows.filter(r=>isGood(r.t)).length,dewpoint:rows.filter(r=>isGood(r.td)).length,wind:rows.filter(r=>isGood(r.u)&&isGood(r.v)).length};
   plotSounding(s,rows,tm,summary);
  }
  async function updateSounding(s){
@@ -356,7 +443,7 @@
   if(!cycle||!Number.isInteger(hour)||hour<0){
    await updateSparseSounding(s,token,'Profile unavailable');return;
   }
-  s.progress.textContent=`Loading pressure-level profile for ${fmt(validTime)}…`;
+  s.progress.textContent=`Loading native pressure-level profile for ${fmt(validTime)}…`;
   try{
    const result=await window.EVUSoundingProfiles?.load({model,cycle,hour,
     lon:selected.lon,lat:selected.lat});
@@ -367,7 +454,8 @@
     if(recordCount){
      const sourceNote=model==='refs_mean'?' · native operational REFS Mean':'';
      const gridNote=result.gridKm?` · sampled grid ~${Math.round(result.gridKm)} km`:'';
-     s.progress.textContent=`Valid ${fmt(validTime)} · ${n.temperature} temperature / ${n.dewpoint} dewpoint / ${n.wind} wind levels${gridNote}${sourceNote} · below-ground levels not screened`;
+     const missingNote=result.unavailableVariables?.length?` · missing chunks: ${result.unavailableVariables.join(', ')}`:'';
+     s.progress.textContent=`Native profile · valid ${fmt(validTime)} · T ${n.temperature} / Td ${n.dewpoint} / Wind ${n.wind} pressure levels${gridNote}${sourceNote}${missingNote} · no below-ground screening`;
      const summary=await soundingDiagnostics(selected,record,validTime);
      summary.gridKm=result.gridKm||null;
      summary.levels=n;
@@ -379,7 +467,7 @@
   }catch(e){
    if(s.cancelled||token!==s.token)return;
    console.warn('Unable to load pressure-level sounding:',e);
-   await updateSparseSounding(s,token,'Profile download failed');
+   await updateSparseSounding(s,token,'Full profile loading error: '+(e?.message||String(e)));
   }
  }
  async function openWindow(type,data){const s=makeWindow(type,data);if(type==='series')await updateSeries(s);else await updateSounding(s);}
@@ -387,5 +475,19 @@
   if(refreshTimer!==null)clearTimeout(refreshTimer);
   refreshTimer=setTimeout(()=>{refreshTimer=null;for(const s of WINDOWS){if(s.type==='sounding'&&!s.cancelled)void updateSounding(s);}},75);
  }
- window.EVUPointInspector={showMenu,scheduleSoundingRefresh};
+ // Canvases hold rendered pixels, not CSS colors: repaint existing windows
+ // when the main viewer theme changes, using only their last plotted data.
+ // New data arriving asynchronously will also draw in the latest st.theme.
+ function refreshTheme(){
+  for(const s of WINDOWS){
+   if(s.cancelled)continue;
+   const plot=s.lastPlot;
+   if(plot?.kind==='sounding')plotSounding(s,plot.rows,plot.validTime,plot.summary);
+   else if(plot?.kind==='series')plotSeries(s,plot.points);
+   else frame(s.canvas.getContext('2d'),s.canvas,
+    s.type==='sounding'?`${s.data.modelLabel} / Vertical profile`:`${s.data.modelLabel} / ${fieldName(s.data.field)}`,
+    'Loading chart…');
+  }
+ }
+ window.EVUPointInspector={showMenu,scheduleSoundingRefresh,refreshTheme};
 })();

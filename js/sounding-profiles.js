@@ -84,12 +84,18 @@
   const vars=Array.isArray(ds.variables)?ds.variables.map(v=>v.name):[];
   const wanted=['t','td','u','v'].filter(v=>vars.includes(v));
   if(!wanted.includes('t'))throw Error('Temperature not present in profile catalog');
-  const values=await Promise.all(wanted.map(v=>chunk(ds.path,v,hour,shape)));
-  const data=Object.fromEntries(wanted.map((v,i)=>[v,values[i]]));
+  // A partial hourly publication should not force a misleading six-level
+  // fallback if temperature and other profile chunks remain usable.
+  const settled=await Promise.allSettled(wanted.map(v=>chunk(ds.path,v,hour,shape)));
+  const data={};const unavailableVariables=[];
+  wanted.forEach((v,i)=>{if(settled[i].status==='fulfilled')data[v]=settled[i].value;
+    else unavailableVariables.push(v);});
+  if(!data.t)throw new Error('Native profile temperature chunk is missing or unreadable');
+  const usable=Object.keys(data);
   const size=shape[2]*shape[3];
   const rows=pressure.map((p,i)=>{
    const row={p,t:null,td:null,u:null,v:null};
-   for(const name of wanted){
+   for(const name of usable){
     const slice=data[name].subarray(i*size,(i+1)*size);
     const sampled=Number(new apgl.RawScalarField(grid,slice).sampleField(lon,lat));
     if(!good(sampled))continue;
@@ -104,7 +110,7 @@
   const numWind=rows.filter(r=>good(r.u)&&good(r.v)).length;
   return {status:'available',rows,model:ds.model,cycle:ds.init_time,hour,
    gridKm:Number(attrs.grid_spacing_km)||null,levels:{temperature:numT,dewpoint:numTd,wind:numWind},
-   ensembleMethod:ds.ensemble_method||null};
+   ensembleMethod:ds.ensemble_method||null,unavailableVariables};
  }
  window.EVUSoundingProfiles={load,chooseRecord};
 })();

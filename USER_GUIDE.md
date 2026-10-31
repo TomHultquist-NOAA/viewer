@@ -1,6 +1,6 @@
 # OMD EVU Model Viewer — User Guide
 
-**Viewer version 1.1.10 · October 30, 2026**
+**Viewer version 1.1.17 · October 31, 2026**
 
 The OMD EVU Model Viewer displays weather model forecasts and available verifying analyses side by side. The panels share a geographic view, making it easier to compare different models and forecast hours. The default layout includes RRFS, HRRR, REFS members, REFS Mean, and an Analysis panel.
 
@@ -30,7 +30,7 @@ You can switch between dark and light appearance. On desktop, the controls can b
 
 ## Right-click: time series and sounding
 
-**Right-click a location on a model or analysis map** and select one of these tools. Both open a floating chart window that you can move or resize. Use the **download icon** in the chart header to save a PNG.
+**Right-click a location on a model or analysis map** and select one of these tools. Both open a floating chart window that you can move or resize. Use the **download icon** in the chart header to save a PNG. Open soundings and point time series change their chart colors immediately when the viewer switches between light and dark modes; saved PNGs reflect the active theme without reloading the chart data.
 
 **Time series** plots the current field at the clicked location across the full forecast cycle. It stays tied to the chosen model, field, location, and cycle, even if you subsequently change what is displayed in the viewer. Instantaneous quantities and run-to-date totals are shown as **lines**; time-period precipitation and snowfall accumulations (such as 1-, 3-, 6-, and 24-hour totals) are shown as **bars**. Rolling accumulation intervals can overlap, so adjacent bars should not be added together. Unavailable hours are not zero. It may take a moment to load the full series; progress is shown in the chart window. For Reflectivity with Ptype, the series plots reflectivity (dBZ), not the precipitation-type category.
 
@@ -43,6 +43,8 @@ The sounding window reports how many temperature, dewpoint, and wind levels are 
 ## Fields, precipitation type, and snowfall
 
 **Reflectivity with Ptype** appears below Precipitation type in the Radar menu. It colors model reflectivity by forecast precipitation type: green progressing into yellow/orange for stronger rain echoes, blue for snow, pink for freezing rain, purple for sleet, and amber for mixed precipitation. Both reflectivity and precipitation type must be available for the chosen hour.
+
+**Precipitation rate** is displayed in inches per hour (in/hr), including map values, the colorbar, point time series, and PNG/GIF exports. Stored values are unchanged.
 
 Snowfall and precipitation fields include hourly, multi-hour, and accumulated options where available. Some totals need a complete sequence of earlier data, so a missing input can make a later accumulation unavailable. Missing data are **not** treated as zero.
 
@@ -60,6 +62,23 @@ The full color palette stretches across the selected interval. The new scale app
 
 ## Overlays and transparency
 
+The **Shear & helicity** field group displays 0–1/0–6 km bulk shear and
+0–1/0–3 km storm-relative helicity (SRH). Default color scales are **0–60 kt for 0–1 km** and **0–90 kt for 0–6 km**; use the numerical colorbar to change them. On **bulk shear**, the **Shear barbs**
+checkbox displays the upper-minus-lower wind vector difference as conventional
+wind barbs, with 5/10/50-knot markings. Their shafts point opposite the
+downshear direction, following wind-barb orientation conventions; the barbs
+describe shear, **not** wind at a single level. On **SRH**, the **Storm motion barbs**
+checkbox controls native Bunkers right-moving storm-motion barbs, also in knots.
+All overlays follow synchronized panels, pan/zoom operations, and panel PNG
+exports, and the severe-weather checkbox state is remembered independently
+of other wind overlays.
+
+The overlays require native U/V components in the published Zarr catalog for
+that model and hour. If a source omits them, the corresponding overlay is
+absent rather than simulated. The RAP analysis requires the latest converter
+and missing-field recovery for older analysis hours to publish native 0–1 km and 0–6 km shear components. Native RAP 0–1 km components are available in Converter v1.4.1 when provided in the source GRIB inventory. A missing
+barb overlay does not imply missing scalar shading.
+
 Depending on the field, you can enable height or pressure contours, wind barbs, and contours of the shaded field. **Numerical CAPE, shear, storm-relative helicity, updraft helicity, and severe-weather composite fields also support shaded-field contours**, with conventional rounded value intervals that become finer at close zoom. Categorical precipitation-type fields do not support these numerical contours. **For 500-hPa absolute-vorticity shading, RRFS and individual REFS members use a modest display-only smooth, while HRRR and REFS Mean use an even lighter smooth** to make plots easier to compare. The stored fields and point-sampled values are unchanged. **Zero or very weak values are transparent** for fields where a clear background is useful (including CAPE, shear, SRH, wind speeds, severe-weather indices, and near-zero 500-hPa vorticity). Difference maps also become transparent close to zero. This lets the underlying map background show through in dark and light modes, without changing the meteorological data. Temperature and MSLP shading remain continuous because zero is not a no-weather threshold for those fields. The available overlay checkboxes share compact rows when space permits and wrap when necessary. Report counts appear below the switches. The available options appear with the field controls. Use **Image opacity** to fade the weather shading without fading geographic outlines, contours, wind barbs, or observation markers. Applicable overlays are also included when exporting plots.
 
 ## Weather observations and storm reports
@@ -72,13 +91,13 @@ On supported radar or severe-weather maps, enable **SPC reports** to display pre
 
 ## Compare two panels
 
-Select the comparison checkboxes beside **two compatible panel titles** to open a **Difference** map. The result is **first selected panel minus second selected panel**. The difference follows changes to the forecast hour and view. You can inspect the values and use the window's download icon to save a PNG. Incompatible or missing fields cannot be compared.
+Select the comparison checkboxes beside **two compatible panel titles** to open a **Difference** map. The result is **first selected panel minus second selected panel**. On opening, the difference window adjusts its map area to match the selected panel's aspect ratio and geographic footprint, so both horizontal and vertical extents agree as closely as the screen permits. The floating window can be resized freely afterward. Resizing the difference window does not, by itself, reveal counties that are hidden at the corresponding panel scale. County and other geographic boundary visibility in exported difference PNGs follows the live map, without adding counties just because export resolution is higher. Saved difference maps use the same plot-area geometry as individual panel PNGs at the selected output size, reducing differences in geographic crop. Fit and Fill still determine whether edges are shown or cropped, and independently resized or zoomed maps retain their chosen view. The difference follows changes to the forecast hour and synchronized panel view; you can zoom the floating map independently for close inspection. Use the window's download icon to save a PNG. Incompatible or missing fields cannot be compared.
 
 ## Save PNGs and animated GIFs
 
-Use a panel's **download icon** to export one plot, or **Export all panels** for a comparison image or animation. Choose the image proportions (**16:9** or **4:3**) and whether to **Fit** the entire map area or **Fill** the frame (which can crop edges). Titles, times, legends, and applicable overlays are included.
+Use a panel's **download icon** to export one plot, or **Export all panels** for a comparison image or animation. All exported PNGs and GIFs receive a unique UTC timestamp and short suffix in their filenames, so repeated downloads keep distinct names instead of browser-added `(1)` and `(2)` suffixes. Choose the image proportions (**16:9** or **4:3**) and whether to **Fit** the entire map area or **Fill** the frame (which can crop edges). Titles, times, legends, and applicable overlays are included. Exported METAR, mPING, and SPC Local Storm Report markers are slightly enlarged for presentation readability; on-screen marker sizes do not change.
 
-Select **Large labels** when preparing images for presentations. It enlarges the model or analysis title and time information in exported PNGs and GIFs, without changing the live viewer.
+Select **Large labels** when preparing images for presentations. It enlarges the model or analysis title and time information in exported PNGs and GIFs, without changing the live viewer. The difference-map title and time line use the same normal and large font sizes as individual-panel exports.
 
 For animated GIFs, the defaults are:
 
