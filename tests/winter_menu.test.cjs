@@ -19,7 +19,7 @@ assert.equal(flat.length,all.length);assert.deepEqual([...flat].sort(),[...all].
 assert.equal(new Set(flat).size,flat.length);
 const info=src.slice(src.indexOf('function fieldInfo('),src.indexOf('// A raw Zarr chunk'));
 assert.match(info,/:v.name==='ptype'&&isHRRR\?'Derived precipitation type'/);
-assert.match(info,/:dominantMean\?'Dominant ensemble precipitation type'/);
+assert.match(info,/:dominantMean\?'Ensemble dominant precipitation type'/);
 assert.match(info,/:v.name==='ptype'\?'Dominant precipitation type'/);
 assert.match(fs.readFileSync(path.join(__dirname,'../index.html'),'utf8'),/1\.0\.20-20261030/);
 console.log('PASS: nested categories, ordering, all moved fields, titles and stable field IDs');

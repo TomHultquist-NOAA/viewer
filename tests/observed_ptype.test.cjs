@@ -10,7 +10,7 @@ assert.equal(cfg.ptypeObservations.path,'data/ptype_observations/');
 for(const id of ['obsControl','obsSynoptic','obsMping','obsCount'])assert(html.includes(`id="${id}"`));
 assert.match(js,/new maplibregl\.Popup/);
 assert.match(js,/setText\(`\$\{label\}/); // popup escapes external descriptions
-assert.match(js,/st\.field==='ptype'/);
+assert.match(js,/observationVisible\(\)/);
 assert.match(js,/circle-stroke-color.*st\.theme==='light'/);
 assert.match(js,/Date\.parse\(obj\.valid_time\)!==when\.getTime\(\)/);
 // Execute only the standalone observations helpers against a synthetic MapLibre-like map.
@@ -21,7 +21,7 @@ const context=vm.createContext({
  st:{ref:{init_time:'2026-10-28T12:00:00Z'},hour:6,field:'ptype',cfg:{ptypeObservations:cfg.ptypeObservations},
      theme:'dark',active:[],obsCurrent:null,obsCache:new Map(),obsLoadToken:0,obsEnabled:{synoptic:true,mping:true}},
  el:{obsControl:{hidden:true},obsCount:{textContent:''}},PTYPE:['#0','#1','#2','#3','#4','#5'],
- PTYPE_LABELS:['unknown','rain','snow','freezing rain','sleet','mixed'],Date,Number,console,URL,fetch:async()=>({status:404,ok:false}),
+ RADAR_REPORT_FIELDS:new Set(['ptype','refc']),FIELD_GROUP_DEFS:[{key:'radar',fields:['ptype','refc']},{key:'shear',fields:['shear01']},{key:'convective',fields:['sbcape']}],PTYPE_LABELS:['unknown','rain','snow','freezing rain','sleet','mixed'],Date,Number,console,URL,fetch:async()=>({status:404,ok:false}),
  fmt:()=>'',maplibregl:{Popup:class{}},
 });
 vm.runInContext(js.slice(start,end),context);

@@ -5,7 +5,6 @@
 (()=>{
  'use strict';
  const WINDOWS=new Set(); let menu=null, nextZ=4500, refreshTimer=null;
- const nf=n=>Number.isFinite(n)?n.toFixed(Math.abs(n)>=100?0:Math.abs(n)>=10?1:2):'—';
  const isGood=n=>Number.isFinite(n)&&n>-1e9&&Math.abs(n)<1e9;
  const cycleLabel=ds=>ds?.init_time?fmt(ds.init_time):'unknown cycle';
  const icDownload='<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/></svg>';
@@ -49,7 +48,7 @@
   head.append(save,close);
   const body=document.createElement('div');body.className='evu-inspect-body';
   const progress=document.createElement('p');progress.className='evu-inspect-status';progress.setAttribute('role','status');progress.setAttribute('aria-live','polite');
-  const canvas=document.createElement('canvas');canvas.width=type==='sounding'?1260:1100;canvas.height=type==='sounding'?810:735;canvas.className='evu-inspect-canvas';
+  const canvas=document.createElement('canvas');canvas.width=type==='sounding'?1480:1100;canvas.height=type==='sounding'?900:785;canvas.className='evu-inspect-canvas';
   body.append(progress,canvas);win.append(head,body);document.body.append(win);
   const n=WINDOWS.size;win.style.left=Math.min(50+n*35,Math.max(8,window.innerWidth-400))+'px';win.style.top=Math.min(120+n*38,Math.max(8,window.innerHeight-320))+'px';win.style.zIndex=String(++nextZ);
   win.addEventListener('pointerdown',()=>{win.style.zIndex=String(++nextZ);});
@@ -69,6 +68,9 @@
  }
  function frame(ctx,canvas,title,subtitle){
   const w=canvas.width,h=canvas.height,theme=st.theme==='light';
+  // Reused canvases preserve textAlign from the previous plot (often 'center'
+  // or 'right'). Reset it explicitly or header labels can render off-canvas.
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
   ctx.fillStyle=theme?'#ffffff':'#111e30';ctx.fillRect(0,0,w,h);
   ctx.fillStyle=theme?'#1e293b':'#f1f6ff';ctx.font='bold 29px system-ui';ctx.fillText(title,42,51);
   ctx.fillStyle=theme?'#475569':'#abc3d9';ctx.font='19px system-ui';ctx.fillText(subtitle,43,83);
@@ -81,26 +83,61 @@
   const match=/^(?:apcp|snow)(1|3|6|24|48)h$/.exec(field||'');
   return match?Number(match[1]):0;
  }
+ // Round axis *intervals*, not just the printed values. Most meteorological
+ // fields use whole-number hPa, °F, °C, kt, J/kg, etc. Precipitation in inches
+ // and rates in in/hr retain decimals because sub-unit changes are meaningful.
+ function seriesAxisFractional(unit){
+  return unit==='in'||unit==='in/hr'||unit==='fraction'||unit==='ratio';
+ }
+ function seriesYAxis(values,unit='',bars=false){
+  const finite=values.filter(isGood);
+  if(!finite.length)return {min:0,max:1,ticks:[0,1],decimals:0};
+  const fractional=seriesAxisFractional(unit);
+  const low=Math.min(...finite),high=Math.max(...finite);
+  const range=high-low;
+  const pad=range>0?range*.08:(fractional?Math.max(.005,Math.abs(high)*.08):Math.max(1,Math.min(10,Math.abs(high)*.01)));
+  const min=bars?Math.min(0,low):low-pad;
+  const max=high+pad;
+  const rawStep=Math.max(Number.EPSILON,(max-min)/5);
+  const mag=Math.pow(10,Math.floor(Math.log10(rawStep)));
+  const fraction=[1,2,5,10].find(n=>n*mag>=rawStep*(1-1e-12))||10;
+  const step=fractional?fraction*mag:Math.max(1,Math.ceil(fraction*mag));
+  let bottom=Math.floor(min/step)*step,top=Math.ceil(max/step)*step;
+  if(top<=bottom)top=bottom+step;
+  if((top-bottom)/step<2){
+   if(bars)top=bottom+2*step;
+   else{bottom-=step;top+=step;}
+  }
+  const decimals=Number.isInteger(step)?0:Math.min(6,Math.max(0,Math.ceil(-Math.log10(step)-1e-9)));
+  const ticks=[];
+  const count=Math.min(30,Math.round((top-bottom)/step));
+  for(let i=0;i<=count;i++)ticks.push(Number((bottom+i*step).toFixed(Math.max(6,decimals))));
+  return {min:bottom,max:top,ticks,decimals};
+ }
+ function seriesTickLabel(value,decimals){
+  const rounded=Number(value.toFixed(decimals));
+  return (Object.is(rounded,-0)?0:rounded).toLocaleString('en-US',{maximumFractionDigits:decimals});
+ }
  function plotSeries(s,points){
   s.lastPlot={kind:'series',points};
   const {canvas,data}=s,ctx=canvas.getContext('2d'),validPoints=points.filter(x=>isGood(x.value));
   const unit=FIELDS[data.field]?.unit||'';const ink=frame(ctx,canvas,`${data.modelLabel} · ${fieldName(data.field)}`,`Init ${data.timeMode==='analysis'?fmt(data.referenceCycle):cycleLabel(data.dataset)} · ${data.lat.toFixed(3)}°, ${data.lon.toFixed(3)}° · ${unit||'units not specified'}`);
   const x0=95,x1=1039,y0=136,y1=644;
+  // Deliberately a little more visible than the sounding guide grid in both themes.
+  const seriesGrid=st.theme==='light'?'#bdcbd9':'#4b6680';
   ctx.font='17px system-ui';
   if(!validPoints.length){ctx.fillStyle=ink.muted;ctx.fillText('No published numeric forecast values for this point and cycle.',x0+40,335);return;}
   const maxH=Math.max(1,...points.map(x=>x.hour));
   const accumulationHours=intervalAccumulationHours(data.field),bars=accumulationHours>0;
-  let min=Math.min(...validPoints.map(x=>x.value)),max=Math.max(...validPoints.map(x=>x.value));
-  const padding=Math.max(.08*(max-min),max===min?Math.max(1,Math.abs(max)*.1):0);
-  if(bars){min=Math.min(0,min);max=Math.max(max+padding,1e-6);}
-  else{min-=padding;max+=padding;}
+  const yAxis=seriesYAxis(validPoints.map(x=>x.value),unit,bars);
+  const {min,max}=yAxis;
   const px=hour=>x0+hour/maxH*(x1-x0),py=v=>y1-(v-min)/(max-min)*(y1-y0);
-  for(let i=0;i<=6;i++){
-   const yy=y1-(y1-y0)*i/6,v=min+(max-min)*i/6;axis(ctx,x0,yy,x1,yy,ink.grid);
-   ctx.fillStyle=ink.muted;ctx.textAlign='right';ctx.fillText(nf(v),x0-11,yy+6);
+  for(const v of yAxis.ticks){
+   const yy=py(v);axis(ctx,x0,yy,x1,yy,seriesGrid);
+   ctx.fillStyle=ink.muted;ctx.textAlign='right';ctx.fillText(seriesTickLabel(v,yAxis.decimals),x0-11,yy+6);
   }
   const tickStep=maxH>72?12:maxH>36?6:maxH>18?3:2;
-  for(let h=0;h<=maxH;h+=tickStep){const xx=px(h);axis(ctx,xx,y0,xx,y1,ink.grid);ctx.fillStyle=ink.muted;ctx.textAlign='center';ctx.fillText(`F${String(h).padStart(3,'0')}`,xx,y1+30);}
+  for(let h=0;h<=maxH;h+=tickStep){const xx=px(h);axis(ctx,xx,y0,xx,y1,seriesGrid);ctx.fillStyle=ink.muted;ctx.textAlign='center';ctx.fillText(`F${String(h).padStart(3,'0')}`,xx,y1+30);}
   ctx.textAlign='center';ctx.fillStyle=ink.ink;ctx.fillText('Forecast lead time (hours)',(x0+x1)/2,y1+69);
   ctx.save();ctx.translate(33,(y0+y1)/2);ctx.rotate(-Math.PI/2);ctx.fillText(unit||fieldName(data.field),0,0);ctx.restore();
   const color='#32acdb';ctx.strokeStyle=color;ctx.lineWidth=3;let active=false,lastH=null;
@@ -124,9 +161,23 @@
   }
   ctx.textAlign='left';ctx.font='17px system-ui';ctx.fillStyle=ink.muted;
   const note=bars?`${accumulationHours}-hour totals shown as bars · rolling intervals may overlap; missing ≠ zero.`:'Gaps are unavailable data, not zero.';
-  ctx.fillText(`${validPoints.length} valid / ${points.length} hours. ${note}`,x0,718);
+  // Footer is kept below the X-axis title rather than drawn through it.
+  ctx.fillText(`${validPoints.length} valid / ${points.length} hours. ${note}`,x0,canvas.height-26);
  }
- const SKEW=40;
+ // Place hodograph speed-ring labels on visible arcs rather than clamping
+ // them against the edge/cardinal labels. Pure helper for layout tests.
+ function hodographRingLabel(ox,oy,r,bounds){
+  const angles=[-35,-27,-45,-20,-55,-65,-75,-85,25,35,45,55,115,135,155];
+  for(const degrees of angles){
+   const theta=degrees*Math.PI/180;
+   const x=ox+r*Math.cos(theta),y=oy+r*Math.sin(theta);
+   if(x>=bounds.left+24&&x<=bounds.right-24&&
+      y>=bounds.top+18&&y<=bounds.bottom-18)return {x,y};
+  }
+  return null;
+ }
+ // Slightly gentler tilt than the prior 40°C spread across 1000–100 hPa.
+ const SKEW=35;
  function deriveSurfaceMetrics(rows){
   const ordered=[...rows].filter(r=>Number.isFinite(r?.p)).sort((a,b)=>b.p-a.p);
   const sfc=ordered.find(r=>isGood(r.t)||isGood(r.td)||isGood(r.u)||isGood(r.v))||null;
@@ -169,12 +220,17 @@
   const tint=light?'#f4f7fb':'#15263a',edge=light?'#dce4ec':'#38516b';
   const goodRows=rows.filter(r=>r&&isGood(r.p)&&r.p>=100&&r.p<=1050).sort((a,b)=>b.p-a.p);
   const sparse=!!summary.sparse;
-  const p0=1050,ptop=100;
-  const x0=101,x1=775,y0=160,y1=687;
-  const barbX=813;
+  // Anchor the bottom of the plot at the actual model surface pressure when
+  // present. Never extend the temperature trace below terrain.
+  const p0=summary.terrainScreened&&isGood(summary.surfacePressure)
+   ?Math.max(400,Math.min(1050,summary.surfacePressure)):1050,ptop=100;
+  const x0=99,x1=820,y0=166,y1=762;
+  // A readable near-surface temperature axis without unnecessary +60/+70°C space.
+  const temperatureMin=-50,temperatureMax=50;
+  const barbX=860;
   // Preserve standard skew-T log-P pressure scaling.
-  const Y=p=>y1-Math.log(1000/p)/Math.log(1000/100)*(y1-y0);
-  const X=(t,p)=>x0+((t+50+SKEW*Math.log(1000/p)/Math.log(1000/100))/130)*(x1-x0);
+  const Y=p=>y1-Math.log(p0/p)/Math.log(p0/ptop)*(y1-y0);
+  const X=(t,p)=>x0+((t-temperatureMin+SKEW*Math.log(1000/p)/Math.log(1000/100))/(temperatureMax-temperatureMin))*(x1-x0);
   const card=(x,y,w,h,r=12)=>{ctx.fillStyle=tint;ctx.strokeStyle=edge;ctx.lineWidth=1.2;
     ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();};
   const label=(txt,x,y,size=16,color=muted,weight='400',align='left')=>{
@@ -183,18 +239,18 @@
   const path=(points,color,width=1,dash=[])=>{if(points.length<2)return;ctx.save();ctx.lineWidth=width;ctx.strokeStyle=color;ctx.setLineDash(dash);ctx.beginPath();
     for(let i=0;i<points.length;i++)i?ctx.lineTo(...points[i]):ctx.moveTo(...points[i]);ctx.stroke();ctx.restore();};
   // Plot backing and reference axes. All curves are clipped inside the plot.
-  card(x0-14,y0-30,x1-x0+32,y1-y0+67);
+  card(x0-14,y0-50,x1-x0+32,y1-y0+87);
   ctx.save();ctx.beginPath();ctx.rect(x0,y0,x1-x0,y1-y0);ctx.clip();
   // Dry adiabats: potential temperature, K, referenced to 1000 hPa.
   for(let theta=260;theta<=430;theta+=20){const points=[];
    for(let p=1000;p>=100;p-=15){let t=theta*Math.pow(p/1000,.2854)-273.15;points.push([X(t,p),Y(p)]);}
-   path(points,light?'#e2ebf1':'#243c4c',1.0);
+   path(points,light?'#a9b8c9':'#536f87',1.2);
   }
   // Mixing-ratio guides in g/kg. Do not portray these as observed dewpoints.
   for(const q of [1,2,4,8,12,16,20]){const points=[];
    for(let p=1000;p>=450;p-=15){const w=q/1000,e=w*p/(.622+w),ratio=Math.log(e/6.112);
     const t=243.5*ratio/(17.67-ratio);if(Number.isFinite(t))points.push([X(t,p),Y(p)]);}
-   path(points,light?'#d9eade':'#29473f',1,[4,8]);
+   path(points,light?'#95baa5':'#4b8a73',1.2,[4,7]);
   }
   for(const p of [1000,925,850,700,600,500,400,300,250,200,150,100]){
    path([[x0,Y(p)],[x1,Y(p)]],p===700||p===500?edge:grid,p===700||p===500?1.5:1);
@@ -213,20 +269,39 @@
    }
    for(const r of validRows)dot(ctx,X(r[key],r.p),Y(r.p),color,2.6);
   };
+  // Approximate most-unstable parcel trace: selected from valid native T/Td
+  // in the lowest 300 hPa. Omit if profile is sparse or incompletely moist.
+  const parcel=window.EVUSoundingThermo?.mostUnstableParcel(goodRows,{sparse})||null;
+  if(parcel){
+   path(parcel.points.map(r=>[X(r.t,r.p),Y(r.p)]),'#f7c873',3.1,[9,5]);
+   dot(ctx,X(parcel.lclTemperature,parcel.lclPressure),Y(parcel.lclPressure),'#f7c873',5);
+  }
   profile('t','#fa696c');profile('td','#3ed3ad');
   ctx.restore();
   // Pressure and temperature ticks outside of plot clip.
   for(const p of [1000,925,850,700,600,500,400,300,250,200,150,100]){
+   if(p>p0)continue;
    label(String(p),x0-23,Y(p)+5,14,muted,'500','right');
   }
-  for(let t=-50;t<=70;t+=10){const x=X(t,1000);if(x<x0+6||x>x1-6)continue;
-   label(String(t),x,Y(1000)+28,14,muted,'500','center');
+  if(summary.terrainScreened)label(String(Math.round(p0)),x0-23,y1+5,14,fg,'700','right');
+  for(let t=temperatureMin;t<=temperatureMax;t+=10){const x=X(t,p0);if(x<x0+6||x>x1-6)continue;
+   label(String(t),x,y1+28,14,muted,'500','center');
   }
-  label('Temperature (°C)',(x0+x1)/2,755,16,fg,'650','center');
+  label('Temperature (°C)',(x0+x1)/2,836,16,fg,'650','center');
   ctx.save();ctx.translate(34,(y0+y1)/2);ctx.rotate(-Math.PI/2);label('Pressure (hPa)',0,0,16,fg,'650','center');ctx.restore();
-  label('Skew-T / Log-P',x0-2,y0-9,18,fg,'650');
-  label('T',x0+410,128,16,'#fa696c','700');label('Td',x0+449,128,16,'#3ed3ad','700');
-  label('Dry adiabats  ·  mixing-ratio guides',x0+494,129,11,muted,'400');
+  // Clean, non-overlapping header for the Skew-T panel. Keep the title and
+  // guide-description separate from the trace legend for a more professional look.
+  const headY=y0-25, subY=y0-6, legendY=y0-25;
+  label('Skew-T / Log-P',x0-2,headY,19,fg,'700');
+  label('Dry adiabats · mixing-ratio guides',x0+14,subY,11,muted,'400');
+  const legendItem=(x,color,text,size=14)=>{
+    path([[x,legendY-5],[x+20,legendY-5]],color,3.2);
+    label(text,x+27,legendY,size,color,'700');
+  };
+  let lx=x1-255;
+  legendItem(lx,'#fa696c','T',15); lx+=52;
+  legendItem(lx,'#3ed3ad','Td',15); lx+=62;
+  if(parcel) legendItem(lx,'#f7c873','MU parcel*',13);
   // Sparse profiles are a transparent fallback, not a purported full sounding.
   if(sparse){ctx.fillStyle=light?'rgba(255,246,225,.96)':'rgba(71,48,26,.96)';
    ctx.fillRect(x0+8,y0+13,x1-x0-16,42);
@@ -235,76 +310,152 @@
   if(!goodRows.some(r=>isGood(r.t))){label('No usable temperature profile was published for this point.',x0+55,440,19,muted,'500');}
   // Native wind barbs in knots, selected to avoid overlap and clutter.
   label('WIND',barbX,y0-9,13,muted,'700','center');
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const mixColor=(a,b,t)=>{
+   const pa=[parseInt(a.slice(1,3),16),parseInt(a.slice(3,5),16),parseInt(a.slice(5,7),16)];
+   const pb=[parseInt(b.slice(1,3),16),parseInt(b.slice(3,5),16),parseInt(b.slice(5,7),16)];
+   const pc=pa.map((v,i)=>Math.round(lerp(v,pb[i],t)).toString(16).padStart(2,'0'));
+   return `#${pc.join('')}`;
+  };
+  const windBarbColor=knots=>{
+   const stops=[
+    [0,'#7cc7ff'], [15,'#53d2c7'], [30,'#6edc6e'], [45,'#d9df5a'],
+    [60,'#f1bc4f'], [80,'#ef8c3f'], [100,'#df5f55'], [120,'#c04ba5']
+   ];
+   if(!Number.isFinite(knots))return fg;
+   if(knots<=stops[0][0])return stops[0][1];
+   for(let i=1;i<stops.length;i++){
+    const [k1,c1]=stops[i];
+    const [k0,c0]=stops[i-1];
+    if(knots<=k1)return mixColor(c0,c1,(knots-k0)/(k1-k0));
+   }
+   return stops[stops.length-1][1];
+  };
   const drawBarb=(r)=>{
    if(!isGood(r.u)||!isGood(r.v))return;
    const x=barbX,y=Y(r.p),knots=Math.hypot(r.u,r.v)*1.94384449,angle=Math.atan2(-r.u,-r.v);
+   const color=windBarbColor(knots);
    const dirX=Math.sin(angle),dirY=-Math.cos(angle),len=43;
-   const ex=x+len*dirX,ey=y+len*dirY;path([[x,y],[ex,ey]],fg,1.7);
+   const ex=x+len*dirX,ey=y+len*dirY;path([[x,y],[ex,ey]],color,1.9);
    let fifty=Math.floor((knots+2.5)/50),ten=Math.floor((knots+2.5-50*fifty)/10),five=(knots+2.5-50*fifty-10*ten)>=5?1:0;
    let offset=2;
    const feather=(length,flag=false)=>{const bx=ex-offset*dirX,by=ey-offset*dirY;
-    const tx=bx+length*dirY,ty=by-length*dirX;
-    if(flag){ctx.fillStyle=fg;ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(tx,ty);ctx.lineTo(bx-10*dirX,by-10*dirY);ctx.closePath();ctx.fill();offset+=13;}
-    else{path([[bx,by],[tx,ty]],fg,1.7);offset+=8;}};
+    const tx=bx-length*dirY,ty=by+length*dirX;
+    if(flag){ctx.fillStyle=color;ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(tx,ty);ctx.lineTo(bx-10*dirX,by-10*dirY);ctx.closePath();ctx.fill();offset+=13;}
+    else{path([[bx,by],[tx,ty]],color,1.9);offset+=8;}};
    for(let k=0;k<Math.min(fifty,4);k++)feather(19,true);
    for(let k=0;k<Math.min(ten,5);k++)feather(18);
    if(five)feather(10);
-   if(knots<2.5){ctx.strokeStyle=fg;ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.stroke();}
+   if(knots<2.5){ctx.strokeStyle=color;ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.stroke();}
   };
   let lastBarbY=-Infinity;
-  for(const r of goodRows){const y=Y(r.p);if(Math.abs(y-lastBarbY)>=19&&isGood(r.u)&&isGood(r.v)){
+  for(const r of goodRows){const y=Y(r.p);if(Math.abs(y-lastBarbY)>=25&&isGood(r.u)&&isGood(r.v)){
    drawBarb(r);lastBarbY=y;}}
-  label('kt',barbX,750,13,muted,'500','center');
-  // Hodograph — wind component axes in kt, native isobaric levels identified.
-  const hx=876,hy=131,hw=352,hh=292;card(hx,hy,hw,hh);
-  label('HODOGRAPH',hx+17,hy+31,17,fg,'700');label('isobaric levels',hx+hw-19,hy+31,12,muted,'400','right');
+  label('kt',barbX,835,13,muted,'500','center');
+  // Expanded hodograph: dynamically fit the occupied wind envelope so the
+  // curve uses more of the available panel space while keeping the origin.
+  const hx=903,hy=132,hw=545,hh=422;card(hx,hy,hw,hh);
+  label('HODOGRAPH',hx+19,hy+31,18,fg,'700');
+  label('Wind components (kt)',hx+hw-18,hy+31,13,muted,'400','right');
   const windRows=goodRows.filter(r=>isGood(r.u)&&isGood(r.v)&&Math.hypot(r.u,r.v)<130);
-  const maxK=Math.max(50,...windRows.map(r=>Math.hypot(r.u,r.v)*1.94384449));
-  const axisMax=Math.ceil(maxK/20)*20,ox=hx+hw/2,oy=hy+174,scale=108/axisMax;
+  const windPts=windRows.map(r=>({u:r.u*1.94384449,v:r.v*1.94384449,p:r.p}));
+  const left=hx+18, top=hy+58, right=hx+hw-18, bottom=hy+hh-52, pad=22;
+  const maxK=Math.max(40,...windPts.map(r=>Math.hypot(r.u,r.v)));
+  const ringStep=maxK>=160?40:maxK>=100?25:20;
+  const axisMax=Math.ceil(maxK/ringStep)*ringStep;
+  const xs=[0,...windPts.map(r=>r.u)], ys=[0,...windPts.map(r=>r.v)];
+  const xmin=Math.min(...xs), xmax=Math.max(...xs), ymin=Math.min(...ys), ymax=Math.max(...ys);
+  const spanX=Math.max(20,xmax-xmin), spanY=Math.max(20,ymax-ymin);
+  const scale=Math.min((right-left-2*pad)/spanX,(bottom-top-2*pad)/spanY);
+  const ox=left+pad-xmin*scale, oy=bottom-pad+ymin*scale;
+  const plotW=right-left, plotH=bottom-top;
+  const radius=axisMax*scale;
   const hxy=r=>[ox+r.u*1.94384449*scale,oy-r.v*1.94384449*scale];
-  for(let speed=20;speed<=axisMax;speed+=20){ctx.strokeStyle=grid;ctx.lineWidth=1;
-   ctx.beginPath();ctx.arc(ox,oy,speed*scale,0,Math.PI*2);ctx.stroke();
-   label(String(speed),ox+speed*scale+3,oy-6,11,muted);}
-  path([[ox-112,oy],[ox+112,oy]],grid,1);path([[ox,oy-112],[ox,oy+112]],grid,1);
-  label('N',ox,oy-115,12,muted,'600','center');label('E',ox+119,oy+4,12,muted,'600');
-  label('S',ox,oy+125,12,muted,'600','center');label('W',ox-122,oy+4,12,muted,'600','right');
-  const hcolor=p=>p>=700?'#39c8aa':p>=400?'#f7b956':'#e57c9c';
-  for(let i=1;i<windRows.length;i++){
-   const a=windRows[i-1],b=windRows[i];const c=hcolor((a.p+b.p)/2);
-   path([hxy(a),hxy(b)],c,2.8,a.p-b.p>175?[5,5]:[]);
+  ctx.save();ctx.beginPath();ctx.rect(left,top,plotW,plotH);ctx.clip();
+  // Label ring arcs within the plot instead of clamping all labels against
+  // the right boundary (which overlapped the 'E' cardinal label for 80 kt).
+  // Prefer the upper-right arc; skip a label if no fully visible position exists.
+  for(let speed=ringStep;speed<=axisMax;speed+=ringStep){
+   const r=speed*scale;
+   ctx.strokeStyle=grid;ctx.lineWidth=1;ctx.beginPath();ctx.arc(ox,oy,r,0,Math.PI*2);ctx.stroke();
+   const position=hodographRingLabel(ox,oy,r,{left,top,right,bottom});
+   if(position){
+    // Small backing patch breaks the guide ring beneath the numeral.
+    const text=String(speed);ctx.font='500 12px system-ui';
+    const tw=ctx.measureText(text).width;
+    ctx.fillStyle=tint;ctx.fillRect(position.x-tw/2-4,position.y-13,tw+8,18);
+    label(text,position.x,position.y,12,muted,'600','center');
+   }
   }
-  for(const r of windRows){if([1000,925,850,700,500,300,200].includes(r.p)){
-   const [xx,yy]=hxy(r);dot(ctx,xx,yy,hcolor(r.p),3.1);
-   if([850,700,500,300].includes(r.p))label(String(r.p),xx+6,yy-5,10,muted);
-  }}
+  path([[left,oy],[right,oy]],grid,1);
+  path([[ox,top],[ox,bottom]],grid,1);
+  const hcolor=p=>p>=900?'#37c7ae':p>=700?'#5da7ec':p>=500?'#efbb69':'#da82d2';
+  for(let i=1;i<windRows.length;i++){
+   const a=windRows[i-1],b=windRows[i];
+   path([hxy(a),hxy(b)],hcolor((a.p+b.p)/2),3.2,a.p-b.p>175?[6,5]:[]);
+  }
+  let lastLabel=null;
+  for(const target of [1000,925,850,700,500,300,200]){
+   const r=windRows.find(r=>Math.abs(r.p-target)<1);
+   if(!r)continue;
+   const [xx,yy]=hxy(r);dot(ctx,xx,yy,hcolor(r.p),4);
+   if([925,850,700,500,300].includes(target)&&(!lastLabel||Math.hypot(xx-lastLabel[0],yy-lastLabel[1])>=30)){
+    label(String(target),Math.min(right-18,xx+8),Math.max(top+14,yy-7),12,fg,'650');lastLabel=[xx,yy];
+   }
+  }
+  ctx.restore();
+  label('N',ox,Math.max(top-6,oy-radius-12),12,muted,'600','center');
+  label('E',Math.min(right+12,ox+radius+18),oy+4,12,muted,'600','center');
+  label('S',ox,Math.min(bottom+18,oy+radius+18),12,muted,'600','center');
+  label('W',Math.max(left-12,ox-radius-18),oy+4,12,muted,'600','center');
   if(!windRows.length)label('Winds unavailable',ox,oy,17,muted,'500','center');
-  // Compact diagnostics and profile provenance; avoid pretending these
-  // environmental values are derived from sparse Skew-T data.
-  const dx=876,dy=438,dw=352,dh=287;card(dx,dy,dw,dh);
-  label('MODEL DIAGNOSTICS',dx+16,dy+30,16,fg,'700');
-  const diag=summary.diagnostics||{}, v=(x,unit)=>isGood(x)?`${Math.round(x)} ${unit}`:'—';
+  label('≥900',hx+22,hy+hh-13,12,'#37c7ae');
+  label('900–700',hx+113,hy+hh-13,12,'#5da7ec');
+  label('700–500',hx+242,hy+hh-13,12,'#efbb69');
+  label('<500 hPa',hx+382,hy+hh-13,12,'#da82d2');
+  // Model-derived diagnostics are sampled from the published model grid,
+  // not recomputed from the coarser sounding-profile grid.
+  const dx=903,dy=570,dw=545,dh=257;card(dx,dy,dw,dh);
+  label('MODEL DIAGNOSTICS',dx+20,dy+34,18,fg,'700');
+  const diag=summary.diagnostics||{},v=(x,unit)=>isGood(x)?`${Math.round(x)} ${unit}`:'—';
+  const validShear=x=>isGood(x)&&x>=0&&x<=250?v(x,'kt'):'—';
   const stats=[['SBCAPE',v(diag.sbcape,'J/kg')],['MLCAPE',v(diag.mlcape,'J/kg')],
    ['MUCAPE',v(diag.mucape,'J/kg')],['SRH 0–1',v(diag.srh01,'m²/s²')],
-   ['SRH 0–3',v(diag.srh03,'m²/s²')],['Shear 0–6',isGood(diag.shear06)&&diag.shear06<=250?v(diag.shear06,'kt'):'—']];
-  const yy0=dy+59;
+   ['SRH 0–3',v(diag.srh03,'m²/s²')],['Shear 0–1 km',validShear(diag.shear01)],
+   ['Shear 0–6 km',validShear(diag.shear06)]];
+  const leftX=dx+20,rightX=dx+dw/2+10;
   for(let i=0;i<stats.length;i++){
-   const yy=yy0+i*29;label(stats[i][0],dx+18,yy,14,muted);
-   label(stats[i][1],dx+dw-17,yy,14,fg,'600','right');
+   const col=i%2,row=Math.floor(i/2),xx=col?rightX:leftX,yy=dy+70+row*34;
+   label(stats[i][0],xx,yy,13,muted);
+   label(stats[i][1],xx+222,yy,13,fg,'650','right');
   }
-  path([[dx+17,dy+238],[dx+dw-17,dy+238]],edge,1);
-  const n=summary.levels||{
-   temperature:goodRows.filter(r=>isGood(r.t)).length,
-   dewpoint:goodRows.filter(r=>isGood(r.td)).length,
-   wind:windRows.length};
-  label('Available levels  T / Td / Wind',dx+18,dy+254,12,muted);
-  label(`${n.temperature} / ${n.dewpoint} / ${n.wind}`,dx+dw-17,dy+254,13,fg,'700','right');
+  path([[dx+20,dy+196],[dx+dw-20,dy+196]],edge,1);
+  const n=summary.levels||{temperature:goodRows.filter(r=>isGood(r.t)).length,
+   dewpoint:goodRows.filter(r=>isGood(r.td)).length,wind:windRows.length};
+  label('Levels (2-m T/Td, 10-m wind + aloft)',dx+20,dy+219,13,muted);
+  label(`${n.temperature} / ${n.dewpoint} / ${n.wind}`,dx+dw-20,dy+219,14,fg,'700','right');
+  if(parcel)label(`MU* ${Math.round(parcel.sourcePressure)} hPa  •  LCL ~${Math.round(parcel.lclPressure)} hPa`,dx+20,dy+245,12,'#f7c873','600');
+  else label('MU parcel: unavailable (insufficient native moisture data)',dx+20,dy+245,12,muted);
   const met=deriveSurfaceMetrics(goodRows);
-  label(`Surface: ${isGood(met.surface?.t)?Math.round(met.surface.t)+'°C':'—'} / ${isGood(met.surface?.td)?Math.round(met.surface.td)+'°C':'—'}  ·  ${formatWind(met.surface?.u,met.surface?.v)}`,x0,794,14,fg,'500');
-  label(`${summary.gridKm?'~'+Math.round(summary.gridKm)+'-km grid  ·  ':''}${sparse?'Sparse fallback  ·  ':''}Native pressure data only; levels below terrain are not screened`,hx+dw/2,794,12,muted,'400','center');
+  label(`Lowest level: ${isGood(met.surface?.t)?Math.round(met.surface.t)+'°C':'—'} / ${isGood(met.surface?.td)?Math.round(met.surface.td)+'°C':'—'}  ·  ${formatWind(met.surface?.u,met.surface?.v)}`,x0,865,14,fg,'500');
+  // Keep MU-parcel caveats inside the right-hand footer. The former single
+  // centered line extended beyond the 1480-pixel canvas and was truncated.
+  // Measure both lines against the actual right-card width on either theme.
+  const footnote=(message,y)=>{
+   const x=dx+20, maxWidth=dw-40;
+   let fontSize=12;
+   ctx.font=`400 ${fontSize}px system-ui`;
+   while(ctx.measureText(message).width>maxWidth&&fontSize>10){
+    fontSize-=0.5;ctx.font=`400 ${fontSize}px system-ui`;
+   }
+   label(message,x,y,fontSize,muted);
+  };
+  footnote(`*Approximate pseudo-adiabatic MU parcel; no CAPE/CIN computed.${sparse?' Sparse fallback.':''}`,856);
+  footnote(summary.terrainScreened?'Native surface pressure; below-ground levels excluded.':'Surface pressure unavailable; no terrain screening.',879);
  }
  async function soundingDiagnostics(selected,record,validTime){
-  const out={diagnostics:{sbcape:null,mlcape:null,mucape:null,srh01:null,srh03:null,shear06:null}};
-  const names=['sbcape','mlcape','mucape','srh01','srh03','shear06'];
+  const out={diagnostics:{sbcape:null,mlcape:null,mucape:null,srh01:null,srh03:null,shear01:null,shear06:null}};
+  const names=['sbcape','mlcape','mucape','srh01','srh03','shear01','shear06'];
   if(selected.timeMode==='analysis'){
    const source=st.sources.get(selected.sourceId);if(!source)return out;
    const stamp=validTime.toISOString();
@@ -455,10 +606,13 @@
      const sourceNote=model==='refs_mean'?' · native operational REFS Mean':'';
      const gridNote=result.gridKm?` · sampled grid ~${Math.round(result.gridKm)} km`:'';
      const missingNote=result.unavailableVariables?.length?` · missing chunks: ${result.unavailableVariables.join(', ')}`:'';
-     s.progress.textContent=`Native profile · valid ${fmt(validTime)} · T ${n.temperature} / Td ${n.dewpoint} / Wind ${n.wind} pressure levels${gridNote}${sourceNote}${missingNote} · no below-ground screening`;
+     const surfaceNote=result.terrainScreened?` · native surface ${Math.round(result.surfacePressure)} hPa · below-ground levels removed`:' · surface pressure unavailable; terrain screening not possible';
+     s.progress.textContent=`Native profile · valid ${fmt(validTime)} · T ${n.temperature} / Td ${n.dewpoint} / Wind ${n.wind} levels${gridNote}${sourceNote}${missingNote}${surfaceNote}`;
      const summary=await soundingDiagnostics(selected,record,validTime);
      summary.gridKm=result.gridKm||null;
      summary.levels=n;
+     summary.terrainScreened=result.terrainScreened;
+     summary.surfacePressure=result.surfacePressure;
      plotSounding(s,result.rows,validTime,summary);return;
     }
     await updateSparseSounding(s,token,'Native profile has no valid values at this location');return;

@@ -20,8 +20,8 @@ for (const expected of [
   'html[data-theme="dark"]',
   'html[data-theme="light"]',
 ]) assert(css.includes(expected),expected);
-assert.equal((js.match(/new maplibregl\.Popup\(/g)||[]).length,2);
-assert.equal((js.match(/new maplibregl\.Popup\(\{[^}]*className:'evu-report-popup'/g)||[]).length,2);
-assert.equal((js.match(/\.setText\(/g)||[]).length,2,'report data must not be injected as HTML');
-assert.match(html,/css\/styles\.css\?v=1\.1\.11-20261031(?:b)?/);
+assert.equal((js.match(/new maplibregl\.Popup\(/g)||[]).length,3);
+assert.equal((js.match(/new maplibregl\.Popup\(\{[^}]*className:'evu-report-popup'/g)||[]).length,3);
+assert.equal((js.match(/\.setText\(/g)||[]).length,3,'report data must not be injected as HTML');
+assert.match(html,/css\/styles\.css\?v=1\.1\.34-20261102(?:b)?/);
 console.log('PASS theme-aware MapLibre popup surfaces, text, line breaks, close controls and pointer triangles');

@@ -1,0 +1,26 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const view=fs.readFileSync(path.join(root,'js/point-inspector.js'),'utf8');
+assert.ok(html.indexOf('js/sounding-thermodynamics.js')<html.indexOf('js/point-inspector.js'));
+assert.match(view,/shear01:null,shear06:null/);
+assert.match(view,/const names=\['sbcape','mlcape','mucape','srh01','srh03','shear01','shear06'\]/);
+assert.match(view,/\['Shear 0–1 km',validShear\(diag.shear01\)\]/);
+// Correct feather side: north-pointing staff feathers extend EAST in canvas coordinates.
+assert.match(view,/const tx=bx-length\*dirY,ty=by\+length\*dirX/);
+const win={};vm.runInNewContext(fs.readFileSync(path.join(root,'js/sounding-thermodynamics.js'),'utf8'),{window:win,Number,Math});
+const th=win.EVUSoundingThermo;
+const levels=[1000,975,950,925,900,875,850,800,750,700,650,600,550,500,450,400,350,300,250,200,150,100];
+const rows=levels.map(p=>({p,t:23-6.5*Math.log(1000/p)*8,td:18-7.5*Math.log(1000/p)*8}));
+const parcel=th.mostUnstableParcel(rows);
+assert.ok(parcel,'complete native T/Td profile can yield a parcel');
+assert.ok(parcel.sourcePressure>=700 && parcel.sourcePressure<=1000);
+assert.ok(parcel.lclPressure<parcel.sourcePressure);
+assert.ok(parcel.points.length>=10);
+assert.ok(parcel.points.every((r,i)=>i===0||r.p<parcel.points[i-1].p),'profile pressure decreases');
+assert.equal(th.mostUnstableParcel(rows,{sparse:true}),null);
+assert.equal(th.mostUnstableParcel(rows.map((r,i)=>({...r,td:i<1?r.td:null}))),null);
+assert.equal(th.mostUnstableParcel(rows.slice(0,3)),null);
+console.log('PASS sounding shear diagnostics, barb pennant handedness, conditional native-T/Td MU parcel');

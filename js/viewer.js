@@ -96,7 +96,7 @@ for(const [key,label,unit,min,max] of [
 // Thresholds use the display units established in each field definition.
 for(const [name,threshold] of Object.entries({
  wspd10:2,wspd300:2,gust:2,u10:2,v10:2,
- rh2m:1,cpofp:1,snowc:1,
+ cpofp:1,snowc:1,
  sbcape:10,mlcape:10,mucape:10,
  shear01:2,shear06:2,srh01:10,srh03:10,
  scp:.1,stp:.1,stp_fixed:.1,
@@ -152,6 +152,7 @@ function fieldGroupFor(fieldKey){return FIELD_MENU_GROUPS.find(group=>group.fiel
 
 // Native converter classes: 0 none/unknown, 1 rain, 2 snow, 3 freezing rain,
 // 4 ice pellets (sleet), 5 mixed. Use one label table for hover and legends.
+const RADAR_REPORT_FIELDS=new Set(FIELD_GROUP_DEFS.find(g=>g.key==='radar').fields);
 const PTYPE_LABELS=['None / Unknown','Rain','Snow','Freezing Rain','Sleet','Mixed'];
 const PTYPE = ['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'];
 // Public, preprocessed observation GeoJSON: no browser-side API tokens or proxy.
@@ -162,7 +163,7 @@ function observationPath(time){
  const root=String(st.cfg?.ptypeObservations?.path||'data/ptype_observations/').replace(/\/?$/,'/');
  return root+observationHourKey(time)+'.json';
 }
-function observationVisible(){return (st.field==='ptype'||st.field==='refc_ptype')&&!!st.cfg?.ptypeObservations?.enabled;}
+function observationVisible(){return RADAR_REPORT_FIELDS.has(st.field)&&!!st.cfg?.ptypeObservations?.enabled;}
 function observationSetCount(){
  if(!el.obsCount)return;
  if(!observationVisible()){el.obsCount.textContent='';return;}
@@ -242,7 +243,7 @@ function syncObservationPanel(p){
  try{const src=m.getSource('evu-observed-ptype');
   if(src){src.setData(filteredObservationGeoJSON());
    for(const id of ['evu-observed-metar','evu-observed-mping']){
-    if(m.getLayer(id))m.setLayoutProperty(id,'visibility',observationVisible()?'visible':'none');
+    if(m.getLayer(id)){m.setLayoutProperty(id,'visibility',observationVisible()?'visible':'none');if(observationVisible())m.moveLayer?.(id);}
    }
   }
  }catch(err){console.warn('Observation overlay update:',err);}
@@ -374,11 +375,99 @@ async function refreshSPCReports(){
  st.spcCurrent=combined;syncSPCPanels();
 }
 
+// Optional GOES GLM Level-2 FLASH centroids, not ground-strike locations.
+// Color bins are age relative to the current forecast valid hour, NEVER now.
+const LIGHTNING_EMPTY={type:'FeatureCollection',features:[]};
+const LIGHTNING_COLORS=['#ed468b','#f59e0b','#36b6cd','#7d84dc']; // 0–15, 15–30, 30–45, 45–60 minutes
+const LIGHTNING_FIELDS=new Set(FIELD_GROUP_DEFS.filter(group=>['radar','shear','convective'].includes(group.key)).flatMap(group=>group.fields));
+function lightningVisible(){return st.lightningEnabled&&LIGHTNING_FIELDS.has(st.field)&&st.cfg?.lightning?.enabled!==false;}
+function lightningColor(age){return LIGHTNING_COLORS[Math.min(3,Math.max(0,Math.floor(age/15)))];}
+function lightningPath(when){
+ const root=String(st.cfg?.lightning?.path||'data/lightning/').replace(/\/?$/,'/');
+ return root+observationHourKey(when)+'.json';
+}
+function lightningFeatureData(){
+ if(!lightningVisible()||!st.lightningCurrent?.features)return LIGHTNING_EMPTY;
+ return {type:'FeatureCollection',features:st.lightningCurrent.features};
+}
+function ensureLightningOverlay(p){
+ if(!p.map)return;
+ const m=p.map;
+ try{
+  if(!m.getSource('evu-lightning'))m.addSource('evu-lightning',{type:'geojson',data:LIGHTNING_EMPTY});
+  if(!m.getLayer('evu-lightning'))m.addLayer({id:'evu-lightning',type:'circle',source:'evu-lightning',
+   paint:{'circle-radius':['interpolate',['linear'],['zoom'],2,2.8,6,4.1,10,5.1],
+    'circle-color':['step',['get','age_minutes'],LIGHTNING_COLORS[0],15,LIGHTNING_COLORS[1],30,LIGHTNING_COLORS[2],45,LIGHTNING_COLORS[3]],
+    'circle-stroke-width':1,'circle-stroke-color':st.theme==='light'?'#182737':'#ffffff','circle-opacity':.9}});
+  if(!p.lightningClickInstalled){p.lightningClickInstalled=true;
+   m.on('click','evu-lightning',ev=>{
+    if(!lightningVisible()||!ev.features?.length)return;
+    const a=ev.features[0].properties||{};
+    new maplibregl.Popup({maxWidth:'245px',className:'evu-report-popup'})
+     .setLngLat(ev.lngLat).setText(`GLM lightning flash\n${a.time||''}\n${Math.round(Number(a.age_minutes)||0)} min before valid hour · ${a.satellite||''}`)
+     .addTo(m);
+   });
+   m.on('mouseenter','evu-lightning',()=>{if(m.getCanvas())m.getCanvas().style.cursor='pointer';});
+   m.on('mouseleave','evu-lightning',()=>{if(m.getCanvas())m.getCanvas().style.cursor='';});
+  }
+ }catch(err){console.warn('Lightning layer unavailable:',String(err));}
+}
+function syncLightningPanel(p){
+ if(!p?.map)return;
+ ensureLightningOverlay(p);
+ const m=p.map;
+ try{
+  const src=m.getSource('evu-lightning');if(!src||!m.getLayer('evu-lightning'))return;
+  const visible=lightningVisible();
+  src.setData(lightningFeatureData());
+  m.setLayoutProperty('evu-lightning','visibility',visible?'visible':'none');
+  if(visible)m.moveLayer?.('evu-lightning');
+  m.triggerRepaint?.();
+ }catch(err){console.warn('Lightning overlay update failed:',String(err));}
+}
+function syncLightningPanels(){
+ if(el.lightningCount)el.lightningCount.textContent=lightningVisible()?
+  (st.lightningCurrent?.future?'Future valid hour':st.lightningCurrent?.missing?'GLM data unavailable':
+   st.lightningCurrent===null?'Loading GLM lightning…':`${st.lightningCurrent.features.length} GLM flashes · past 60 min`):'';
+ for(const p of st.active)syncLightningPanel(p);
+}
+async function fetchLightningHour(when){
+ const key=observationHourKey(when),prior=st.lightningCache.get(key);
+ if(prior&&Date.now()-prior.at<(prior.value?.missing?90000:600000))return prior.value;
+ if(when.getTime()>Date.now())return {future:true,features:[]};
+ let value={missing:true,features:[]};
+ try{
+  const response=await fetch(lightningPath(when),{cache:'no-store'});
+  if(response.ok){
+   const obj=await response.json();
+   if(obj.schema!=='omd-evu-glm-flashes-1'||obj.type!=='FeatureCollection'||Date.parse(obj.valid_time)!==when.getTime())throw Error('GLM hour mismatch');
+   const end=when.getTime(),start=end-3600000;
+   const features=(obj.features||[]).filter(f=>{
+    const c=f?.geometry?.coordinates,t=Date.parse(f?.properties?.time);
+    return f?.geometry?.type==='Point'&&Array.isArray(c)&&c.length>=2&&
+     Number.isFinite(c[0])&&Number.isFinite(c[1])&&t>start&&t<=end;
+   }).map(f=>({...f,properties:{...f.properties,age_minutes:(end-Date.parse(f.properties.time))/60000}}));
+   value={features};
+  }else if(response.status!==404)throw Error('HTTP '+response.status);
+ }catch(err){console.warn('GLM data unavailable:',String(err));}
+ st.lightningCache.set(key,{at:Date.now(),value});
+ if(st.lightningCache.size>36)st.lightningCache.delete(st.lightningCache.keys().next().value);
+ return value;
+}
+async function refreshLightningReports(){
+ const token=++st.lightningLoadToken;
+ if(!lightningVisible()||!st.ref){st.lightningCurrent=null;syncLightningPanels();return;}
+ const when=obsValidDate();st.lightningCurrent=null;syncLightningPanels();
+ const data=await fetchLightningHour(when);
+ if(token!==st.lightningLoadToken)return;
+ st.lightningCurrent=data;syncLightningPanels();
+}
+
 /* OMD EVU autumnplot-gl + MapLibre GL viewer. Zarr-v2 decoding stays browser-native. */
 'use strict';
 const $=id=>document.getElementById(id);
-const el=Object.fromEntries(['userGuideBtn','userGuideDialog','userGuideClose','userGuideDone','imageOpacity','imageOpacityLabel','spcControl','spcToggleBtn','spcCount','obsControl','obsSynoptic','obsMping','obsCount','obsAttribution','contourOption','mslp850Option','mslp850ToggleBtn','exportKindFieldset','exportGifChoice','exportGifOptions','exportGifStart','exportGifStartLabel','exportGifEnd','exportGifEndLabel','exportGifStep','exportGifDelay','exportGifQuality','exportLargeLabels','exportScroll','exportGifDelayLabel','exportGifSummary','modelSetSelect','differenceDialog','differenceDialogPair','differenceOpenBtn','differenceCancelBtn','differenceWindow','differenceMap','differenceMessage','differenceDragHandle','differenceWindowTitle','differenceWindowSubtitle','differenceCloseBtn','differenceSaveBtn','differenceSample','differenceLegendUnit','contourControl','contourToggleBtn','heightOption','heightToggleBtn','windOption','windToggleBtn','fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportDialogHelp','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels','legendResetBtn','legendRangePopup','legendRangeForm','legendRangeMessage','legendRangeError','legendMinSlider','legendMaxSlider','legendMinNumber','legendMaxNumber','legendRangeApplyBtn','legendRangeResetBtn','legendCancelBtn'].map(x=>[x,$(x)]));
-const st={spcEnabled:false,spcCache:new Map(),spcCurrent:[],spcLoadToken:0,imageOpacity:1,overlayMSLP:true,overlayMSLP850:true,cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,overlaySevereWind:true,difference:{selected:[],open:false,map:null,layer:null,component:null,grid:null,token:0,timer:null,resizeObserver:null,geo:null,fieldKey:null,snapshot:null,saveBusy:false,mouseSampling:false,liveCanvas:null,liveToken:0,liveTimer:null,outlineCache:null,warmKey:null,warmSerial:0},mrmsAccumCache:null,alignedAccumCache:null,alignedSource:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,lastFieldByGroup:new Map(),hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0,obsCache:new Map(),obsCurrent:null,obsLoadToken:0,obsEnabled:{synoptic:true,mping:true},colorRanges:new Map(),legendSelection:null};
+const el=Object.fromEntries(['userGuideBtn','userGuideDialog','userGuideClose','userGuideDone','imageOpacity','imageOpacityLabel','interpolateToggleBtn','spcControl','spcToggleBtn','spcCount','lightningControl','lightningToggleBtn','lightningLegend','lightningCount','obsControl','obsSynoptic','obsMping','obsCount','obsAttribution','contourOption','mslp850Option','mslp850ToggleBtn','exportKindFieldset','exportGifChoice','exportGifOptions','exportGifStart','exportGifStartLabel','exportGifEnd','exportGifEndLabel','exportGifStep','exportGifDelay','exportGifQuality','exportLargeLabels','exportScroll','exportGifDelayLabel','exportGifSummary','modelSetSelect','differenceDialog','differenceDialogPair','differenceOpenBtn','differenceCancelBtn','differenceWindow','differenceMap','differenceMessage','differenceDragHandle','differenceWindowTitle','differenceWindowSubtitle','differenceCloseBtn','differenceSaveBtn','differenceSample','differenceLegendUnit','contourControl','contourToggleBtn','heightOption','heightToggleBtn','windOption','windToggleBtn','fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportDialogHelp','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels','legendResetBtn','legendRangePopup','legendRangeForm','legendRangeMessage','legendRangeError','legendMinSlider','legendMaxSlider','legendMinNumber','legendMaxNumber','legendRangeApplyBtn','legendRangeResetBtn','legendCancelBtn'].map(x=>[x,$(x)]));
+const st={lightningEnabled:false,lightningCache:new Map(),lightningCurrent:null,lightningLoadToken:0,spcEnabled:false,spcCache:new Map(),spcCurrent:[],spcLoadToken:0,imageOpacity:1,interpolate:false,overlayMSLP:true,overlayMSLP850:true,cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,overlaySevereWind:true,difference:{selected:[],open:false,map:null,layer:null,component:null,grid:null,token:0,timer:null,resizeObserver:null,geo:null,fieldKey:null,snapshot:null,saveBusy:false,mouseSampling:false,liveCanvas:null,liveToken:0,liveTimer:null,outlineCache:null,warmKey:null,warmSerial:0},mrmsAccumCache:null,alignedAccumCache:null,alignedSource:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,lastFieldByGroup:new Map(),hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0,obsCache:new Map(),obsCurrent:null,obsLoadToken:0,obsEnabled:{synoptic:true,mping:true},colorRanges:new Map(),legendSelection:null};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -505,7 +594,7 @@ function fieldInfo(v,requested=st.field,sourceModel=''){
   :matchedPrecip?'PMM accumulated precipitation'
   :legacyMeanPrecip?'Accumulated precipitation · legacy ensemble mean'
   :v.name==='ptype'&&isHRRR?'Derived precipitation type'
-  :dominantMean?'Dominant ensemble precipitation type'
+  :dominantMean?'Ensemble dominant precipitation type'
   :v.name==='ptype'?'Dominant precipitation type'
   :meanFraction?meta.label+' · weighted mean':meta.label;
  return {...meta,colors,fraction:meta.fraction||!!meta.copyColors&&!!FIELDS[meta.copyColors].fraction,
@@ -633,7 +722,7 @@ function createPanel(cfg,i){const card=document.createElement('section');card.cl
  expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label',`Expand ${cfg.label||cfg.id} panel`);
  expand.title=`Expand ${cfg.label||cfg.id} to fill plotting area`;
  expand.innerHTML=EXPAND_ICON;
- const view=document.createElement('div');view.className='panel-viewport';const snap=document.createElement('img');snap.className='map-snapshot';snap.alt='Previously rendered weather plot';snap.hidden=true;const frame=document.createElement('div');frame.className='map-frame';const lbl=document.createElement('div');lbl.className='plot-label';const title=document.createElement('strong'),sub=document.createElement('span'),labelMeta=document.createElement('div');labelMeta.className='plot-label-meta';labelMeta.append(title,sub);lbl.append(labelMeta);const notice=document.createElement('div');notice.className='notice visible';const note=document.createElement('span');notice.append(note);const info=document.createElement('div');info.className='point-info';info.hidden=true;const ghost=document.createElement('div');ghost.className='sync-crosshair';ghost.hidden=true;ghost.setAttribute('aria-hidden','true');view.append(frame,snap,lbl,notice,info,ghost);
+ const view=document.createElement('div');view.className='panel-viewport';const scrollRail=document.createElement('button');scrollRail.type='button';scrollRail.className='panel-scroll-rail';scrollRail.setAttribute('aria-label',`Scroll to next model after ${cfg.label||cfg.id}`);scrollRail.title='Swipe vertically here to scroll between model panels, or tap for the next panel';scrollRail.textContent='↕ Scroll';const snap=document.createElement('img');snap.className='map-snapshot';snap.alt='Previously rendered weather plot';snap.hidden=true;const frame=document.createElement('div');frame.className='map-frame';const lbl=document.createElement('div');lbl.className='plot-label';const title=document.createElement('strong'),sub=document.createElement('span'),labelMeta=document.createElement('div');labelMeta.className='plot-label-meta';labelMeta.append(title,sub);lbl.append(labelMeta);const notice=document.createElement('div');notice.className='notice visible';const note=document.createElement('span');notice.append(note);const info=document.createElement('div');info.className='point-info';info.hidden=true;const ghost=document.createElement('div');ghost.className='sync-crosshair';ghost.hidden=true;ghost.setAttribute('aria-hidden','true');view.append(frame,snap,lbl,notice,info,ghost,scrollRail);
  const compare=document.createElement('label');compare.className='panel-difference-selector';
  const compareCheck=document.createElement('input');compareCheck.type='checkbox';compareCheck.setAttribute('aria-label',`Select ${cfg.label||cfg.id} for difference map`);
  compare.title=`Compare ${cfg.label||cfg.id} with another panel (first selected minus second selected)`;compare.append(compareCheck);if(!cfg.placeholder){lbl.prepend(compare);view.append(save);}view.append(expand);
@@ -651,8 +740,11 @@ function createPanel(cfg,i){const card=document.createElement('section');card.cl
  view.addEventListener('pointerenter',restorePlotKeyboardNavigation);
  view.addEventListener('pointermove',restorePlotKeyboardNavigation,{passive:true});
  compare.addEventListener('pointerdown',e=>e.stopPropagation());compare.addEventListener('click',e=>e.stopPropagation());
- const p={contourField:null,contourCanvas:null,contourFrameRequested:false,contourRafId:null,contourRedrawTimer:null,contourCache:null,cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,compare,compareCheck,legendTitle,legendCanvas,legendLabels,wind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,initializing:false,cancelMapWait:null,loadingStage:'',loadSince:0,stageSince:0};
- notice.style.pointerEvents='none';card.addEventListener('click',()=>{selectPanel(p);if(!p.cfg.placeholder)activate(p).catch(e=>fail(p,e));});save.addEventListener('click',e=>{e.stopPropagation();openExportDialog('panel',p,e);});
+ const p={scrollRail,contourField:null,contourCanvas:null,contourFrameRequested:false,contourRafId:null,contourRedrawTimer:null,contourCache:null,cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,compare,compareCheck,legendTitle,legendCanvas,legendLabels,wind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,initializing:false,cancelMapWait:null,loadingStage:'',loadSince:0,stageSince:0};
+ notice.style.pointerEvents='none';card.addEventListener('click',()=>{selectPanel(p);if(!p.cfg.placeholder)activate(p).catch(e=>fail(p,e));});
+ scrollRail.addEventListener('pointerdown',e=>e.stopPropagation());
+ scrollRail.addEventListener('click',e=>{e.stopPropagation();const next=st.panels[p.i+1]||st.panels[0];if(next&&next!==p)next.card.scrollIntoView({behavior:'smooth',block:'start'});});
+ save.addEventListener('click',e=>{e.stopPropagation();openExportDialog('panel',p,e);});
  expand.addEventListener('click',e=>{e.stopPropagation();setExpandedPanel(st.expandedPanel===p?null:p);});
  compareCheck.addEventListener('change',()=>setDifferenceSelection(p,compareCheck.checked));
  if(cfg.placeholder){p.status='missing';card.classList.add('analysis-placeholder');p.title.textContent='Analysis · verifying data';p.sub.textContent='RAP F000 / MRMS · planned';setNote(p,cfg.placeholderText||'Verifying analysis data not yet available');}
@@ -776,7 +868,7 @@ async function boot(){try{
  st.loopSpeedIndex=LOOP_INTERVALS.reduce((best,ms,i)=>Math.abs(ms-defaultDelay)<Math.abs(LOOP_INTERVALS[best]-defaultDelay)?i:best,2);
  if(q.has('speed')){const idx=Number(q.get('speed'));if(Number.isInteger(idx)&&idx>=0&&idx<LOOP_INTERVALS.length)st.loopSpeedIndex=idx;}
  updateSpeedButtons();
- const h=Number(q.get('fhr')??st.cfg.defaultForecastHour??0);st.hour=Number.isInteger(h)&&h>=0?h:0;refreshHours();bind();syncUI();updateSharedLegend();void refreshObservationOverlay();
+ const h=Number(q.get('fhr')??st.cfg.defaultForecastHour??0);st.hour=Number.isInteger(h)&&h>=0?h:0;refreshHours();bind();syncUI();updateSharedLegend();void refreshObservationOverlay();void refreshSPCReports();void refreshLightningReports();
  ['fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn'].forEach(id=>el[id].disabled=false);el.saveAllPngBtn.disabled=false;
  if(!('DecompressionStream' in window))throw Error('Browser does not support zlib DecompressionStream');await waitLibraries();
  // No remote maps/tiles: map style and boundary layers are locally hosted.
@@ -794,6 +886,9 @@ async function boot(){try{
   }
  },{root:innerWidth<=800?null:el.viewerGrid,rootMargin:'80px'});
  st.panels.filter(p=>!p.cfg.placeholder).forEach(p=>st.observer.observe(p.card));
+ // Ensure the complete 3×3 workspace is initialized even if an observer
+ // notification was suppressed while earlier panels were rendering.
+ void activateConfiguredPanels();
  // A map request queued while scrolling might be dropped once it finally gets
  // its initialization turn. Recheck currently visible panels after scrolling
  // stops, even if IntersectionObserver does not fire a second enter event.
@@ -810,6 +905,21 @@ async function boot(){try{
  window.addEventListener('resize',scanVisible,{passive:true});
  updateStatus();schedulePrefetch();
  }catch(e){console.error(e);el.dataStatus.textContent='Viewer initialization failed: '+String(e);if(!st.panels.length)el.viewerGrid.textContent='Initialization failed: '+String(e);else st.panels.forEach(p=>setNote(p,'Initialization failed: '+String(e)));}}
+// Do not rely solely on IntersectionObserver: its enter notifications can
+// arrive during a render and be skipped, leaving (for example) only 7 of 9
+// configured panels activated until the user scrolls. Initialize all nine
+// whenever the GPU budget permits. Keep touch-device context-pressure recovery.
+async function activateConfiguredPanels(){
+ const candidates=st.panels.filter(p=>!p.cfg.placeholder);
+ const order=[...candidates.filter(nearViewport),...candidates.filter(p=>!nearViewport(p))];
+ for(const p of order){
+  if(p.map||p.cfg.placeholder)continue;
+  if(mapCapacity()<candidates.length&&!nearViewport(p))continue;
+  if(st.active.length>=mapCapacity()&&!p.map)continue;
+  try{await activate(p,'startup');}
+  catch(e){fail(p,e);}
+ }
+}
 async function waitLibraries(){
  for(let k=0;k<100;k++){
   if(window.maplibregl?.Map&&window.apgl?.RawScalarField&&window.apgl?.PlotLayer){
@@ -1057,11 +1167,33 @@ function bind(){
   try{localStorage.setItem('omd_evu_image_opacity',String(st.imageOpacity));}catch(_){}
   for(const p of st.panels)p.lastKey=null;void renderAll();
  });
+ let interpolationSaved=null;try{interpolationSaved=localStorage.getItem('omd_evu_interpolate');}catch(_){}
+ st.interpolate=interpolationSaved==='1';el.interpolateToggleBtn.checked=st.interpolate;
+ el.interpolateToggleBtn.addEventListener('change',()=>{
+  st.interpolate=el.interpolateToggleBtn.checked;
+  try{localStorage.setItem('omd_evu_interpolate',st.interpolate?'1':'0');}catch(_){}
+  // Change the sampler parameters on the existing GPU textures directly.
+  // Re-uploading the same field is unnecessary: WGLTexture.setImageData()
+  // does not update TEXTURE_MAG_FILTER/TEXTURE_MIN_FILTER on an existing
+  // texture. No Zarr fetch, decode, data upload, or map rebuild is needed.
+  for(const p of st.panels){
+   if(!p.map||!p.component||!p.interpolationEligible||p.status!=='ready')continue;
+   applyRasterInterpolationFilter(p.component,p);
+  }
+ });
  let spcSaved=null;try{spcSaved=localStorage.getItem('omd_evu_spc_overlay');}catch(_){}
  st.spcEnabled=spcSaved==='1';el.spcToggleBtn.checked=st.spcEnabled;
  el.spcToggleBtn.addEventListener('change',()=>{
   st.spcEnabled=el.spcToggleBtn.checked;try{localStorage.setItem('omd_evu_spc_overlay',st.spcEnabled?'1':'0');}catch(_){}
   void refreshSPCReports();
+ });
+ let lightningSaved=null;try{lightningSaved=localStorage.getItem('omd_evu_lightning_overlay');}catch(_){}
+ st.lightningEnabled=lightningSaved==='1';el.lightningToggleBtn.checked=st.lightningEnabled;
+ el.lightningToggleBtn.addEventListener('change',()=>{
+  st.lightningEnabled=el.lightningToggleBtn.checked;
+  el.lightningLegend.hidden=!st.lightningEnabled;
+  try{localStorage.setItem('omd_evu_lightning_overlay',st.lightningEnabled?'1':'0');}catch(_){}
+  void refreshLightningReports();
  });
  for(const id of ['userGuideClose','userGuideDone'])el[id].onclick=()=>el.userGuideDialog.close();
  el.userGuideBtn.onclick=()=>el.userGuideDialog.showModal();
@@ -1233,6 +1365,7 @@ function setTheme(theme,save){
     ['coast','line-color',c.line],['coast-detail','line-color',c.line],['country','line-color',c.line],['country-detail','line-color',c.line],
     ['states','line-color',c.minor],['counties','line-color',c.minor],
     ['evu-observed-metar','circle-stroke-color',theme==='light'?'#152633':'#ffffff'],
+    ['evu-lightning','circle-stroke-color',theme==='light'?'#152633':'#ffffff'],
     ['evu-spc-lsr','circle-stroke-color',theme==='light'?'#152633':'#ffffff']]){
     try{if(m.getLayer(id))m.setPaintProperty(id,property,value);}catch(err){console.warn('Theme paint update',id,err);}
    }
@@ -1575,6 +1708,37 @@ function paintSynchronizedHover(){
  }
 }
 
+// On a phone the desktop right-click inspector has no obvious equivalent.
+// A stationary, one-finger hold opens the SAME point menu, while moving more
+// than 12 CSS pixels cancels the gesture so normal map pan/pinch still works.
+// Bind to the MapLibre canvas (not to the plot's scroll rail or control buttons).
+function bindTouchPointInspector(p,m){
+ const canvas=m.getCanvas?.();if(!canvas)return;
+ let hold=null;
+ const clear=()=>{if(hold)clearTimeout(hold.timer);hold=null;};
+ canvas.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='touch'||!e.isPrimary||!window.EVUPointInspector)return;
+  clear();const x=e.clientX,y=e.clientY,id=e.pointerId;
+  const timer=setTimeout(()=>{
+   if(!hold||hold.id!==id||p.map!==m)return;
+   // An updated map camera is acceptable; convert from the actual pressed
+   // screen position only once the press is confirmed.
+   const rect=canvas.getBoundingClientRect();
+   if(rect.width<1||rect.height<1){clear();return;}
+   const point=m.unproject([x-rect.left,y-rect.top]);
+   if(!point){clear();return;}
+   p.lastLongPressAt=Date.now();
+   window.EVUPointInspector.showMenu(p,{lngLat:point,originalEvent:{clientX:x,clientY:y,preventDefault(){}}});
+   clear();
+  },600);
+  hold={id,x,y,timer};
+ },{passive:true});
+ canvas.addEventListener('pointermove',e=>{
+  if(hold&&e.pointerId===hold.id&&Math.hypot(e.clientX-hold.x,e.clientY-hold.y)>12)clear();
+ },{passive:true});
+ for(const event of ['pointerup','pointercancel','lostpointercapture','touchcancel'])canvas.addEventListener(event,clear,{passive:true});
+ canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&!e.isPrimary)clear();},{passive:true});
+}
 function createMap(p){
  const node=document.createElement('div');node.className='map-host';
  node.style='position:absolute;inset:0;';p.frame.replaceChildren(node);
@@ -1604,7 +1768,8 @@ function createMap(p){
  m.on('moveend',()=>scheduleContourRedraw(p,160+p.i*35));
  m.on('zoomend',()=>geographyZoom(p));
  m.on('mousemove',e=>queueSynchronizedHover(p,e.lngLat));
- m.on('contextmenu',e=>{e.originalEvent?.preventDefault();window.EVUPointInspector?.showMenu(p,e);});
+ m.on('contextmenu',e=>{e.originalEvent?.preventDefault();if(p.lastLongPressAt&&Date.now()-p.lastLongPressAt<1200)return;window.EVUPointInspector?.showMenu(p,e);});
+ bindTouchPointInspector(p,m);
  m.on('mouseleave',()=>{if(st.hover?.master===p)clearSynchronizedHover();});
  m.on('error',e=>{p.lastMapError=String(e.error?.message||e.error||e);console.warn('MapLibre',p.lastMapError);});
  // WebGL context loss is a browser/GPU resource signal, not an arbitrary
@@ -1632,7 +1797,7 @@ function createMap(p){
  });
  m.on('load',()=>{
   if(p.map!==m)return;
-  try{addGeographySkeleton(m);syncObservationPanel(p);syncSPCPanel(p);}
+  try{addGeographySkeleton(m);syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);}
   catch(e){p.lastMapError='Could not install geography layers: '+String(e);console.error(p.lastMapError);}
   updateGeographyVisibility(p);
   if(st.mode==='lambert'&&!st.mapView&&!m.__evuExtentFitted)fitDataExtent(m);
@@ -1752,10 +1917,9 @@ function handlePersistentContextLoss(p,m){
  },5000);
 }
 function waitMapInitTurn(p,source){
- // Only serialize the MapLibre setup. Zarr downloads and GPU plotting are
- // allowed to run while the next map initializes. This prevents a burst of
- // simultaneous CSP-worker/GPU starts on phones without slowing all downloads.
- if(innerWidth>800)return createReadyMap(p,source);
+ // Only serialize MapLibre/worker startup; GPU plots and Zarr fetches remain
+ // concurrent. This avoids context/worker contention when all nine panels
+ // initialize together, regardless of screen size.
  const previous=st.mapInitQueue;
  const job=previous.catch(()=>{}).then(()=>createReadyMap(p,source));
  st.mapInitQueue=job.then(()=>{},()=>{});
@@ -1792,7 +1956,7 @@ async function createReadyMap(p,source){
   if(p.map!==m)return null;
   // The map-ready probe can resolve before a late MapLibre load callback.
   // In either order, new REFS/analysis panels receive the currently loaded LSRs.
-  syncSPCPanel(p);
+  syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);
   return m;
  }catch(e){
   if(p.map===m)discardMap(p);
@@ -1818,7 +1982,7 @@ async function activateInternal(p,source){
  p._used=++st.clock;
  await renderPanel(p,st.seq);scheduleDifferenceRefresh();
 }
-async function renderAll(){window.EVUPointInspector?.scheduleSoundingRefresh();void refreshObservationOverlay();void refreshSPCReports();if(st.prefetchContext!==null&&st.prefetchContext!==prefetchContextKey())cancelQueuedPrefetches();st.seq++;invalidateDifferenceForViewChange();st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateStatus();schedulePrefetch();scheduleDifferenceRefresh();}}
+async function renderAll(){window.EVUPointInspector?.scheduleSoundingRefresh();void refreshObservationOverlay();void refreshSPCReports();void refreshLightningReports();if(st.prefetchContext!==null&&st.prefetchContext!==prefetchContextKey())cancelQueuedPrefetches();st.seq++;invalidateDifferenceForViewChange();st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateStatus();schedulePrefetch();scheduleDifferenceRefresh();}}
 // The compressed-byte store is optional. CacheStorage is available under HTTPS
 // (or localhost), survives browser reloads, and holds many forecast hours without
 // filling the decoded GPU-data caches. Missing/quota-restricted storage simply
@@ -2344,6 +2508,34 @@ function paletteRange(p){return {min:p.levels[0],max:p.levels.at(-1)};}
 // a user stretches the colorbar range. Insert boundaries into the exact band
 // colors used by autumnplot-gl; the rest of the palette remains unchanged.
 // This applies equally to live GPU plots and PNG/GIF colorbar exports.
+function isTransparentPaletteColor(color){
+ return typeof color==='string'&&/^#[0-9a-f]{6}00$/i.test(color);
+}
+function blendPaletteColors(a,b){
+ const ma=typeof a==='string'&&a.match(/^#([0-9a-f]{6})$/i);
+ const mb=typeof b==='string'&&b.match(/^#([0-9a-f]{6})$/i);
+ if(!ma)return mb?'#'+mb[1]:'#808080';
+ if(!mb)return '#'+ma[1];
+ const aa=[1,3,5].map(i=>parseInt(ma[1].slice(i-1,i+1),16));
+ const bb=[1,3,5].map(i=>parseInt(mb[1].slice(i-1,i+1),16));
+ return '#'+aa.map((v,i)=>Math.round((v+bb[i])/2).toString(16).padStart(2,'0')).join('');
+}
+// Some fixed palettes historically encoded their own transparent zero band.
+// That band must not be stretched with custom min/max values: the physical
+// zero mask below is the single source of transparency for these fields.
+function makeZeroPaletteOpaque(p){
+ if(!p?.colors?.some(isTransparentPaletteColor))return p;
+ const colors=p.colors.slice();
+ for(let i=0;i<colors.length;i++){
+  if(!isTransparentPaletteColor(colors[i]))continue;
+  let left=i-1,right=i+1;
+  while(left>=0&&isTransparentPaletteColor(colors[left]))left--;
+  while(right<colors.length&&isTransparentPaletteColor(colors[right]))right++;
+  const before=left>=0?colors[left]:null,after=right<colors.length?colors[right]:null;
+  colors[i]=before&&after?blendPaletteColors(before,after):(before||after||'#808080');
+ }
+ return {...p,colors};
+}
 function clearZeroBand(p,threshold){
  if(!(Number.isFinite(threshold)&&threshold>0)||!p?.levels?.length||!p.colors?.length)return p;
  const levels=p.levels,colors=p.colors;
@@ -2367,13 +2559,14 @@ function clearZeroBand(p,threshold){
  return {...p,levels:edges,colors:shade};
 }
 function pal(m,v){
- const base=basePal(m,v),selected=adjustableColorbar(m)?st.colorRanges.get(st.field):null;
- let result=base;
+ const base=basePal(m,v),opaqueBase=m.clearZero?makeZeroPaletteOpaque(base):base;
+ const selected=adjustableColorbar(m)?st.colorRanges.get(st.field):null;
+ let result=opaqueBase;
  if(selected){
-  const {min,max}=paletteRange(base);
+  const {min,max}=paletteRange(opaqueBase);
   if(Number.isFinite(min)&&Number.isFinite(max)&&max>min&&selected.max>selected.min){
    const scale=(selected.max-selected.min)/(max-min);
-   result={...base,levels:base.levels.map((x,i)=>i===0?selected.min:i===base.levels.length-1?selected.max:selected.min+(x-min)*scale)};
+   result={...opaqueBase,levels:opaqueBase.levels.map((x,i)=>i===0?selected.min:i===opaqueBase.levels.length-1?selected.max:selected.min+(x-min)*scale)};
   }
  }
  return clearZeroBand(result,m.clearZero);
@@ -2626,12 +2819,17 @@ function updateContourControl(){
  const linesAvailable=contoursAvailable();
  const reportsAvailable=observationVisible();
  const spcAvailable=SPC_FIELDS.has(st.field);
+ const lightningAvailable=LIGHTNING_FIELDS.has(st.field)&&st.cfg?.lightning?.enabled!==false;
  el.spcControl.hidden=!spcAvailable;
  el.spcCount.hidden=!spcAvailable;
+ el.lightningControl.hidden=!lightningAvailable;
+ el.lightningCount.hidden=!lightningAvailable;
+ el.lightningLegend.hidden=!lightningAvailable||!st.lightningEnabled;
+ el.lightningToggleBtn.checked=st.lightningEnabled;
  el.spcToggleBtn.checked=st.spcEnabled;
  const heightAvailable=Boolean(heightVariableName(st.field));
  const windAvailable=Boolean(windComponentNames(st.field));
- el.contourControl.hidden=!(linesAvailable||reportsAvailable||heightAvailable||windAvailable||st.field==='mslp');
+ el.contourControl.hidden=!(linesAvailable||reportsAvailable||spcAvailable||lightningAvailable||heightAvailable||windAvailable||st.field==='mslp');
  el.heightOption.hidden=!heightAvailable;
  el.windOption.hidden=!windAvailable;
  el.contourOption.hidden=!linesAvailable;
@@ -3069,7 +3267,11 @@ function overlayPlotDescriptor(p){
   if(st.overlayMSLP850&&p?.temperature850Field)layers.push('850-hPa temperature (dashed)');
   return layers.join(' + ');
  }
- const parts=[FIELDS[field]?.label||field];
+ // Always use source-specific metadata when restoring a panel title after
+ // overlays or animation redraw. The menu label is intentionally generic,
+ // whereas HRRR/REFS Ptype and REFS Mean PMM products are not interchangeable.
+ const meta=fieldInfo(p?.v||{name:field},field,p?.ds?.model||p?.cfg?.source);
+ const parts=[meta.label];
  if(heightVariableName(field)&&st.overlayHeight&&p?.heightField)parts.push('height');
  if(windComponentNames(field)&&overlayWindVisible(field)&&p?.wind)parts.push(field.startsWith('shear')?'shear barbs':field.startsWith('srh')?'right-mover barbs':'wind barbs');
  if(st.contours&&contoursAvailable(field))parts.push('shaded-field contours');
@@ -3094,7 +3296,11 @@ async function prepareHeightContours(p,ds,h,seq){
 // Legacy forecast shear components retain their native VUCSH/VVCSH units.
 // RAP analysis v2 components are explicitly normalized to m/s. Detect from
 // paired data so both new and older already-published forecasts display well.
-function shearOverlayScale(u,v,depth){
+function shearOverlayScale(u,v,depth,componentUnits=''){
+ const units=String(componentUnits).trim().toLowerCase();
+ // The historical store's .zattrs can still say s-1 after selected hours
+ // have been repaired to m/s. Trust an unambiguous sampled magnitude over
+ // stale array-wide metadata until all legacy hours have been reconciled.
  const sample=[];const step=Math.max(1,Math.floor(u.length/2048));
  for(let i=0;i<u.length;i+=step){
   const a=u[i],b=v[i];
@@ -3105,7 +3311,9 @@ function shearOverlayScale(u,v,depth){
  sample.sort((a,b)=>a-b);
  const median=sample[Math.floor(sample.length/2)];
  if(median>=.2)return 1;
- if(median<=.03)return depth;
+ if(units==='m s-1'||units==='m/s')return 1;
+ if(units==='s-1'||units==='1/s'||units==='s^-1')return depth;
+ if(median<.2)return depth;
  return null; // source units ambiguous; do not draw mislabeled barbs
 }
 function scaledShearField(data,scale){
@@ -3124,7 +3332,7 @@ async function prepareWindBarbs(p,ds,h,seq){
   if(seq!==st.seq||!p.map||!windComponentNames(p.cfg?.field||st.field))return;
   const fieldName=p.cfg?.field||st.field;
   const depth=fieldName==='shear01'?1000:fieldName==='shear06'?6000:null;
-  const scale=depth?shearOverlayScale(ud,vd,depth):1;
+  const scale=depth?shearOverlayScale(ud,vd,depth,u.attrs?.units||v.attrs?.units||''):1;
   if(scale===null){console.warn('Ambiguous native bulk-shear component units',p.cfg.label);return;}
   p.wind={u:new apgl.RawScalarField(gridForPanel(p,ds,u),depth?scaledShearField(ud,scale):ud),
           v:new apgl.RawScalarField(gridForPanel(p,ds,v),depth?scaledShearField(vd,scale):vd)};
@@ -3259,8 +3467,43 @@ function panelDisplayTitle(p,fieldDescription){
  }
  return `${String(p?.cfg?.label||p?.cfg?.id||'Panel')} · ${fieldDescription}`;
 }
+// autumnplot-gl 4.1.1 creates WGLTexture objects with their filter parameters
+// in the constructor. Its setImageData() method replaces pixel data but does
+// NOT update TEXTURE_MAG_FILTER/TEXTURE_MIN_FILTER on an existing texture.
+// Therefore changing image_mag_filter and calling updateField() alone cannot
+// change an already-rendered panel. Update the actual bound WebGL texture(s).
+function applyRasterInterpolationFilter(component,p){
+ const elems=component?.gl_elems,gl=elems?.gl,textures=component?.fill_texture;
+ if(!gl||!textures||typeof textures.values!=='function')return false;
+ const filter=(p?.interpolationEligible&&st.interpolate)?gl.LINEAR:gl.NEAREST;
+ let changed=false;
+ for(const texture of textures.values()){
+  if(!texture||typeof texture.activate!=='function'||typeof texture.deactivate!=='function')continue;
+  texture.activate(0);
+  try{
+   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,filter);
+   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,filter);
+   changed=true;
+  }finally{texture.deactivate();}
+ }
+ if(changed)elems.map?.triggerRepaint?.();
+ return changed;
+}
+// Set the preferred filter before every Raster field update so newly-created
+// textures receive it in their constructor. Apply it again after updateField
+// so existing textures also receive the real WebGL sampler change.
+function installRasterInterpolation(component,p){
+ const originalUpdate=component.updateField.bind(component);
+ component.updateField=async function(field,mask){
+  const gl=this.gl_elems?.gl;
+  if(gl)this.image_mag_filter=(p.interpolationEligible&&st.interpolate)?gl.LINEAR:gl.NEAREST;
+  const result=await originalUpdate(field,mask);
+  applyRasterInterpolationFilter(this,p);
+  return result;
+ };
+}
 async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContours(p);p.heightField=null;p.rawField=null;p.contourField=null;p.temperature850Field=null;p.diffDisplayData=null;const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=panelDisplayTitle(p,fieldInfo(selected.v||{name:p.cfg.field||st.field},p.cfg.field||st.field,selected.ds?.model||p.cfg.source).label);p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?(p.cfg.timeMode==='analysis'?`Valid ${fmt(valid(selected.ds,selected.h))}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
- if(selected.error||!selected.v||!Number.isInteger(selected.h)||selected.h<0||selected.h>=selected.v.shape[0]||!selected.v.available_hours.includes(selected.h)){if(p.layer&&p.map?.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);p.layer=null;p.component=null;p.rawField=null;p.contourField=null;p.lastKey=null;p.status='missing';p.save.disabled=true;setNote(p,selected.error||`No ${selected.v.name} for F${pad3(selected.h)}`);legend(p,null);syncSPCPanel(p);updateStatus();if(st.difference.open&&st.difference.selected.includes(p))scheduleDifferenceRefresh();return;}
+ if(selected.error||!selected.v||!Number.isInteger(selected.h)||selected.h<0||selected.h>=selected.v.shape[0]||!selected.v.available_hours.includes(selected.h)){if(p.layer&&p.map?.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);p.layer=null;p.component=null;p.rawField=null;p.contourField=null;p.lastKey=null;p.status='missing';p.save.disabled=true;setNote(p,selected.error||`No ${selected.v.name} for F${pad3(selected.h)}`);legend(p,null);syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);updateStatus();if(st.difference.open&&st.difference.selected.includes(p))scheduleDifferenceRefresh();return;}
  const {ds,v,h}=selected,m=fieldInfo(v,st.field,ds?.model||p.cfg.source);p.status='loading';p.loadSince=Date.now();p.save.disabled=true;updateStatus();p.busy=true;
  // When this hour is cached, replace its texture silently: status overlays make
  // a smooth loop appear to flash even though nothing needs downloading.
@@ -3301,8 +3544,11 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContou
  const grid=gridForPanel(p,ds,v),shadeData=snowfallShadeData(vorticityShadeData(p,ds,v,h,m,data),st.field,m,v.shape);
  const field=new apgl.RawScalarField(grid,shadeData),rawField=shadeData===data?field:new apgl.RawScalarField(grid,data);
  const signature=JSON.stringify([st.field,v.name,v.shape,ds.grid]);
+ const klass=st.cfg.display.fieldRendering==='smooth'&&!m.category&&!m.ptype&&!m.ptypeReflectivity?apgl.ContourFill:apgl.Raster;
+ p.interpolationEligible=klass===apgl.Raster&&!m.category&&!m.ptype&&!m.ptypeReflectivity;
+ p.renderField=field;
  if(p.component&&p.lastKey===signature&&typeof p.component.updateField==='function'){await p.component.updateField(field);}
- else{if(p.layer&&p.map.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);const cmap=makeColormap(m,v);const klass=st.cfg.display.fieldRendering==='smooth'&&!m.category&&!m.ptype&&!m.ptypeReflectivity?apgl.ContourFill:apgl.Raster;const comp=new klass(field,{cmap});const layer=new apgl.PlotLayer(`evu-field-${p.i}`,comp);p.component=comp;p.layer=layer;
+ else{if(p.layer&&p.map.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);const cmap=makeColormap(m,v);const comp=new klass(field,{cmap});if(klass===apgl.Raster)installRasterInterpolation(comp,p);const layer=new apgl.PlotLayer(`evu-field-${p.i}`,comp);p.component=comp;p.layer=layer;
  // MapLibre doesn't await async custom-layer onAdd(). autumnplot-gl's onAdd()
  // depends on its *own* worker. Wait for that promise explicitly to catch missing
  // worker bundles instead of claiming the field was rendered successfully.
@@ -3322,9 +3568,8 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContou
  p.lastKey=signature;}
 
  p.rawField=rawField;p.contourField=/^snow(?:1h|3h|6h|24h|48h)$/.test(st.field)||st.field==='asnow'?rawField:field;p.diffDisplayData=data;scheduleContourRedraw(p);legend(p,m);if(windComponentNames(p.cfg?.field||st.field))await prepareWindBarbs(p,ds,h,seq);if(heightVariableName(p.cfg?.field||st.field))await prepareHeightContours(p,ds,h,seq);if(st.field==='mslp'&&st.overlayMSLP850)await prepareMSLP850Contours(p,ds,h,seq);updatePanelPlotTitle(p);await waitPaint(p.map);if(seq!==st.seq||!p.map||p.contextLost)return;
- // Refresh reports after the asynchronous autumnplot custom layer is ready.
- // All panels (including REFS and verification analyses) use the same LSRs.
- syncSPCPanel(p);
+ // Reconcile all observation layers after asynchronous weather layer replacement.
+ syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);
  p.status='ready';p.renderedSeq=seq;p.save.disabled=false;clearNote(p);if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});// The PNG export path explicitly captures a finished render frame. Avoid stale blank snapshots here.
  }catch(e){if(seq===st.seq)fail(p,e);}finally{if(noteDelay!==null)clearTimeout(noteDelay);p.busy=false;updateStatus();if(st.difference.open&&st.difference.selected.includes(p))scheduleDifferenceRefresh();if(!st.rendering&&!st.panels.some(x=>x.busy))schedulePrefetch();}}
 // Keep the legend in the same units/range as the autumnplot-gl color map.
@@ -3426,7 +3671,12 @@ function sharedPalette(){
   if(v)break;
  }
  v=v||{name:st.field,attrs:{}};
- const m=fieldInfo(v);return {v,m,palette:pal(m,v),ticks:legendTicks(m,v)};
+ const sourceMeta=fieldInfo(v);
+ // The shared color scale applies to ALL panels. It must not inherit RRFS's
+ // dominant-type title and misdescribe HRRR's derived or REFS Mean's ensemble
+ // dominant product.
+ const m=st.field==='ptype'?{...sourceMeta,label:'Precipitation type (model-specific)'}:sourceMeta;
+ return {v,m,palette:pal(m,v),ticks:legendTicks(m,v)};
 }
 function visibleSharedTicks(ticks,width){
  const max=width<550?5:width<850?7:15;
@@ -3790,8 +4040,8 @@ function scaledObservationZoomSize(value,factor){
  return null; // Unknown expressions are left untouched instead of risking invalid styles.
 }
 function applyExportObservationMarkerSize(map,renderScale,oldZoom,exportZoom,sharpIndividual){
- const obs=observationVisible(),spc=spcVisible();
- if((!obs&&!spc)||!map)return ()=>{};
+ const obs=observationVisible(),spc=spcVisible(),lightning=lightningVisible();
+ if((!obs&&!spc&&!lightning)||!map)return ()=>{};
  const changes=[];
  const restore=()=>{
   for(const {layer,kind,property,original} of changes.reverse()){
@@ -3807,7 +4057,9 @@ function applyExportObservationMarkerSize(map,renderScale,oldZoom,exportZoom,sha
    ['evu-observed-metar','paint','circle-stroke-width',obs],
    ['evu-observed-mping','layout','icon-size',obs],
    ['evu-spc-lsr','paint','circle-radius',spc],
-   ['evu-spc-lsr','paint','circle-stroke-width',spc]
+   ['evu-spc-lsr','paint','circle-stroke-width',spc],
+   ['evu-lightning','paint','circle-radius',lightning],
+   ['evu-lightning','paint','circle-stroke-width',lightning]
   ]){
    if(!enabled||!map.getLayer?.(layer))continue;
    const original=kind==='paint'?map.getPaintProperty(layer,property):map.getLayoutProperty(layer,property);
@@ -3822,7 +4074,7 @@ function applyExportObservationMarkerSize(map,renderScale,oldZoom,exportZoom,sha
  }catch(err){restore();console.warn('Could not enlarge observation symbols for export:',err);}
  return restore;
 }
-// Individual exports paint the report symbols (METAR, mPING and SPC LSR) in
+// Individual exports paint the report symbols (METAR, mPING, SPC LSR and GLM) in
 // the final presentation canvas. MapLibre's CSS zoom, viewport enlargement, framebuffer DPR and
 // Fit/Fill transforms otherwise make symbol sizes unpredictable. Retain the
 // geographic locations from the actual high-resolution capture camera and
@@ -3859,7 +4111,78 @@ function snapshotIndividualExportObservations(map,cssWidth,cssHeight){
    projectReport(feature,'spc',{type});
   }
  }
+ if(lightningVisible()&&st.lightningCurrent?.features?.length){
+  for(const f of st.lightningCurrent.features)projectReport(f,'lightning',{age_minutes:Number(f.properties?.age_minutes)});
+ }
  return points.length?{points,light:st.theme==='light'}:null;
+}
+// Export-only outline enhancement. Forecast shading, compositing and PNG
+// downsampling can soften thin geographic lines, especially in dark mode.
+// Strengthen only the boundary paint while capturing; restore *exactly* the
+// original values even if the capture fails. Never change county visibility.
+const EXPORT_BOUNDARY_LAYERS=[
+ ['coast',1.35,false],['coast-detail',1.35,false],
+ ['country',1.35,false],['country-detail',1.35,false],
+ ['states',1.50,true],['counties',1.48,true]
+];
+function applyExportBoundaryStyle(map){
+ if(st.theme!=='dark'||!map?.getLayer||!map?.setPaintProperty)return ()=>{};
+ const saved=[];
+ for(const [id,widthFactor,minor] of EXPORT_BOUNDARY_LAYERS){
+  if(!map.getLayer(id))continue;
+  const paint=[
+   ['line-color',minor?'#b0cbd9':'#e0eff6'],
+   ['line-width',Math.max(1,(Number(map.getPaintProperty(id,'line-width'))||1)*widthFactor)],
+   ['line-opacity',minor ? 0.94 : 1]
+  ];
+  for(const [property,value] of paint){
+   try{
+    const original=map.getPaintProperty(id,property);
+    map.setPaintProperty(id,property,value);
+    saved.push([id,property,original]);
+   }catch(err){console.warn('Could not enhance export boundary:',id,property,err);}
+  }
+ }
+ return ()=>{
+  for(let i=saved.length-1;i>=0;i--){
+   const [id,property,original]=saved[i];
+   try{map.setPaintProperty(id,property,original);}catch(err){console.warn('Could not restore export boundary:',id,property,err);}
+  }
+ };
+}
+// The captured APGL raster is composited over MapLibre line layers. To make
+// geographic borders readable over BOTH bright and dark forecast colors,
+// redraw a two-tone stroke above the weather raster in final export pixels.
+// Reuse the exact visible geography at capture time; temporary export zooms
+// must not add counties or detailed features that were absent on screen.
+function exportGeographyVisibility(p,map){
+ const visible={};
+ for(const [key,id] of [['coast','coast'],['coast_detail','coast-detail'],
+   ['country','country'],['country_detail','country-detail'],['states','states'],['counties','counties']]){
+  const layer=map.getLayer?.(id);
+  visible[key]=Boolean(layer&&p.geoApplied?.has(key)&&
+   map.getLayoutProperty?.(id,'visibility')!=='none'&&
+   map.getZoom()>=(layer.minzoom||0));
+ }
+ return visible;
+}
+async function captureExportGeography(p,map,width,height){
+ if(!(width>0&&height>0))return null;
+ const visible=exportGeographyVisibility(p,map);
+ if(!Object.values(visible).some(Boolean))return null;
+ // A forecast-hour GIF generally reuses the same map camera. Cache only the
+ // relatively small overlay raster, keyed to the exact projection/size and
+ // visible geography. Large standalone captures are kept uncached to limit
+ // browser memory; no cached geometry can alter screen-map paint properties.
+ const center=map.getCenter(),cameraKey=JSON.stringify([
+  width,height,center.lng,center.lat,map.getZoom(),map.getBearing(),map.getPitch(),
+  st.mode,st.theme,visible
+ ]);
+ if(p.exportGeographyCache?.key===cameraKey)return p.exportGeographyCache.canvas;
+ const image=document.createElement('canvas');image.width=width;image.height=height;
+ await redrawDifferenceBoundaries(image,map,{exportGeoVisible:visible,exportStyle:true});
+ p.exportGeographyCache=width*height<=1800000?{key:cameraKey,canvas:image}:null;
+ return image;
 }
 async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividual=false){
  const map=p.map,canvas=map.getCanvas(),node=map.getContainer();
@@ -3903,7 +4226,8 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
  const oldRatio=typeof map.getPixelRatio==='function'?map.getPixelRatio():null;
  let changedRatio=false,windStyle=null,contourStyle=null;
  let restoreObservationMarkers=()=>{};
- let png=null,windPNG=null,contourPNG=null,exportObservations=null;
+ let restoreExportBoundaries=()=>{};
+ let png=null,windPNG=null,contourPNG=null,exportObservations=null,exportGeography=null;
  try{
   if(hideExportCounties)map.setLayoutProperty('counties','visibility','none');
   if(expanded){
@@ -3941,9 +4265,16 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   // exports overlay larger symbols directly on their final composition instead.
   if(!sharpIndividual)restoreObservationMarkers=applyExportObservationMarkerSize(map,
    renderScale,oldZoom,exportZoom,false);
+  // Preserve the live boundary styling; amplify lines only in captured maps.
+  restoreExportBoundaries=applyExportBoundaryStyle(map);
   // Let the high-resolution vector and autumnplot custom layers settle before
   // encoding. Existing all-panels map geometry remains deliberately unchanged.
   png=await captureMapFrame(map,sharpIndividual?3:1);
+  // Capture projected outlines BEFORE restoring the temporary high-resolution
+  // map camera. They are finally composited ABOVE the meteorological shading.
+  // Geography is optional: a vector-data fetch failure must not abort PNG/GIF.
+  try{exportGeography=await captureExportGeography(p,map,canvas.width,canvas.height);}
+  catch(err){console.warn('Optional export geography overlay unavailable:',err);}
   if(sharpIndividual)exportObservations=snapshotIndividualExportObservations(map,cssW,cssH);
   const plottedField=p.cfg?.field||st.field;
   const withHeight=Boolean(overlayHeightVisible(plottedField)&&p.heightField);
@@ -3976,6 +4307,7 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
    windPNG=p.windCanvas.toDataURL('image/png');
   }
  }finally{
+  restoreExportBoundaries();
   restoreObservationMarkers();
   if(changedRatio){try{map.setPixelRatio(oldRatio);}catch(err){console.warn('Could not restore pixel ratio',err);}}
   if(windStyle!==null)p.windCanvas.setAttribute('style',windStyle);
@@ -3995,11 +4327,11 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   if(p.contourCanvas)scheduleContourRedraw(p);
   if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});
  }
- return {map:await decodePNG(png),wind:await decodePNG(windPNG),contours:await decodePNG(contourPNG),observations:exportObservations,png};
+ return {map:await decodePNG(png),geography:exportGeography,wind:await decodePNG(windPNG),contours:await decodePNG(contourPNG),observations:exportObservations,png};
 }
 async function panelImage(p,targetW=0,targetH=0,framing='fill',sharpIndividual=false){
  if(p.map){const output=await captureMapPNG(p,targetW,targetH,framing,sharpIndividual);p.lastSnapshot=output.png;return output;}
- return {map:await decodePNG(p.lastSnapshot||null),wind:null,contours:null};
+ return {map:await decodePNG(p.lastSnapshot||null),geography:null,wind:null,contours:null};
 }
 // Draw a captured map without ever distorting geographic shapes. In particular,
 // the map's framebuffer is often much wider than the old fixed PNG plot box.
@@ -4024,12 +4356,12 @@ function drawMapFramed(ctx,image,x,y,width,height,framing='fill'){
 function drawWindExport(ctx,windImage,mapRect,mapImage){
  if(!windImage)return;
  const iw=mapImage.naturalWidth||mapImage.width,ih=mapImage.naturalHeight||mapImage.height;
- const scaleX=windImage.naturalWidth/iw,scaleY=windImage.naturalHeight/ih;
+ const scaleX=(windImage.naturalWidth||windImage.width)/iw,scaleY=(windImage.naturalHeight||windImage.height)/ih;
  ctx.drawImage(windImage,mapRect.sx*scaleX,mapRect.sy*scaleY,
    mapRect.sw*scaleX,mapRect.sh*scaleY,mapRect.dx,mapRect.dy,mapRect.dw,mapRect.dh);
 }
 // Paint reports on top of the high-resolution individual-panel map (including
-// SPC LSRs) in final PNG/GIF pixels. This guarantees readable sizes whether the browser panel
+// SPC LSRs and GLM lightning) in final PNG/GIF pixels. This guarantees readable sizes whether the browser panel
 // began at 300px or 1800px wide and whether Fit or Fill was selected.
 function drawIndividualExportObservations(ctx,observations,mapRect,mapImage,plotWidth){
  if(!observations?.points?.length||!(plotWidth>0))return;
@@ -4047,10 +4379,10 @@ function drawIndividualExportObservations(ctx,observations,mapRect,mapImage,plot
  ctx.beginPath();ctx.rect(mapRect.dx,mapRect.dy,mapRect.dw,mapRect.dh);ctx.clip();
  // Keep the existing report types: METAR circles, mPING triangles,
  // and SPC LSR circles (red tornado / blue wind / green hail).
- for(const source of ['synoptic','mping','spc']){
+ for(const source of ['synoptic','mping','spc','lightning']){
   for(const report of observations.points){
    if(report.source!==source)continue;
-   const col=source==='spc'?SPC_COLORS[report.type]:PTYPE[report.ptype];
+   const col=source==='spc'?SPC_COLORS[report.type]:source==='lightning'?lightningColor(report.age_minutes):PTYPE[report.ptype];
    if(!col)continue;
    const px=report.x*iw,py=report.y*ih;
    const x=mapRect.dx+(px-mapRect.sx)*mapRect.dw/mapRect.sw;
@@ -4059,7 +4391,7 @@ function drawIndividualExportObservations(ctx,observations,mapRect,mapImage,plot
       x<mapRect.dx-radius*3||x>mapRect.dx+mapRect.dw+radius*3||
       y<mapRect.dy-radius*3||y>mapRect.dy+mapRect.dh+radius*3)continue;
    ctx.beginPath();
-   if(source!=='mping')ctx.arc(x,y,radius,0,Math.PI*2);
+   if(source!=='mping')ctx.arc(x,y,source==='lightning'?radius*.75:radius,0,Math.PI*2);
    else{
     const r=radius*1.2;
     ctx.moveTo(x,y-r);ctx.lineTo(x+r*.98,y+r*.86);
@@ -4097,6 +4429,7 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
   if(captured.map&&p.status==='ready'){
    const im=captured.map;
    const rect=drawMapFramed(ctx,im,x,y,w,h,st.lastExportFraming);
+   drawWindExport(ctx,captured.geography,rect,im);
    drawWindExport(ctx,captured.wind,rect,im);
    drawWindExport(ctx,captured.contours,rect,im);
   }else{
@@ -4143,6 +4476,7 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
  if(captured.map&&p.status==='ready'){
   const im=captured.map;
   const rect=drawMapFramed(ctx,im,boxX,boxY,boxW,boxH,st.lastExportFraming);
+  drawWindExport(ctx,captured.geography,rect,im);
   drawWindExport(ctx,captured.wind,rect,im);
   drawWindExport(ctx,captured.contours,rect,im);
   drawIndividualExportObservations(ctx,captured.observations,rect,im,boxW);
@@ -4356,7 +4690,7 @@ async function exportAll(ratio='16:9',returnCanvas=false){
  cx.fillStyle=st.theme==='light'?'#1d2e42':'#eef4fa';
  cx.textBaseline='middle';cx.textAlign='left';
  const fieldMeta=fieldInfo({name:st.field});
- const fieldHeading=`${st.field==='mslp'?'MSLP shading'+(st.overlayMSLP?' + MSLP isobars':'')+(st.overlayMSLP850?' + 850-hPa temperature (dashed where available)':''):fieldMeta.label}${fieldMeta.unit?' ('+fieldMeta.unit+')':''}`;
+ const fieldHeading=`${st.field==='mslp'?'MSLP shading'+(st.overlayMSLP?' + MSLP isobars':'')+(st.overlayMSLP850?' + 850-hPa temperature (dashed where available)':''):st.field==='ptype'?'Precipitation type (model-specific)':fieldMeta.label}${fieldMeta.unit?' ('+fieldMeta.unit+')':''}`;
  const timingHeading=`Init ${fmt(st.ref.init_time)} · F${pad3(st.hour)} · Valid ${fmt(valid(st.ref,st.hour))}`;
  // Common field and valid-time information belong in the comparison image
  // header; model names stay exclusively in the individual map panels.
@@ -4414,17 +4748,44 @@ function differenceLabel(p){
  const label=p?.cfg?.label||p?.cfg?.id||'Panel',source=differenceAnalysisSource(p);
  return source?`${label} (${source})`:label;
 }
+// Difference color bars are fixed to meaningful field ranges, but their
+// labels should NOT inherit fractional endpoints that make no meteorological
+// sense (e.g. a 3.75-unit STP range or a 212.5-unit SRH range). Keep the
+// original shading and mapping unchanged; put integer labels *inside* such
+// ranges rather than mislabeling the endpoints. Small liquid accumulations and
+// precipitation rates genuinely need fractional ticks.
+const DIFFERENCE_FRACTIONAL_TICKS=new Set([
+ 'prate','apcp','apcp1h','apcp3h','apcp6h','apcp24h','apcp48h',
+ 'frzr','frozr','tsnowp','weasd'
+]);
+function differenceIntegerStep(target){
+ const size=Math.max(1,target);
+ const base=Math.pow(10,Math.floor(Math.log10(size)));
+ const choices=[1,2,5,10].map(mult=>mult*base).filter(n=>n>=1);
+ return choices.reduce((best,n)=>Math.abs(n-size)<Math.abs(best-size)?n:best,choices[0]);
+}
 function differenceTicks(field,limit){
- const step=DIFFERENCE_TICK_STEPS[field]||Math.max(1,limit/3);
- const n=Math.round(limit/step),ticks=[];
- for(let i=-n;i<=n;i++)if(Math.abs(i*step)<=limit+1e-6)ticks.push(Number((i*step).toFixed(4)));
- if(!ticks.some(x=>x===-limit))ticks.unshift(-limit);
- if(!ticks.some(x=>x===limit))ticks.push(limit);
+ if(!(Number.isFinite(limit)&&limit>0))return [0];
+ const fractional=DIFFERENCE_FRACTIONAL_TICKS.has(field)||limit<1;
+ let step=DIFFERENCE_TICK_STEPS[field]||Math.max(1,limit/3);
+ if(!fractional)step=Number.isInteger(step)&&step>=1?step:differenceIntegerStep(limit/3);
+ // Limit the number of labels so narrow difference windows remain readable.
+ while(Math.floor((limit+1e-8)/step)*2+1>9){
+  step=fractional?step*2:differenceIntegerStep(step*1.9);
+ }
+ const n=Math.floor((limit+1e-8)/step),ticks=[];
+ for(let i=-n;i<=n;i++)ticks.push(Number((i*step).toFixed(6)));
+ // Fractional-limit endpoints must not masquerade as integers. When a limit
+ // is itself an integer, it is safe and useful to label the exact endpoints.
+ if(fractional||Number.isInteger(limit)){
+  if(!ticks.some(x=>Math.abs(x+limit)<1e-8))ticks.unshift(-limit);
+  if(!ticks.some(x=>Math.abs(x-limit)<1e-8))ticks.push(limit);
+ }
  return [...new Set(ticks)].sort((a,b)=>a-b);
 }
 function differenceNumber(x){
  if(!Number.isFinite(x))return '—';
- const nearZero=Math.abs(x)<1e-8;return nearZero?'0':String(Number(x.toFixed(3)));
+ const nearZero=Math.abs(x)<1e-8;return nearZero?'0':String(Number(x.toFixed(4)));
 }
 function setDifferenceLegend(field,range,unit){
  const ticks=differenceTicks(field,range);
@@ -4992,7 +5353,7 @@ async function captureSharpDifferenceFrame(map,snapshot,plotWidth,plotHeight,fra
   const overlay=await differenceExportRaster(map,snapshot,image.naturalWidth,image.naturalHeight);
   const outlines=document.createElement('canvas');
   outlines.width=image.naturalWidth;outlines.height=image.naturalHeight;
-  await redrawDifferenceBoundaries(outlines,map,{exportGeoVisible:visible});
+  await redrawDifferenceBoundaries(outlines,map,{exportGeoVisible:visible,exportStyle:true});
   return {image,overlay,outlines};
  }finally{
   if(changedRatio)try{map.setPixelRatio(ratioBefore);}catch(err){console.warn('Difference pixel ratio restore',err);}
@@ -5017,15 +5378,19 @@ async function redrawDifferenceBoundaries(canvas,map,snapshot){
  if(!(w>0&&h>0))return;
  const sx=canvas.width/w,sy=canvas.height/h;
  const colors=themeColors();
+ const exportStyle=!!snapshot.exportStyle;
  const specs=[['coast','coast',1.3],['coast_detail','coast',1.2],['country','coast',1.1],
               ['country_detail','coast',1.1],['states','minor',.95],['counties','minor',.75]];
+ const scale=Math.max(.75,Math.min(2.7,Math.min(sx,sy)));
  ctx.save();ctx.lineJoin='round';ctx.lineCap='round';
  for(const [id,kind,weight] of specs){
   if(!visible[id])continue;
   let data;try{data=await geoData(id);}catch(_){continue;}
-  ctx.strokeStyle=kind==='minor'?colors.minor:colors.line;
-  ctx.globalAlpha=kind==='minor'?.9:1;
-  ctx.lineWidth=Math.max(1.2,weight*Math.min(sx,sy));
+  // The dark ink remains visible over light shading; the thin light halo
+  // remains visible over dark shading. Both strokes follow the same path,
+  // so there is no geographic displacement or duplicate boundary data.
+  const inside=Math.max(kind==='minor'?.9:1.15,weight*scale*1.32);
+  const outside=inside+Math.max(kind==='minor'?1.7:2.35,scale*(kind==='minor'?1.25:1.60));
   ctx.beginPath();let segments=0;
   for(const f of data.features){
    const g=f.geometry;if(!g)continue;
@@ -5041,7 +5406,19 @@ async function redrawDifferenceBoundaries(canvas,map,snapshot){
     segments++;
    }
   }
-  if(segments)ctx.stroke();
+  if(segments){
+   if(exportStyle){
+    ctx.globalAlpha=kind==='minor'?.87:.96;
+    ctx.strokeStyle='#f8fbff';ctx.lineWidth=outside;ctx.stroke();
+    ctx.globalAlpha=kind==='minor'?.91:.98;
+    ctx.strokeStyle=st.theme==='light'?'#1d2d3d':'#102638';
+    ctx.lineWidth=inside;ctx.stroke();
+   }else{
+    ctx.globalAlpha=kind==='minor'?.9:1;
+    ctx.strokeStyle=kind==='minor'?colors.minor:colors.line;
+    ctx.lineWidth=Math.max(1.2,weight*Math.min(sx,sy));ctx.stroke();
+   }
+  }
  }
  ctx.restore();
 }

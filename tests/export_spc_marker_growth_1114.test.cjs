@@ -6,7 +6,7 @@ const cfg=JSON.parse(fs.readFileSync(path.join(root,'config.json'),'utf8'));
 assert.equal(cfg.display.exportObservationMarkerScale,1,'existing configuration default remains compatible');
 const start=src.indexOf('// The single-panel export expands its real CSS map viewport');
 const end=src.indexOf('async function captureMapPNG(',start);
-const c=vm.createContext({st:{cfg},observationVisible:()=>false,spcVisible:()=>true,console});
+const c=vm.createContext({st:{cfg},lightningVisible:()=>false,observationVisible:()=>false,lightningVisible:()=>false,spcVisible:()=>true,console});
 vm.runInContext(src.slice(start,end),c);
 const radius=['interpolate',['linear'],['zoom'],2,4.3,6,5.5,10,6.5];
 const layers={'evu-spc-lsr':{paint:{'circle-radius':radius,'circle-stroke-width':1.3},layout:{}}};
@@ -20,7 +20,7 @@ assert.equal(layers['evu-spc-lsr'].paint['circle-radius'],radius,'restores live 
 assert.equal(layers['evu-spc-lsr'].paint['circle-stroke-width'],1.3,'restores live LSR stroke');
 const drawStart=src.indexOf('function drawIndividualExportObservations(');
 const drawEnd=src.indexOf('function panelMapRatio(p){',drawStart);
-const d=vm.createContext({st:{cfg},SPC_COLORS:{tornado:'#f00'},PTYPE:['#000','#0f0']});
+const d=vm.createContext({lightningVisible:()=>false,st:{cfg},SPC_COLORS:{tornado:'#f00'},PTYPE:['#000','#0f0']});
 vm.runInContext(src.slice(drawStart,drawEnd),d);
 let circle=[];
 const context={save(){},restore(){},beginPath(){},rect(){},clip(){},arc(...v){circle=v},fill(){},stroke(){}};

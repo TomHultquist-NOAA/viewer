@@ -14,7 +14,7 @@ let spcEnabled=true;
 const st={cfg:{display:{exportObservationMarkerScale:1}},obsCurrent:null,spcCurrent:reportList,theme:'dark'};
 const context=vm.createContext({
  st, PTYPE:[null,'#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'],
- SPC_COLORS:spcColor,spcVisible:()=>spcEnabled,observationVisible:()=>false,
+ SPC_COLORS:spcColor,spcVisible:()=>spcEnabled,lightningVisible:()=>false,observationVisible:()=>false,
  filteredObservationGeoJSON:()=>{throw Error('must not read METAR when off');},console
 });
 vm.runInContext(src.slice(snapshotStart,snapshotEnd)+src.slice(drawStart,drawEnd),context);

@@ -8,13 +8,13 @@ const ROOT=path.resolve(__dirname,'..');
 const src=fs.readFileSync(path.join(ROOT,'js/sounding-profiles.js'),'utf8');
 const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
 const inspector=fs.readFileSync(path.join(ROOT,'js/point-inspector.js'),'utf8');
-assert.match(html,/js\/sounding-profiles\.js\?v=1\.1\.11/);
+assert.match(html,/js\/sounding-profiles\.js\?v=1\.1\.34/);
 assert.ok(html.indexOf('js/sounding-profiles.js')<html.indexOf('js/point-inspector.js'));
 assert.match(inspector,/EVUSoundingProfiles\?\.load/);
 assert.match(inspector,/model==='refs_mean'/);
-assert.match(inspector,/Math\.abs\(y-lastBarbY\)>=19/);
+assert.match(inspector,/Math\.abs\(y-lastBarbY\)>=25/);
 assert.match(inspector,/scheduleSoundingRefresh/);
-assert.match(inspector,/const Y=p=>y1-Math\.log\(1000\/p\)\/Math\.log\(1000\/100\)/);
+assert.match(inspector,/const Y=p=>y1-Math\.log\(p0\/p\)\/Math\.log\(p0\/ptop\)/);
 const catalog={schema:'omd-evu-sounding-profile-1',datasets:[
   {path:'sounding_rrfs_20261028_1200.zarr',model:'rrfs',init_time:'2026-10-28T12:00:00Z',available_hours:[0,1],variables:['t','td','u','v'].map(name=>({name}))},
   {path:'sounding_refs_mean_20261028_1200.zarr',model:'refs_mean',init_time:'2026-10-28T12:00:00Z',available_hours:[1],ensemble_method:'native operational time-lagged REFS Mean GRIB2',variables:['t','td','u','v'].map(name=>({name}))}

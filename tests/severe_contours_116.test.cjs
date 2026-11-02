@@ -15,11 +15,11 @@ for(const categorical of ['ptype','refc_ptype','csnow','cicep','cfrzr','crain','
 // The runtime checkbox is revealed by updateContourControl, not only the helper.
 context.st={field:'sbcape',spcEnabled:false,overlayHeight:false,overlayUpperWind:false,
  overlaySurfaceWind:false,overlayMSLP:false,overlayMSLP850:false,contours:false,active:[]};
-context.el=Object.fromEntries(['contourControl','spcControl','spcToggleBtn','spcCount','heightOption','windOption',
+context.el=Object.fromEntries(['lightningControl','lightningToggleBtn','lightningCount','lightningLegend','contourControl','spcControl','spcToggleBtn','spcCount','heightOption','windOption',
  'contourOption','mslp850Option','mslp850ToggleBtn','obsControl','obsCount','obsAttribution',
  'heightToggleBtn','windToggleBtn','contourToggleBtn'].map(key=>[key,{hidden:true,checked:false}]));
 context.observationVisible=()=>false;
-context.SPC_FIELDS=new Set(['sbcape']);
+context.LIGHTNING_FIELDS=new Set();context.SPC_FIELDS=new Set(['sbcape']);
 context.heightVariableName=()=>null;
 context.windComponentNames=()=>null;
 context.FIELDS={sbcape:{label:'Surface-based CAPE',unit:'J/kg'}};

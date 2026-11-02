@@ -14,7 +14,7 @@ assert.match(html,/id="obsAttribution"/);
 assert.match(src,/const linesAvailable=contoursAvailable\(\);/);
 assert.match(src,/el\.obsControl\.hidden=!reportsAvailable/);
 assert.match(src,/el\.contourOption\.hidden=!linesAvailable/);
-assert.match(src,/el\.contourControl\.hidden=!\(linesAvailable\|\|reportsAvailable\|\|heightAvailable\|\|windAvailable\|\|st\.field===/);
+assert.match(src,/el\.contourControl\.hidden=!\(linesAvailable\|\|reportsAvailable\|\|spcAvailable\|\|lightningAvailable/);
 assert.match(css,/\.overlays-switches/);
 assert.match(src,/filter:\['==',\['get','source'\],'synoptic'\]/);
 assert.match(src,/filter:\['==',\['get','source'\],'mping'\]/);
@@ -27,7 +27,7 @@ const b=src.indexOf('/* OMD EVU autumnplot-gl',a);
 const ctx=vm.createContext({
  st:{field:'ptype',cfg:{ptypeObservations:{enabled:true,path:'data/ptype_observations/'}},theme:'dark',active:[],obsCurrent:null,
    obsEnabled:{synoptic:true,mping:true}},
- el:{obsCount:{textContent:'',hidden:true}},PTYPE:['#0','#1','#2','#3','#4','#5'],PTYPE_LABELS:['Unknown','Rain','Snow','Freezing rain','Sleet','Mixed'],
+ el:{obsCount:{textContent:'',hidden:true}},PTYPE:['#0','#1','#2','#3','#4','#5'],RADAR_REPORT_FIELDS:new Set(['ptype','refc']),FIELD_GROUP_DEFS:[{key:'radar',fields:['ptype','refc']},{key:'shear',fields:['shear01']},{key:'convective',fields:['sbcape']}],PTYPE_LABELS:['Unknown','Rain','Snow','Freezing rain','Sleet','Mixed'],
  document:{createElement:()=>({width:0,height:0,getContext:()=>({beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},getImageData(){return {width:36,height:36,data:new Uint8ClampedArray(36*36*4)}}})})},
  Date,Number,console,URL,fetch(){},maplibregl:{Popup:class{}},fmt:()=>''
 });

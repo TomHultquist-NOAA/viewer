@@ -12,8 +12,8 @@ const reports=[report('synoptic',1,-100,40),report('mping',2,-99,41),report('oth
 const ctx=vm.createContext({
  st:{cfg:{display:{exportObservationMarkerScale:1}},obsCurrent:{features:reports},theme:'dark'},
  PTYPE:['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'],
- observationVisible:()=>true,
- filteredObservationGeoJSON:()=>({features:reports}),spcVisible:()=>false,SPC_COLORS:{tornado:'#e63737',wind:'#2e80dc',hail:'#35b86b'},console
+ lightningVisible:()=>false,observationVisible:()=>true,
+ filteredObservationGeoJSON:()=>({features:reports}),lightningVisible:()=>false,spcVisible:()=>false,SPC_COLORS:{tornado:'#e63737',wind:'#2e80dc',hail:'#35b86b'},console
 });
 vm.runInContext(src.slice(start,finish)+src.slice(drawStart,drawEnd),ctx);
 const map={project:([lon])=>({x:(lon+101)*100,y:120})};

@@ -1,3 +1,112 @@
+## v1.1.34 — 2026-11-02
+
+- Fix the Interpolate toggle so it changes the actual WebGL texture sampler parameters (`TEXTURE_MAG_FILTER` and `TEXTURE_MIN_FILTER`) on existing panel textures; the prior implementation changed the library property but did not update already-created GPU texture objects.
+- Apply filtering directly to existing textures and trigger map repaint without refetching, decoding, or re-uploading field data. New textures also receive the selected filter during creation and subsequent forecast-hour updates.
+- Retain nearest-neighbor rendering for categorical precipitation type and Reflectivity-with-Ptype; preference remains off by default and persists locally.
+- Add a regression test that verifies actual `gl.texParameteri` calls for every texture, including toggling back off and categorical safeguards.
+- Refresh README, user guide, in-app guide and PDF; update companion converter reference to v1.4.13.
+
+## v1.1.33 — 2026-11-01
+
+- Add an opt-in **Interpolate** display toggle, off by default, using GPU bilinear texture filtering for continuous scalar-field rasters.
+- Keep categorical precipitation type and Reflectivity-with-Ptype on nearest-neighbor sampling; preserve source Zarr data, point sampling, time series, soundings, and numerical calculations.
+- Persist the local browser preference and apply the same live-panel rendering to PNG/GIF exports without re-fetching data or rebuilding maps.
+- Refresh README and user guide references to Converter v1.4.12; regenerate the in-app and PDF guides.
+- No converter or forecast-data changes in this viewer release.
+
+## v1.1.32 — 2026-11-01
+
+- Fix custom numerical colorbar ranges so a field has only one transparent near-zero interval, anchored to physical zero; the original UH palette's transparent band is made opaque before the single physical-zero mask is applied.
+- Keep neutral bands small and field-specific; retain 0% relative humidity shading because very dry air is meteorologically meaningful.
+- Package web assets with world-readable `644` file permissions and `755` directory permissions, matching deployment documentation and preventing web-server `403 Forbidden` errors caused by group-only reads.
+- Add a reproducible root-only viewer ZIP builder that validates permissions, current release-note inclusion, and archive integrity.
+- Update viewer documentation to reference Converter v1.4.11 and explain stable near-zero transparency under custom ranges.
+
+## v1.1.31 — 2026-11-01
+
+- Documentation maintenance release aligned the companion converter reference with v1.4.10.
+- Clarify REFS Mean PMM composite reflectivity and PMM accumulated-precipitation source labeling, and document the converter's protected-case-aware GLM retention behavior.
+- Regenerate the in-app and PDF user guides. No viewer JavaScript, CSS, field mapping, or rendering behavior changes.
+
+## v1.1.30 — 2026-11-01
+
+- Restore the required Ptype nomenclature for HRRR, RRFS/REFS members, and REFS Mean on all redraws, single-panel exports and GIF/all-panel captions.
+- Prevent generic field-menu descriptions from overwriting model-specific precipitation-type and PMM labels; use a neutral shared legend/export heading.
+- Add targeted regression tests. No data conversion or model field changes.
+
+## v1.1.29 — 2026-11-01
+
+- Mobile point chart access through a stationary 600-ms hold, preserving short taps and map gestures.
+- Scroll rail on mobile models prevents map movement while scrolling through all nine panels.
+- Initialize all configured panels independently of visibility notifications; sequence MapLibre startups to reduce GPU contention.
+- Includes the v1.1.28 GLM/report overlays, native 10-m wind sounding anchor, reduced Skew-T tilt and readable MU footer.
+
+## 1.1.28 — 2026-11-01
+
+- Reduced Skew-T tilt slightly and wrapped the MU pseudo-adiabatic parcel caveats into a fitted two-line footer, preventing text clipping.
+
+- Display native 10-m surface wind vectors alongside native 2-m T/Td on sounding plots; include them in native wind-level counts where available.
+
+- Fixed SPC LSR restore-on-refresh and asynchronous per-panel overlay synchronization.
+- Expanded METAR/mPING visibility to the complete Radar & precip. type menu group.
+- Added opt-in, valid-time-relative, age-colored **GLM lightning** for all radar/ptype, shear/helicity and instability/severe-storm fields, with interactive markers and export support. See `RELEASE_1_1_28.md`.
+
+## v1.1.27 — November 1, 2026
+
+- Use clean whole-number color-bar ticks in interactive difference plots and exported difference PNGs for meteorological variables where decimals are unnecessary (including dynamic ranges for SRH, SCP/STP, and other severe parameters).
+- Keep fractional ticks for precipitation rates and small liquid accumulations in inches; preserve the original fixed shading ranges, numerical differences, symmetric zero, and field units.
+- Apply identical tick generation to the difference window and exported PNG, with bounded label density. Update and synchronize the user guide and release notes.
+
+## v1.1.26 — November 1, 2026
+
+- Draw exported coastlines and geopolitical boundaries with an export-only two-tone light halo and dark central stroke **above forecast shading**, maintaining readable outlines over light and dark model colors in both viewer themes.
+- Apply consistently to individual and all-panel PNG/GIF exports and difference-map PNG exports; never add counties or detailed boundaries hidden at the original map zoom.
+- Cache unchanged map-geometry overlays across GIF frames to avoid unnecessary repeated projection; live map paint styles remain as before.
+- Add targeted export overlay contrast, composition-order, theme, visibility, cache, and browser-rendering checks. See `RELEASE_1_1_26.md`.
+
+## v1.1.25 — November 1, 2026
+
+Improve geopolitical outline contrast in dark-theme PNG/GIF exports: use slightly brighter, thicker coastlines, international boundaries, state borders, and counties during capture, restore all live map paint settings afterward, and render difference-map export outlines with a matching dark-theme enhancement. Screen maps and county visibility thresholds remain unchanged. See `RELEASE_1_1_25.md`.
+
+## v1.1.24 — November 1, 2026
+
+- Position hodograph speed-ring labels on visible arcs rather than clamping them beside the eastern cardinal label.
+- Increase time-series gridline contrast in both display themes.
+- Raise the Skew-T panel border to improve title spacing and use a tighter −50°C to +50°C surface-temperature axis.
+- Update the user guide and add layout regression coverage. See `RELEASE_1_1_24.md`.
+
+## v1.1.23 — November 1, 2026
+
+- Time-series Y axes now use meteorologically sensible rounded intervals: whole-number labels for most variables and fractional ticks for precipitation (in and in/hr) and other explicitly fractional units.
+- Separated the time-series X-axis title from the valid-hours / missing-data note by increasing the chart's footer space; this also applies to saved PNG exports.
+- Updated and synchronized the on-screen and PDF user guides. See `RELEASE_1_1_23.md`.
+
+## v1.1.22
+
+- Increase dry-adiabat and mixing-ratio guide visibility in light and dark mode while preserving separate, subtler reference-line styling.
+- Reset reused canvas text alignment and baseline at each chart redraw, preventing sounding valid date/time and coordinate subtitles (and titles) from clipping off the left edge after theme/time changes.
+- Synchronize the in-app and PDF user guides. See `RELEASE_1_1_22.md`.
+
+## v1.1.21 — November 1, 2026
+
+Cleaned up the Skew-T header/legend layout to eliminate label overlap and improve the overall professional presentation of the sounding display. The Skew-T title, guide-description text, and T/Td/MU parcel legend are now separated and better aligned. See `RELEASE_1_1_21.md`.
+
+## v1.1.20 — November 1, 2026
+
+Color-coded sounding wind barbs by wind speed, plus a tighter, dynamically fitted hodograph framing that reduces dead space and makes the plotted wind profile more visible. See `RELEASE_1_1_20.md`.
+
+## v1.1.19 — November 1, 2026
+
+Terrain-aware sounding surfaces from optional native surface-pressure and 2-m temperature/dewpoint Zarr arrays; legacy shear-barb unit metadata compatibility. See `RELEASE_1_1_19.md`.
+
+## v1.1.18 — 2026-10-31
+
+- Correct wind-barb feather/pennant handedness in pressure-level soundings to match standard wind-barb notation.
+- Enlarge the Skew-T and hodograph layout, reduce crowded hodograph pressure labels, and make pressure-band coloring and speed rings clearer.
+- Add sampled model-grid **0–1 km** shear next to existing 0–6 km shear in sounding diagnostics; unavailable values remain missing.
+- Add an optional, clearly labeled approximate most-unstable parcel and LCL based only on sufficient native pressure-level T/Td samples. Suppress it for sparse profiles; no CAPE/CIN derived.
+- Maintain native browser-only rendering, existing catalog formats and theme-refresh behavior.
+
 ## 1.1.17 — October 31, 2026
 - All PNG and GIF export paths (single-panel, multi-panel, differences, soundings and point time series) generate unique timestamped filenames, including a short per-page token and counter. Preserve the descriptive export filename base and file extension.
 

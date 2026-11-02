@@ -25,5 +25,5 @@ assert.match(diff,/drawMapFramed\(cx,combined,layout\.mapX,layout\.mapY,layout\.
 assert.match(diff,/cx\.font=`bold \$\{layout\.titleFont\}px Arial`/);
 assert.match(diff,/cx\.font=`\$\{layout\.subtitleFont\}px Arial`/);
 assert.ok(!diff.includes('39*scale'),'difference-specific oversized font must be gone');
-assert.match(html,/viewer\.js\?v=1\.1\.17-20261031/);
+assert.match(html,/viewer\.js\?v=1\.1\.34-20261102/);
 console.log('PASS single-panel and difference PNG export aperture, typography and legend geometry consistent');

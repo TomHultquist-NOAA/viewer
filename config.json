@@ -189,5 +189,9 @@
     "enabled": true,
     "path": "data/ptype_observations/",
     "windowMinutes": 30
+  },
+  "lightning": {
+    "enabled": true,
+    "path": "data/lightning/"
   }
 }

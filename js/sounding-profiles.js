@@ -50,8 +50,8 @@
   }).catch(e=>{metaCache.delete(path);throw e;});
   metaCache.set(path,inflight);return inflight;
  }
- async function chunk(path,name,h,shape){
-  const key=`data/${path}/${name}/${h}.0.0.0`;
+ async function chunk(path,name,h,shape,surface=false){
+  const key=`data/${path}/${name}/${h}.${surface?'0.0':'0.0.0'}`;
   if(chunkCache.has(key)){
    const value=chunkCache.get(key);chunkCache.delete(key);chunkCache.set(key,value);return value;
   }
@@ -62,7 +62,7 @@
    if(typeof DecompressionStream!=='function')throw Error('Browser does not support native Zarr decompression');
    const stream=response.body.pipeThrough(new DecompressionStream('deflate'));
    const buf=await new Response(stream).arrayBuffer();
-   const expected=shape[1]*shape[2]*shape[3]*4;
+   const expected=(surface?shape[2]*shape[3]:shape[1]*shape[2]*shape[3])*4;
    if(buf.byteLength!==expected)throw Error(`Invalid profile chunk size (${buf.byteLength}; expected ${expected})`);
    const result=new Float32Array(buf);
    chunkCache.set(key,result);
@@ -90,6 +90,13 @@
   const data={};const unavailableVariables=[];
   wanted.forEach((v,i)=>{if(settled[i].status==='fulfilled')data[v]=settled[i].value;
     else unavailableVariables.push(v);});
+  // Newer profile stores include native surface PRES/TMP/DPT at each hour.
+  // Legacy stores remain readable, but cannot be terrain-screened faithfully.
+  const surfaceFields=['sp','t2m','td2m','u10','v10'].filter(v=>vars.includes(v));
+  const surfaceSettled=await Promise.allSettled(surfaceFields.map(v=>chunk(ds.path,v,hour,shape,true)));
+  const surfaceData={};
+  surfaceFields.forEach((v,i)=>{if(surfaceSettled[i].status==='fulfilled')surfaceData[v]=surfaceSettled[i].value;
+    else unavailableVariables.push(v);});
   if(!data.t)throw new Error('Native profile temperature chunk is missing or unreadable');
   const usable=Object.keys(data);
   const size=shape[2]*shape[3];
@@ -105,10 +112,34 @@
    }
    return row;
   }).filter(r=>Number.isFinite(r.p)&&r.p>=100&&r.p<=1050);
-  const numT=rows.filter(r=>good(r.t)).length;
-  const numTd=rows.filter(r=>good(r.td)).length;
-  const numWind=rows.filter(r=>good(r.u)&&good(r.v)).length;
-  return {status:'available',rows,model:ds.model,cycle:ds.init_time,hour,
+  const surfaceSample={};
+  for(const [name,values] of Object.entries(surfaceData)){
+   const v=Number(new apgl.RawScalarField(grid,values).sampleField(lon,lat));
+   surfaceSample[name]=good(v)?v:null;
+  }
+  const pressurePa=surfaceSample.sp;
+  const surfacePressure=good(pressurePa)&&pressurePa>=40000&&pressurePa<=115000?pressurePa/100:null;
+  // No invented surface pressure or altitude. Anchor 2-m T/Td and 10-m
+  // native U/V to the actual surface pressure; their distinct measurement
+  // heights are preserved in provenance. Omit below-ground isobaric levels
+  // (e.g., 925 hPa on a high plateau).
+  const screenedRows=surfacePressure!==null?rows.filter(r=>r.p<surfacePressure-0.01):rows;
+  if(surfacePressure!==null){
+   const t=surfaceSample.t2m,td=surfaceSample.td2m,u=surfaceSample.u10,v=surfaceSample.v10;
+   const surfaceU=good(u)&&u>=-250&&u<=250?u:null;
+   const surfaceV=good(v)&&v>=-250&&v<=250?v:null;
+   if((good(t)&&t>=150&&t<=360)||(good(td)&&td>=150&&td<=360)||
+      surfaceU!==null||surfaceV!==null){
+    screenedRows.unshift({p:surfacePressure,
+     t:good(t)&&t>=150&&t<=360?t-273.15:null,
+     td:good(td)&&td>=150&&td<=360?td-273.15:null,
+     u:surfaceU,v:surfaceV,surface:true,windHeightM:10});
+   }
+  }
+  const numT=screenedRows.filter(r=>good(r.t)).length;
+  const numTd=screenedRows.filter(r=>good(r.td)).length;
+  const numWind=screenedRows.filter(r=>good(r.u)&&good(r.v)).length;
+  return {status:'available',rows:screenedRows,surfacePressure,terrainScreened:surfacePressure!==null,model:ds.model,cycle:ds.init_time,hour,
    gridKm:Number(attrs.grid_spacing_km)||null,levels:{temperature:numT,dewpoint:numTd,wind:numWind},
    ensembleMethod:ds.ensemble_method||null,unavailableVariables};
  }

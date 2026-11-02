@@ -6,11 +6,11 @@ const root=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const src=fs.readFileSync(path.join(root,'js/viewer.js'),'utf8');
 const makeControl=()=>({hidden:true,checked:false,title:''});
-const el={spcControl:makeControl(),spcToggleBtn:makeControl(),spcCount:makeControl(),contourControl:makeControl(),contourOption:makeControl(),mslp850Option:makeControl(),mslp850ToggleBtn:makeControl(),heightOption:makeControl(),windOption:makeControl(),obsControl:makeControl(),obsCount:makeControl(),obsAttribution:makeControl(),contourToggleBtn:makeControl(),heightToggleBtn:makeControl(),windToggleBtn:makeControl()};
+const el={lightningControl:makeControl(),lightningToggleBtn:makeControl(),lightningCount:makeControl(),lightningLegend:makeControl(),spcControl:makeControl(),spcToggleBtn:makeControl(),spcCount:makeControl(),contourControl:makeControl(),contourOption:makeControl(),mslp850Option:makeControl(),mslp850ToggleBtn:makeControl(),heightOption:makeControl(),windOption:makeControl(),obsControl:makeControl(),obsCount:makeControl(),obsAttribution:makeControl(),contourToggleBtn:makeControl(),heightToggleBtn:makeControl(),windToggleBtn:makeControl()};
 const st={field:'t850',contours:false,overlayMSLP:true,overlayMSLP850:true,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,active:[],exportRender:false};
 const FIELDS={t850:{label:'850 hPa forecast',unit:'°C'},absv500:{label:'500 hPa forecast'},wspd10:{label:'10-m wind speed'},mslp:{label:'MSLP'},ptype:{label:'Precipitation type'}};
 function fieldHasHeight(f){return ['t925','t850','t700','absv500'].includes(f);}
-const ctx=vm.createContext({el,st,FIELDS,SPC_FIELDS:new Set(['refc','mxuphl','mxuphl_run']),console,
+const ctx=vm.createContext({el,st,FIELDS,LIGHTNING_FIELDS:new Set(),SPC_FIELDS:new Set(['refc','mxuphl','mxuphl_run']),console,
  heightVariableName(f){return fieldHasHeight(f)?'h'+(f==='absv500'?'500':f.slice(1)):null;},
  windComponentNames(f){return fieldHasHeight(f)||f==='wspd10'?['u','v']:null;},
  contoursAvailable(f=st.field){return f!=='ptype';},

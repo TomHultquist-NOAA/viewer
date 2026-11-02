@@ -14,7 +14,7 @@ assert.match(src,/new apgl\.RawScalarField/);
 assert.match(src,/s\.type==='sounding'/);
 assert.match(src,/data\.dataset/); // time series keeps clicked cycle
 assert.match(src,/upper-level dewpoint unavailable/);
-assert.match(src,/const Y=p=>y1-Math\.log\(1000\/p\)/);
+assert.match(src,/const Y=p=>y1-Math\.log\(p0\/p\)/);
 assert.match(src,/p===1000\?'t2m':'t'\+p/);
 assert.match(src,/const surfaceDs=/);
 assert.match(src,/lastH/); // plot gaps rather than zero interpolation

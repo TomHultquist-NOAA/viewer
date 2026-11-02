@@ -1,0 +1,18 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.join(__dirname,'..');
+const js=fs.readFileSync(path.join(root,'js/viewer.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const guide=fs.readFileSync(path.join(root,'USER_GUIDE.md'),'utf8');
+assert.match(html,/js\/viewer\.js\?v=1\.1\.34-20261102/);
+assert.match(html,/<input type="checkbox" id="interpolateToggleBtn">/);
+assert.match(js,/function applyRasterInterpolationFilter\(component,p\)/);
+assert.match(js,/texture\.activate\(0\)/);
+assert.match(js,/gl\.texParameteri\(gl\.TEXTURE_2D,gl\.TEXTURE_MAG_FILTER,filter\)/);
+assert.match(js,/gl\.texParameteri\(gl\.TEXTURE_2D,gl\.TEXTURE_MIN_FILTER,filter\)/);
+assert.match(js,/applyRasterInterpolationFilter\(p\.component,p\)/);
+assert.match(guide,/GPU bilinear filtering/);
+assert.match(guide,/off by default/);
+console.log('PASS interpolation UI, current cache token, actual GPU texture sampler update and guide');

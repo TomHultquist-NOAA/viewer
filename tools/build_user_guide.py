@@ -54,7 +54,10 @@ def publish_html(text: str):
  source=PAGE.read_text()
  start=source.index('  <div class="user-guide-scroll">')
  end=source.index('  <div class="user-guide-footer">',start)
- PAGE.write_text(source[:start]+rendered+source[end:])
+ # Rebuilding repeatedly must replace the old source hash, not append a
+ # growing list of obsolete fingerprints before the popup content.
+ prefix=re.sub(r'(?m)^  <!-- user-guide-source-sha256: [0-9a-f]{64} -->\n','',source[:start])
+ PAGE.write_text(prefix+rendered+source[end:])
 
 # PDF generator follows the same paragraphs/headings/table rows as Markdown.
 def publish_pdf(text: str):

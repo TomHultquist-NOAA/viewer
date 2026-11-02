@@ -11,7 +11,7 @@ const speedU=Float32Array.from({length:400},()=>18);
 const speedV=Float32Array.from({length:400},()=>24);
 assert.equal(vm.runInContext('shearOverlayScale(speedU,speedV,6000)',Object.assign(ctx,{speedU,speedV})),1);
 assert.equal(vm.runInContext('shearOverlayScale(gradU,gradV,1000)',ctx),1000);
-assert.equal(vm.runInContext('shearOverlayScale(ambiguous,speedV.map(()=>0),6000)',Object.assign(ctx,{ambiguous:Float32Array.from({length:400},()=>.08)})),null);
+assert.equal(vm.runInContext('shearOverlayScale(ambiguous,speedV.map(()=>0),6000)',Object.assign(ctx,{ambiguous:Float32Array.from({length:400},()=>.08)})),6000);
 const fields=code.slice(code.indexOf('function windComponentNames('),code.indexOf('// Secondary MSLP overlay:',code.indexOf('function windComponentNames(')));
 const lookup=vm.createContext({heightVariableName:()=>null});
 vm.runInContext(fields,lookup);
