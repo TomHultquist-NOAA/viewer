@@ -1,6 +1,6 @@
 # OMD EVU Model Viewer — User Guide
 
-**Viewer version 1.1.34**
+**Viewer version 1.1.35**
 
 The OMD EVU Model Viewer displays weather model forecasts and available verifying analyses side by side. The panels share a geographic view, making it easier to compare different models and forecast hours. The default layout includes RRFS, HRRR, REFS members, REFS Mean, and an Analysis panel.
 
@@ -109,7 +109,7 @@ Select the comparison checkboxes beside **two compatible panel titles** to open 
 
 ## Save PNGs and animated GIFs
 
-Use a panel's **download icon** to export one plot, or **Export all panels** for a comparison image or animation. All exported PNGs and GIFs receive a unique UTC timestamp and short suffix in their filenames, so repeated downloads keep distinct names instead of browser-added `(1)` and `(2)` suffixes. Choose the image proportions (**16:9** or **4:3**) and whether to **Fit** the entire map area or **Fill** the frame (which can crop edges). Titles, times, legends, and applicable overlays are included. Exported METAR, mPING, and SPC Local Storm Report markers are slightly enlarged for presentation readability; on-screen marker sizes do not change. Geographic outlines in PNG and GIF exports use a narrow light border around a stronger dark line, making coastlines and political boundaries easier to identify over **both dark and bright weather shading** in either viewer theme. This applies to individual, all-panel, and difference-map exports. On-screen outlines are unchanged because they already render clearly; existing county-visibility thresholds and map geography are preserved.
+Use a panel's **download icon** to export one plot, or **Export all panels** for a comparison image or animation. All exported PNGs and GIFs receive a unique UTC timestamp and short suffix in their filenames, so repeated downloads keep distinct names instead of browser-added `(1)` and `(2)` suffixes. Choose the image proportions (**16:9** or **4:3**) and whether to **Fit** the entire map area or **Fill** the frame (which can crop edges). Titles, times, legends, and applicable overlays are included. Exported METAR, mPING, and SPC Local Storm Report markers are slightly enlarged for presentation readability; on-screen marker sizes do not change. Geographic outlines in PNG and GIF exports use a narrow light border around a stronger dark line, making coastlines and political boundaries easier to identify over **both dark and bright weather shading** in either viewer theme. This applies to individual, all-panel, and difference-map exports. Live maps use a slimmer two-tone outline (a contrasting casing and inner stroke) to keep geographic lines visible over both bright and dark shading. Exported lines retain their stronger presentation treatment; county-visibility thresholds and map geography are unchanged.
 
 Select **Large labels** when preparing images for presentations. It enlarges the model or analysis title and time information in exported PNGs and GIFs, without changing the live viewer. The difference-map title and time line use the same normal and large font sizes as individual-panel exports.
 

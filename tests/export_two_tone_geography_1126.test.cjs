@@ -23,7 +23,7 @@ const map={
  getLayer:id=>({minzoom:0}),getLayoutProperty:(id,k)=>'visible'
 };
 const geo={type:'FeatureCollection',features:[{geometry:{type:'LineString',coordinates:[[20,50],[120,60],[230,70]]}}]};
-const world={st,document:{createElement:()=>canvas()},themeColors:()=>({minor:'#557788',line:'#99aabb'}),geoData:async()=>geo,map,console};
+const world={st,document:{createElement:()=>canvas()},themeColors:()=>({minor:'#557788',line:'#99aabb',boundaryCasing:'#122533'}),geoData:async()=>geo,map,console};
 const c=vm.createContext(world);
 vm.runInContext(render+'\n'+code,c);
 (async()=>{
@@ -39,8 +39,10 @@ vm.runInContext(render+'\n'+code,c);
  }
  calls.length=0;
  await c.redrawDifferenceBoundaries(canvas(),map,{exportGeoVisible:{coast:true,counties:false}});
- assert.equal(calls.length,1,'live difference map uses original one-pass styling');
- assert.equal(calls[0].color,'#99aabb','live colors preserved');
+ assert.equal(calls.length,2,'live difference map uses a subtle contrast casing and inner stroke');
+ assert.equal(calls[0].color,'#122533','live casing is dark');
+ assert.equal(calls[1].color,'#99aabb','live inner stroke preserves themed colors');
+ assert.ok(calls[0].width>calls[1].width,'live casing remains wider than its inner stroke');
  st.theme='dark';
  const p={geoApplied:new Set(['coast','states']),exportGeographyCache:null};
  calls.length=0;
@@ -62,5 +64,5 @@ vm.runInContext(render+'\n'+code,c);
   'map export renders optional geography without blocking when unavailable');
  assert.match(src,/const hideExportCounties=sharpIndividual&&oldZoom<countyThreshold\(p\)/,
   'no counties added by temporary higher-res zoom');
- console.log('PASS all export types use two-tone geography, live style preserved, cache and visibility honored');
+ console.log('PASS all export types use two-tone geography, live casing contrast verified, cache and visibility honored');
 })().catch(e=>{console.error(e);process.exitCode=1});

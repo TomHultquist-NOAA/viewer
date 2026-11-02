@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#09111f">
 <title>OMD EVU Model Viewer | autumnplot-gl</title>
-<link rel="stylesheet" href="css/styles.css?v=1.1.34-20261102">
+<link rel="stylesheet" href="css/styles.css?v=1.1.35-20261102">
 <!-- WebGL comes from the browser. MapLibre uses a separately hosted worker for CSP-safe startup. -->
 <link rel="stylesheet" href="vendor/maplibre-gl.css">
 <script src="vendor/maplibre-gl-csp.js"></script>
 <script src="vendor/autumnplot-gl.js"></script>
 <script src="js/gif-export.js?v=1.0.20-20261030"></script>
-<script src="js/viewer.js?v=1.1.34-20261102" defer></script>
-<script src="js/sounding-profiles.js?v=1.1.34-20261102" defer></script>
-<script src="js/sounding-thermodynamics.js?v=1.1.34-20261102" defer></script>
-<script src="js/point-inspector.js?v=1.1.34-20261102" defer></script>
+<script src="js/viewer.js?v=1.1.35-20261102" defer></script>
+<script src="js/sounding-profiles.js?v=1.1.35-20261102" defer></script>
+<script src="js/sounding-thermodynamics.js?v=1.1.35-20261102" defer></script>
+<script src="js/point-inspector.js?v=1.1.35-20261102" defer></script>
 </head>
 <body>
 <header class="toolbar">
@@ -113,7 +113,7 @@
 
 <dialog id="userGuideDialog" class="user-guide-dialog" aria-labelledby="userGuideTitle">
   <div class="user-guide-head"><div><small>Model guidance visualization</small><h2 id="userGuideTitle">Model Viewer User Guide</h2><p>Interactive forecast and analysis comparisons</p></div><div class="user-guide-head-actions"><a class="guide-pdf-link" href="USER_GUIDE.pdf" target="_blank" rel="noopener noreferrer" aria-label="Open User Guide PDF in a new tab" title="Open PDF User Guide in a new tab"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v6h6"/><path d="M8.5 15h7M8.5 18h5"/></svg><span class="sr-only">Open PDF</span></a><button id="userGuideClose" type="button" aria-label="Close user guide">×</button></div></div>
-  <!-- user-guide-source-sha256: 47e0569ea81355c72e8ab756dbda96cb31a9331c859d98a030abe74e11d2e13e -->
+  <!-- user-guide-source-sha256: 1e7aa6e32b7b32d0b05f2f494e39fe258b6b0013ba072ce97b9fd7a5de80fa79 -->
   <div class="user-guide-scroll">
    <nav class="guide-index" aria-label="Guide contents">
     <a href="#guide-start">Getting started</a>
@@ -128,7 +128,7 @@
     <a href="#guide-data">Data and limitations</a>
    </nav>
    <div class="guide-intro">
-<p><strong>Viewer version 1.1.34</strong></p>
+<p><strong>Viewer version 1.1.35</strong></p>
 <p>The OMD EVU Model Viewer displays weather model forecasts and available verifying analyses side by side. The panels share a geographic view, making it easier to compare different models and forecast hours. The default layout includes RRFS, HRRR, REFS members, REFS Mean, and an Analysis panel.</p>
    </div>
   <section id="guide-start">
@@ -257,7 +257,7 @@ barb overlay does not imply missing scalar shading.</p>
   </section>
   <section id="guide-export">
     <h3>Save PNGs and animated GIFs</h3>
-<p>Use a panel's <strong>download icon</strong> to export one plot, or <strong>Export all panels</strong> for a comparison image or animation. All exported PNGs and GIFs receive a unique UTC timestamp and short suffix in their filenames, so repeated downloads keep distinct names instead of browser-added <code>(1)</code> and <code>(2)</code> suffixes. Choose the image proportions (<strong>16:9</strong> or <strong>4:3</strong>) and whether to <strong>Fit</strong> the entire map area or <strong>Fill</strong> the frame (which can crop edges). Titles, times, legends, and applicable overlays are included. Exported METAR, mPING, and SPC Local Storm Report markers are slightly enlarged for presentation readability; on-screen marker sizes do not change. Geographic outlines in PNG and GIF exports use a narrow light border around a stronger dark line, making coastlines and political boundaries easier to identify over <strong>both dark and bright weather shading</strong> in either viewer theme. This applies to individual, all-panel, and difference-map exports. On-screen outlines are unchanged because they already render clearly; existing county-visibility thresholds and map geography are preserved.</p>
+<p>Use a panel's <strong>download icon</strong> to export one plot, or <strong>Export all panels</strong> for a comparison image or animation. All exported PNGs and GIFs receive a unique UTC timestamp and short suffix in their filenames, so repeated downloads keep distinct names instead of browser-added <code>(1)</code> and <code>(2)</code> suffixes. Choose the image proportions (<strong>16:9</strong> or <strong>4:3</strong>) and whether to <strong>Fit</strong> the entire map area or <strong>Fill</strong> the frame (which can crop edges). Titles, times, legends, and applicable overlays are included. Exported METAR, mPING, and SPC Local Storm Report markers are slightly enlarged for presentation readability; on-screen marker sizes do not change. Geographic outlines in PNG and GIF exports use a narrow light border around a stronger dark line, making coastlines and political boundaries easier to identify over <strong>both dark and bright weather shading</strong> in either viewer theme. This applies to individual, all-panel, and difference-map exports. Live maps use a slimmer two-tone outline (a contrasting casing and inner stroke) to keep geographic lines visible over both bright and dark shading. Exported lines retain their stronger presentation treatment; county-visibility thresholds and map geography are unchanged.</p>
 <p>Select <strong>Large labels</strong> when preparing images for presentations. It enlarges the model or analysis title and time information in exported PNGs and GIFs, without changing the live viewer. The difference-map title and time line use the same normal and large font sizes as individual-panel exports.</p>
 <p>For animated GIFs, the defaults are:</p>
 <table>

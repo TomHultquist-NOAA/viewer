@@ -6,7 +6,7 @@ const root=path.join(__dirname,'..');
 const js=fs.readFileSync(path.join(root,'js/viewer.js'),'utf8');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const guide=fs.readFileSync(path.join(root,'USER_GUIDE.md'),'utf8');
-assert.match(html,/js\/viewer\.js\?v=1\.1\.34-20261102/);
+assert.match(html,/js\/viewer\.js\?v=1\.1\.35-20261102/);
 assert.match(html,/<input type="checkbox" id="interpolateToggleBtn">/);
 assert.match(js,/function applyRasterInterpolationFilter\(component,p\)/);
 assert.match(js,/texture\.activate\(0\)/);

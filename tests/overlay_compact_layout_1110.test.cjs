@@ -14,5 +14,5 @@ assert.match(css,/\.overlays-switches[^\n]*display:flex;flex-wrap:wrap/);
 assert.match(css,/\.overlays-switches>\.spc-switches\{flex:0 0 auto;white-space:nowrap\}/);
 assert.match(css,/#spcCount\[hidden\]/);
 assert.match(js,/el\.spcCount\.hidden=!spcAvailable/);
-assert.match(html,/css\/styles\.css\?v=1\.1\.34-/);
+assert.match(html,/css\/styles\.css\?v=1\.1\.35-/);
 console.log('PASS SPC Reports and Contours share a wrap-aware row; count remains below; hidden state follows field.');

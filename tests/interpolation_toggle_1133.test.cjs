@@ -12,7 +12,7 @@ const readme=fs.readFileSync(path.join(root,'README.md'),'utf8');
 
 assert.match(html,/<input type="checkbox" id="interpolateToggleBtn">/,'toggle must be unchecked by default');
 assert.match(html,/id="interpolateToggleBtn"[^>]*>/);
-assert.match(html,/js\/viewer\.js\?v=1\.1\.34-20261102/,'viewer cache token must change');
+assert.match(html,/js\/viewer\.js\?v=1\.1\.35-20261102/,'viewer cache token must change');
 assert.match(css,/\.interpolation-control/);
 assert.match(js,/localStorage\.getItem\('omd_evu_interpolate'\)/);
 assert.match(js,/localStorage\.setItem\('omd_evu_interpolate'/);

@@ -13,6 +13,6 @@ assert.match(js,/case 'PaToHpa':return x\/100/);
 assert.match(js,/const alwaysMSLP=plottedField==='mslp'/);
 assert.match(js,/if\(st\.overlayMSLP\)\{drawContours\(p,\{always:true\}\)/);
 assert.match(js,/if\(heightVariableName\(p.cfg\?\.field\|\|st.field\)\)await prepareHeightContours/);
-assert.match(html,/css\/styles\.css\?v=1\.1\.34-20261102(?:b)?/);
-assert.match(html,/js\/viewer\.js\?v=1\.1\.34-20261102(?:b)?/);
+assert.match(html,/css\/styles\.css\?v=1\.1\.35-20261102(?:b)?/);
+assert.match(html,/js\/viewer\.js\?v=1\.1\.35-20261102(?:b)?/);
 console.log('PASS Surface weather, MSLP conversion and contours, RAP analysis overlays, versioned assets');

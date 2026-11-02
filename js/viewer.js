@@ -639,7 +639,12 @@ function layout(){
  // MapLibre must never resize a temporarily hidden panel to 0 x 0.
  for(const p of st.panels){if(p.map&&(!st.expandedPanel||st.expandedPanel===p))p.map.resize();}
 }
-function themeColors(){return st.theme==='light'?{ocean:'#d6e6ee',land:'#e8eee5',line:'#536473',minor:'#87969b',grid:'#97a6b0'}:{ocean:'#0b2238',land:'#1d3541',line:'#adc3cc',minor:'#5d7888',grid:'#3c6474'};}
+// Two-tone geographic ink: a thin contrasting casing keeps the political and
+// coastal lines visible against BOTH bright and dark model color ramps.
+// Unlike the heavier export pass, these live widths stay deliberately subtle.
+function themeColors(){return st.theme==='light'
+ ?{ocean:'#d6e6ee',land:'#e8eee5',line:'#283d4b',minor:'#465d6c',boundaryCasing:'#f6faff',grid:'#97a6b0'}
+ :{ocean:'#0b2238',land:'#1d3541',line:'#e5eff3',minor:'#c0d2dc',boundaryCasing:'#0c1a28',grid:'#3c6474'};}
 function mapStyle(){
  // MapLibre must finish startup before asking its web workers to parse GeoJSON.
  // A true source-free style also makes map failures distinguishable from slow geography.
@@ -688,12 +693,20 @@ function addGeographySkeleton(m){
   {id:'land-detail-mask',type:'fill',source:'detail-mask',minzoom:24,paint:{'fill-color':c.ocean,'fill-opacity':1}},
   {id:'land-detail-fill',type:'fill',source:'land_detail',minzoom:24,paint:{'fill-color':c.land,'fill-opacity':1}},
   {id:'lakes-detail-fill',type:'fill',source:'lakes_detail',minzoom:24,paint:{'fill-color':c.ocean,'fill-opacity':1}},
-  line('coast','coast',c.line,1.15),
-  {...line('coast-detail','coast_detail',c.line,1.1),minzoom:detail},
-  line('country','country',c.line,1.05),
-  {...line('country-detail','country_detail',c.line,1.05),minzoom:detail},
-  line('states','states',c.minor,.85),
-  {...line('counties','counties',c.minor,.67,.78),minzoom:countyThreshold()},
+  // Each casing is immediately BELOW its matching inner stroke but ABOVE the
+  // raster. Both layers share one GeoJSON source, camera and zoom visibility.
+  line('coast-casing','coast',c.boundaryCasing,2.50,.87),
+  line('coast','coast',c.line,1.17,.97),
+  {...line('coast-detail-casing','coast_detail',c.boundaryCasing,2.45,.87),minzoom:detail},
+  {...line('coast-detail','coast_detail',c.line,1.14,.97),minzoom:detail},
+  line('country-casing','country',c.boundaryCasing,2.40,.87),
+  line('country','country',c.line,1.09,.97),
+  {...line('country-detail-casing','country_detail',c.boundaryCasing,2.40,.87),minzoom:detail},
+  {...line('country-detail','country_detail',c.line,1.09,.97),minzoom:detail},
+  line('states-casing','states',c.boundaryCasing,2.00,.83),
+  line('states','states',c.minor,.94,.95),
+  {...line('counties-casing','counties',c.boundaryCasing,1.65,.66),minzoom:countyThreshold()},
+  {...line('counties','counties',c.minor,.73,.82),minzoom:countyThreshold()},
  ];
  for(const layer of layers)if(!m.getLayer(layer.id))m.addLayer(layer);
 }
@@ -1364,6 +1377,8 @@ function setTheme(theme,save){
     ['land-detail-mask','fill-color',c.ocean],['land-detail-fill','fill-color',c.land],['lakes-detail-fill','fill-color',c.ocean],
     ['coast','line-color',c.line],['coast-detail','line-color',c.line],['country','line-color',c.line],['country-detail','line-color',c.line],
     ['states','line-color',c.minor],['counties','line-color',c.minor],
+    ...['coast','coast-detail','country','country-detail','states','counties']
+      .map(id=>[id+'-casing','line-color',c.boundaryCasing]),
     ['evu-observed-metar','circle-stroke-color',theme==='light'?'#152633':'#ffffff'],
     ['evu-lightning','circle-stroke-color',theme==='light'?'#152633':'#ffffff'],
     ['evu-spc-lsr','circle-stroke-color',theme==='light'?'#152633':'#ffffff']]){
@@ -1371,6 +1386,8 @@ function setTheme(theme,save){
    }
    if(m.getLayer?.('evu-observed-mping'))refreshMpingTriangleTheme(m);
  }
+ // The live difference overlay is a canvas; refresh its ink on theme changes.
+ if(st.difference.open&&st.difference.snapshot){st.difference.outlineCache=null;scheduleDifferenceLiveRender();}
  // Repaint already-open Skew-T and point-series canvases as well. Their
  // rendered pixels do not respond to CSS theme variables on their own.
  window.EVUPointInspector?.refreshTheme?.();
@@ -1402,18 +1419,21 @@ function updateGeographyVisibility(p){
  const detail=detailThreshold();
  // Overview lines remain in use until their more detailed replacement is present.
  for(const [overview,key] of [['coast','coast_detail'],['country','country_detail']]){
-  if(m.getLayer(overview))m.setLayoutProperty(overview,'visibility',p.geoApplied.has(key)?'none':'visible');
+  for(const id of [overview+'-casing',overview])
+   if(m.getLayer(id))m.setLayoutProperty(id,'visibility',p.geoApplied.has(key)?'none':'visible');
  }
- // Switching projections changes the threshold; update both the overview
- // replacements AND the new detailed layers (whose initial minzoom is static).
+ // The casing follows precisely the same zoom thresholds as its line, so no
+ // extra geographic detail appears in expanded or floating map windows.
  for(const id of ['coast-detail','country-detail']){
-  if(m.getLayer(id))m.setLayerZoomRange(id,detail,24);
+  for(const boundary of [id+'-casing',id])
+   if(m.getLayer(boundary))m.setLayerZoomRange(boundary,detail,24);
  }
  const ready=p.geoApplied.has('land_detail')&&p.geoApplied.has('lakes_detail');
  for(const id of ['land-detail-mask','land-detail-fill','lakes-detail-fill']){
   if(m.getLayer(id))m.setLayerZoomRange(id,ready?detail:24,24);
  }
- if(m.getLayer('counties'))m.setLayerZoomRange('counties',countyThreshold(p),24);
+ for(const id of ['counties-casing','counties'])
+  if(m.getLayer(id))m.setLayerZoomRange(id,countyThreshold(p),24);
 }
 function maybeDetailedGeography(p){
  const m=p.map,d=st.cfg?.display||{};
@@ -3560,7 +3580,8 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContou
   catch(err){rejectReady(err);throw err;}
  };
  if(!warm)stage(p,`Initializing autumnplot-gl GPU layer (${m.label})…`);
- try{p.map.addLayer(layer,p.map.getLayer('coast')?'coast':undefined);}catch(e){rejectReady(e);throw e;}
+ // The shading must sit BELOW both casing and inner geography strokes.
+ try{p.map.addLayer(layer,p.map.getLayer('coast-casing')?'coast-casing':p.map.getLayer('coast')?'coast':undefined);}catch(e){rejectReady(e);throw e;}
  const gpuWait=Math.max(5000,Number(st.cfg.display?.gpuInitTimeoutSeconds||35)*1000);
  let deadline;
  try{await Promise.race([layerReady,new Promise((_,reject)=>{deadline=setTimeout(()=>reject(new Error('GPU layer initialization timed out after '+Math.round(gpuWait/1000)+' s: autumnplot-gl geometry worker did not respond.')),gpuWait);})]);}
@@ -5305,7 +5326,7 @@ async function captureSharpDifferenceFrame(map,snapshot,plotWidth,plotHeight,fra
  // Use the same geographic visibility as the actual on-screen difference.
  // This also prevents an artificial export zoom from introducing counties.
  const visible=differenceGeoVisibility(map);
- const layerIds=['coast','coast-detail','country','country-detail','states','counties'];
+ const layerIds=['coast','coast-detail','country','country-detail','states','counties'].flatMap(id=>[id+'-casing',id]);
  const lineStates=[];
  const detailStates=[];
  for(const id of layerIds){
@@ -5414,9 +5435,12 @@ async function redrawDifferenceBoundaries(canvas,map,snapshot){
     ctx.strokeStyle=st.theme==='light'?'#1d2d3d':'#102638';
     ctx.lineWidth=inside;ctx.stroke();
    }else{
-    ctx.globalAlpha=kind==='minor'?.9:1;
+    const liveWidth=Math.max(kind==='minor'?.85:1.1,weight*Math.min(sx,sy));
+    ctx.globalAlpha=kind==='minor'?.68:.85;
+    ctx.strokeStyle=colors.boundaryCasing;ctx.lineWidth=liveWidth+(kind==='minor'?1.0:1.4);ctx.stroke();
+    ctx.globalAlpha=kind==='minor'?.86:.97;
     ctx.strokeStyle=kind==='minor'?colors.minor:colors.line;
-    ctx.lineWidth=Math.max(1.2,weight*Math.min(sx,sy));ctx.stroke();
+    ctx.lineWidth=liveWidth;ctx.stroke();
    }
   }
  }

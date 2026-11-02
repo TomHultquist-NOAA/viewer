@@ -1,3 +1,11 @@
+## v1.1.35 — 2026-11-02
+
+- Improved live coastline, national, state, and county boundary contrast with a subtle two-tone casing and inner stroke, without changing map data, geometry, detail thresholds, or forecast shading.
+- Kept geographic casing and inner lines synchronized across 2D and Globe, zoom-dependent county visibility, light/dark themes, and the floating Difference map.
+- Preserved stronger export-only presentation borders for PNG and GIF captures.
+- Sized the Interpolate toggle to match the neighboring Map view selector on desktop; kept compact mobile and sidebar layouts.
+- No changes to model fields, Zarr, data sampling, or existing preference behavior.
+
 ## v1.1.34 — 2026-11-02
 
 - Fix the Interpolate toggle so it changes the actual WebGL texture sampler parameters (`TEXTURE_MAG_FILTER` and `TEXTURE_MIN_FILTER`) on existing panel textures; the prior implementation changed the library property but did not update already-created GPU texture objects.
