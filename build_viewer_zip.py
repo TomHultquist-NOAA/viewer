@@ -80,7 +80,7 @@ def make_archive(source: Path, target: Path, release: str) -> None:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--release', default='1.1.35')
-    parser.add_argument('--output', type=Path, default=ROOT.parent / 'OMD_EVU_Viewer_1.1.35.zip')
+    parser.add_argument('--release', default='1.1.38')
+    parser.add_argument('--output', type=Path, default=ROOT.parent / 'OMD_EVU_Viewer_1.1.38.zip')
     args = parser.parse_args()
     make_archive(ROOT, args.output, args.release)

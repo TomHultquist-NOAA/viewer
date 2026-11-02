@@ -8,7 +8,7 @@ const ROOT=path.resolve(__dirname,'..');
 const src=fs.readFileSync(path.join(ROOT,'js/sounding-profiles.js'),'utf8');
 const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
 const inspector=fs.readFileSync(path.join(ROOT,'js/point-inspector.js'),'utf8');
-assert.match(html,/js\/sounding-profiles\.js\?v=1\.1\.35/);
+assert.match(html,/js\/sounding-profiles\.js\?v=1\.1\.38/);
 assert.ok(html.indexOf('js/sounding-profiles.js')<html.indexOf('js/point-inspector.js'));
 assert.match(inspector,/EVUSoundingProfiles\?\.load/);
 assert.match(inspector,/model==='refs_mean'/);

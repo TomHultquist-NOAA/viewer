@@ -1,3 +1,19 @@
+## v1.1.38 — 2026-11-02
+- Accelerated high-resolution Difference PNG shading for ordinary unrotated, unpitched 2D maps by reusing inverse-projected longitude positions along each raster row, while retaining native-grid field sampling, identical image dimensions, the existing anti-aliasing and the same color/opacity rules. Automatically fall back to exact per-pixel projections for Globe, rotated/tilted or non-Mercator views.
+- Freeze coastline, country, state and county visibility before temporarily enlarging a map for an export. Enforce the same effective county-zoom threshold as the interactive viewer rather than relying only on a potentially stale MapLibre layer minimum zoom.
+- Prevent hidden counties (including their casing layer) from appearing in single-panel PNG, all-panel PNG/GIF and difference PNG exports, and restore the original map-layer visibility afterward.
+- Retain the cleaner two-tone boundary treatment and 25-frame maximum for both GIF resolutions.
+- No changes to forecast model data, color tables, export dimensions or converter.
+
+## v1.1.37 — 2026-11-02
+- Set the same maximum of **25 GIF frames** for both Standard (1200 px) and High (1600 px) quality, for individual-panel and all-panels animations.
+- Default GIF range is **F000–F024** for both resolutions, clipped to forecast hours available in the selected cycle; custom ranges and forecast-hour steps are retained.
+- No changes to PNG exports, palettes, frame delays, or the viewer's underlying model data.
+
+## v1.1.36 — 2026-11-02
+- Changed PNG and GIF export geography to use the same cleaner two-tone boundary treatment now used in the live viewer, improving contrast while reducing the heavier export-only look.
+- Applied the updated export boundary treatment consistently to individual-panel exports, all-panels exports, and difference-map exports.
+
 ## v1.1.35 — 2026-11-02
 
 - Improved live coastline, national, state, and county boundary contrast with a subtle two-tone casing and inner stroke, without changing map data, geometry, detail thresholds, or forecast shading.

@@ -4137,45 +4137,20 @@ function snapshotIndividualExportObservations(map,cssWidth,cssHeight){
  }
  return points.length?{points,light:st.theme==='light'}:null;
 }
-// Export-only outline enhancement. Forecast shading, compositing and PNG
-// downsampling can soften thin geographic lines, especially in dark mode.
-// Strengthen only the boundary paint while capturing; restore *exactly* the
-// original values even if the capture fails. Never change county visibility.
-const EXPORT_BOUNDARY_LAYERS=[
- ['coast',1.35,false],['coast-detail',1.35,false],
- ['country',1.35,false],['country-detail',1.35,false],
- ['states',1.50,true],['counties',1.48,true]
-];
-function applyExportBoundaryStyle(map){
- if(st.theme!=='dark'||!map?.getLayer||!map?.setPaintProperty)return ()=>{};
- const saved=[];
- for(const [id,widthFactor,minor] of EXPORT_BOUNDARY_LAYERS){
-  if(!map.getLayer(id))continue;
-  const paint=[
-   ['line-color',minor?'#b0cbd9':'#e0eff6'],
-   ['line-width',Math.max(1,(Number(map.getPaintProperty(id,'line-width'))||1)*widthFactor)],
-   ['line-opacity',minor ? 0.94 : 1]
-  ];
-  for(const [property,value] of paint){
-   try{
-    const original=map.getPaintProperty(id,property);
-    map.setPaintProperty(id,property,value);
-    saved.push([id,property,original]);
-   }catch(err){console.warn('Could not enhance export boundary:',id,property,err);}
-  }
- }
- return ()=>{
-  for(let i=saved.length-1;i>=0;i--){
-   const [id,property,original]=saved[i];
-   try{map.setPaintProperty(id,property,original);}catch(err){console.warn('Could not restore export boundary:',id,property,err);}
-  }
- };
+// Exports now use the same cleaner two-tone geography treatment as the
+// live viewer. Keep the helper as a no-op so the export flow and tests can
+// preserve their restore semantics without mutating live map paint.
+function applyExportBoundaryStyle(_map){
+ return ()=>{};
 }
 // The captured APGL raster is composited over MapLibre line layers. To make
 // geographic borders readable over BOTH bright and dark forecast colors,
-// redraw a two-tone stroke above the weather raster in final export pixels.
+// redraw the same clean two-tone stroke used by the live viewer above the weather raster in final export pixels.
 // Reuse the exact visible geography at capture time; temporary export zooms
 // must not add counties or detailed features that were absent on screen.
+// Freeze visibility BEFORE temporarily enlarging an export camera. MapLibre's
+// layer.minzoom can lag a dynamic threshold after resize, so evaluate counties
+// against the same effective threshold used by the on-screen viewer.
 function exportGeographyVisibility(p,map){
  const visible={};
  for(const [key,id] of [['coast','coast'],['coast_detail','coast-detail'],
@@ -4183,13 +4158,15 @@ function exportGeographyVisibility(p,map){
   const layer=map.getLayer?.(id);
   visible[key]=Boolean(layer&&p.geoApplied?.has(key)&&
    map.getLayoutProperty?.(id,'visibility')!=='none'&&
-   map.getZoom()>=(layer.minzoom||0));
+   map.getZoom()>=(layer.minzoom||0)&&
+   (key!=='counties'||(st.cfg?.display?.showCountiesOnZoom!==false&&
+    map.getZoom()>=countyThreshold(p))));
  }
  return visible;
 }
-async function captureExportGeography(p,map,width,height){
+async function captureExportGeography(p,map,width,height,frozenVisibility=null){
  if(!(width>0&&height>0))return null;
- const visible=exportGeographyVisibility(p,map);
+ const visible=frozenVisibility||exportGeographyVisibility(p,map);
  if(!Object.values(visible).some(Boolean))return null;
  // A forecast-hour GIF generally reuses the same map camera. Cache only the
  // relatively small overlay raster, keyed to the exact projection/size and
@@ -4201,7 +4178,7 @@ async function captureExportGeography(p,map,width,height){
  ]);
  if(p.exportGeographyCache?.key===cameraKey)return p.exportGeographyCache.canvas;
  const image=document.createElement('canvas');image.width=width;image.height=height;
- await redrawDifferenceBoundaries(image,map,{exportGeoVisible:visible,exportStyle:true});
+ await redrawDifferenceBoundaries(image,map,{exportGeoVisible:visible,exportStyle:false});
  p.exportGeographyCache=width*height<=1800000?{key:cameraKey,canvas:image}:null;
  return image;
 }
@@ -4210,13 +4187,14 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
  const oldStyle=node.getAttribute('style')||'';
  const oldCenter=map.getCenter(),oldZoom=map.getZoom(),oldBearing=map.getBearing(),oldPitch=map.getPitch();
  await ensureExportGeography(p,oldZoom);
- // A sharp standalone export enlarges the viewport and adds log2(scale) to
- // MapLibre zoom; that artificial zoom must NOT reveal counties that were
- // hidden in the live panel. Use the original zoom to decide county visibility.
- // This applies equally in 2D and Globe and is restored in finally on errors.
- const hideExportCounties=sharpIndividual&&oldZoom<countyThreshold(p)&&!!map.getLayer?.('counties');
- const originalCountyVisibility=hideExportCounties
-  ? (map.getLayoutProperty?.('counties','visibility')||'visible') : null;
+ const frozenGeography=exportGeographyVisibility(p,map);
+ // MapLibre and the exported canvas must BOTH honor the on-screen county
+ // visibility, including the casing layer, even after temporary zoom changes.
+ const hiddenCountyLayers=[];
+ if(!frozenGeography.counties){
+  for(const id of ['counties-casing','counties'])if(map.getLayer?.(id))
+   hiddenCountyLayers.push([id,map.getLayoutProperty?.(id,'visibility')||'visible']);
+ }
  const screenW=node.clientWidth||canvas.clientWidth,screenH=node.clientHeight||canvas.clientHeight;
  const expand=framing==='fit'&&screenW>0&&screenH>0&&targetW>0&&targetH>0;
  let newW=screenW,newH=screenH;
@@ -4250,7 +4228,7 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
  let restoreExportBoundaries=()=>{};
  let png=null,windPNG=null,contourPNG=null,exportObservations=null,exportGeography=null;
  try{
-  if(hideExportCounties)map.setLayoutProperty('counties','visibility','none');
+  for(const [id] of hiddenCountyLayers)map.setLayoutProperty(id,'visibility','none');
   if(expanded){
    st.exportRender=true;
    node.style.inset='auto';node.style.position='absolute';
@@ -4286,7 +4264,8 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   // exports overlay larger symbols directly on their final composition instead.
   if(!sharpIndividual)restoreObservationMarkers=applyExportObservationMarkerSize(map,
    renderScale,oldZoom,exportZoom,false);
-  // Preserve the live boundary styling; amplify lines only in captured maps.
+  // Preserve the live boundary styling; exports now reuse the same
+  // cleaner two-tone treatment rather than a heavier export-specific variant.
   restoreExportBoundaries=applyExportBoundaryStyle(map);
   // Let the high-resolution vector and autumnplot custom layers settle before
   // encoding. Existing all-panels map geometry remains deliberately unchanged.
@@ -4294,7 +4273,7 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   // Capture projected outlines BEFORE restoring the temporary high-resolution
   // map camera. They are finally composited ABOVE the meteorological shading.
   // Geography is optional: a vector-data fetch failure must not abort PNG/GIF.
-  try{exportGeography=await captureExportGeography(p,map,canvas.width,canvas.height);}
+  try{exportGeography=await captureExportGeography(p,map,canvas.width,canvas.height,frozenGeography);}
   catch(err){console.warn('Optional export geography overlay unavailable:',err);}
   if(sharpIndividual)exportObservations=snapshotIndividualExportObservations(map,cssW,cssH);
   const plottedField=p.cfg?.field||st.field;
@@ -4339,9 +4318,9 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
    catch(err){console.warn('Could not restore export viewport',err);}
   }
   // Restore exactly what was visible before the export, even if capture fails.
-  if(hideExportCounties){
-   try{map.setLayoutProperty('counties','visibility',originalCountyVisibility);map.triggerRepaint();}
-   catch(err){console.warn('Could not restore county visibility after export',err);}
+  for(const [id,visibility] of hiddenCountyLayers){
+   try{map.setLayoutProperty(id,'visibility',visibility);map.triggerRepaint();}
+   catch(err){console.warn('Could not restore county visibility after export',id,err);}
   }
   st.exportRender=false;
   if(p.windCanvas)scheduleWindRedraw(p);
@@ -4546,6 +4525,7 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
 // uniformly scaled inside them (no geographic stretching).
 // GIF export is intentionally bounded to prevent a large nine-panel animation
 // from exhausting browser memory or monopolizing all WebGL map contexts.
+const GIF_MAX_FRAMES=25; // Shared cap for Standard (1200 px) and High (1600 px) GIFs.
 function gifHoursInRange(start,end,step,hours){
  const supported=new Set(hours),out=[];
  for(let h=start;h<=end;h+=step)if(supported.has(h))out.push(h);
@@ -4554,8 +4534,7 @@ function gifHoursInRange(start,end,step,hours){
 function gifSelection(){
  const start=Number(el.exportGifStart.value),end=Number(el.exportGifEnd.value),step=Number(el.exportGifStep.value);
  const hours=gifHoursInRange(start,end,step,availableHours());
- const high=el.exportGifQuality?.value!=='standard';
- const maxFrames=high?19:25;
+ const maxFrames=GIF_MAX_FRAMES;
  return {start,end,step,hours,maxFrames,delay:Number(el.exportGifDelay.value)};
 }
 function syncGifExportControls(){
@@ -4581,7 +4560,7 @@ function syncGifExportControls(){
 function resetDefaultGifRange(){
  const max=Number(el.exportGifEnd.max)||0;
  el.exportGifStart.value='0';
- el.exportGifEnd.value=String(Math.min(max,el.exportGifQuality?.value==='standard'?24:18));
+ el.exportGifEnd.value=String(Math.min(max,GIF_MAX_FRAMES-1));
 }
 function gifOutputDimensions(ratio,multi){
  const width=el.exportGifQuality?.value==='standard'?1200:1600;
@@ -5257,7 +5236,9 @@ function differenceGeoVisibility(map){
   const layer=map.getLayer?.(id);
   visible[key]=Boolean(layer&&geo?.geoApplied?.has(key)&&
    map.getLayoutProperty(id,'visibility')!=='none'&&
-   map.getZoom()>=(layer.minzoom||0));
+   map.getZoom()>=(layer.minzoom||0)&&
+   (key!=='counties'||(st.cfg?.display?.showCountiesOnZoom!==false&&
+    map.getZoom()>=countyThreshold(geo))));
  }
  return visible;
 }
@@ -5374,7 +5355,7 @@ async function captureSharpDifferenceFrame(map,snapshot,plotWidth,plotHeight,fra
   const overlay=await differenceExportRaster(map,snapshot,image.naturalWidth,image.naturalHeight);
   const outlines=document.createElement('canvas');
   outlines.width=image.naturalWidth;outlines.height=image.naturalHeight;
-  await redrawDifferenceBoundaries(outlines,map,{exportGeoVisible:visible,exportStyle:true});
+  await redrawDifferenceBoundaries(outlines,map,{exportGeoVisible:visible,exportStyle:false});
   return {image,overlay,outlines};
  }finally{
   if(changedRatio)try{map.setPixelRatio(ratioBefore);}catch(err){console.warn('Difference pixel ratio restore',err);}
@@ -5399,7 +5380,6 @@ async function redrawDifferenceBoundaries(canvas,map,snapshot){
  if(!(w>0&&h>0))return;
  const sx=canvas.width/w,sy=canvas.height/h;
  const colors=themeColors();
- const exportStyle=!!snapshot.exportStyle;
  const specs=[['coast','coast',1.3],['coast_detail','coast',1.2],['country','coast',1.1],
               ['country_detail','coast',1.1],['states','minor',.95],['counties','minor',.75]];
  const scale=Math.max(.75,Math.min(2.7,Math.min(sx,sy)));
@@ -5428,23 +5408,39 @@ async function redrawDifferenceBoundaries(canvas,map,snapshot){
    }
   }
   if(segments){
-   if(exportStyle){
-    ctx.globalAlpha=kind==='minor'?.87:.96;
-    ctx.strokeStyle='#f8fbff';ctx.lineWidth=outside;ctx.stroke();
-    ctx.globalAlpha=kind==='minor'?.91:.98;
-    ctx.strokeStyle=st.theme==='light'?'#1d2d3d':'#102638';
-    ctx.lineWidth=inside;ctx.stroke();
-   }else{
-    const liveWidth=Math.max(kind==='minor'?.85:1.1,weight*Math.min(sx,sy));
-    ctx.globalAlpha=kind==='minor'?.68:.85;
-    ctx.strokeStyle=colors.boundaryCasing;ctx.lineWidth=liveWidth+(kind==='minor'?1.0:1.4);ctx.stroke();
-    ctx.globalAlpha=kind==='minor'?.86:.97;
-    ctx.strokeStyle=kind==='minor'?colors.minor:colors.line;
-    ctx.lineWidth=liveWidth;ctx.stroke();
-   }
+   const liveWidth=Math.max(kind==='minor'?.85:1.1,weight*Math.min(sx,sy));
+   ctx.globalAlpha=kind==='minor'?.68:.85;
+   ctx.strokeStyle=colors.boundaryCasing;ctx.lineWidth=liveWidth+(kind==='minor'?1.0:1.4);ctx.stroke();
+   ctx.globalAlpha=kind==='minor'?.86:.97;
+   ctx.strokeStyle=kind==='minor'?colors.minor:colors.line;
+   ctx.lineWidth=liveWidth;ctx.stroke();
   }
  }
  ctx.restore();
+}
+// A zero-bearing/pitch 2D Mercator view has longitude linear in screen X and
+// latitude independent of X. Verify this at sample centers before using it:
+// sampleField still receives the original native-grid lon/lat coordinates and
+// all pixels/colors/resolution remain unchanged. Globe, tilted, rotated, and
+// nonrectilinear projections retain the precise per-pixel inverse projection.
+function differenceExportLongitudeScanline(map,sampleW,cssW,cssH){
+ if(st.mode==='globe'||sampleW<2||Math.abs(Number(map.getBearing?.()||0))>1e-8||
+    Math.abs(Number(map.getPitch?.()||0))>1e-8||
+    (map.getProjection?.()?.type||'mercator')!=='mercator')return null;
+ const step=cssW/sampleW,y=cssH/2;
+ try{
+  const a=map.unproject([step*.5,y]);
+  const b=map.unproject([cssW-step*.5,y]);
+  const mid=map.unproject([cssW/2,y]);
+  if(!a||!b||!mid||![a.lng,a.lat,b.lng,b.lat,mid.lng,mid.lat].every(Number.isFinite))return null;
+  const dx=(b.lng-a.lng)/(sampleW-1);
+  if(Math.abs(a.lat-b.lat)>1e-7||Math.abs(mid.lat-a.lat)>1e-7||
+     Math.abs(mid.lng-(a.lng+dx*(sampleW-1)/2))>1e-7||
+     Math.abs(b.lng-a.lng)>180)return null;
+  const longitude=new Float64Array(sampleW);
+  for(let x=0;x<sampleW;x++)longitude[x]=a.lng+x*dx;
+  return longitude;
+ }catch(_){return null;}
 }
 async function differenceExportRaster(map,snapshot,width,height,{interactive=false}={}){
  const field=snapshot.rawDifference,range=snapshot.range;
@@ -5460,13 +5456,22 @@ async function differenceExportRaster(map,snapshot,width,height,{interactive=fal
  const c=document.createElement('canvas');c.width=sampleW;c.height=sampleH;
  const cx=c.getContext('2d');const data=cx.createImageData(sampleW,sampleH),pixels=data.data;
  const colors=DIFFERENCE_COLORS.map(hex=>[parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)]);
+ const longitude=differenceExportLongitudeScanline(map,sampleW,cssW,cssH);
+ const cssStepX=cssW/sampleW,cssStepY=cssH/sampleH;
  let painted=0;
  for(let y=0;y<sampleH;y++){
+  const py=(y+.5)*cssStepY;
+  // The ordinary 2D view needs only one unproject per raster row, rather
+  // than one per pixel. Other projections retain the original exact path.
+  const rowGeo=longitude?map.unproject([cssStepX*.5,py]):null;
+  const rowLat=rowGeo?.lat;
   for(let x=0;x<sampleW;x++){
-   const point=[(x+.5)*cssW/sampleW,(y+.5)*cssH/sampleH];
-   if(typeof map.isPointOnSurface==='function'&&!map.isPointOnSurface(point))continue;
-   const geo=map.unproject(point);if(!geo)continue;
-   const v=differenceSampleValue(field,geo.lng,geo.lat);if(!Number.isFinite(v)||v<-1e9)continue;
+   const point=longitude?null:[(x+.5)*cssStepX,py];
+   if(point&&typeof map.isPointOnSurface==='function'&&!map.isPointOnSurface(point))continue;
+   const geo=point?map.unproject(point):null;
+   const lon=longitude?longitude[x]:geo?.lng,lat=longitude?rowLat:geo?.lat;
+   if(!Number.isFinite(lon)||!Number.isFinite(lat))continue;
+   const v=differenceSampleValue(field,lon,lat);if(!Number.isFinite(v)||v<-1e9)continue;
    const z=Math.max(0,Math.min(1,(v+range)/(2*range)))*(colors.length-1);
    const lo=Math.floor(z),hi=Math.min(colors.length-1,lo+1),frac=z-lo,i=(y*sampleW+x)*4;
    for(let k=0;k<3;k++)pixels[i+k]=Math.round(colors[lo][k]*(1-frac)+colors[hi][k]*frac);

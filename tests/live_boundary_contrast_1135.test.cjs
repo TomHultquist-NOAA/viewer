@@ -56,5 +56,5 @@ assert.match(css,/\.interpolation-control \.contour-switch\{height:28px\}/,
  '28px compact desktop interpolation aligns with Map view');
 assert.match(css,/\.interpolation-control \.contour-switch\{height:32px;/,
  '32px interpolation matches non-desktop controls');
-assert.match(html, /css\/styles\.css\?v=1\.1\.35-20261102/);
+assert.match(html, /css\/styles\.css\?v=1\.1\.38-20261102/);
 console.log('PASS theme-dependent two-tone live borders, ordering above shading, synchronized visibility, and toolbar alignment');

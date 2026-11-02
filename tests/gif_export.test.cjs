@@ -10,7 +10,7 @@ assert.match(html,/js\/gif-export\.js\?v=1\.0\.20-/);
 assert.match(src,/i===opt\.hours\.length-1\?500:0/);
 assert.match(src,/await exportAll\(ratio,true\):await exportPanel\(panel,ratio,true\)/);
 assert.match(src,/st\.hour=original;syncUI\(\);await renderAll\(\)/);
-assert.match(src,/const maxFrames=high\?19:25/);
+assert.match(src,/const maxFrames=GIF_MAX_FRAMES/);
 let e=new Encoder(12,10);
 for(let k=0;k<3;k++){
  const pixels=new Uint8ClampedArray(12*10*4);

@@ -29,13 +29,12 @@ vm.runInContext(render+'\n'+code,c);
 (async()=>{
  for(const theme of ['dark','light']){
   st.theme=theme;calls.length=0;
-  await c.redrawDifferenceBoundaries(canvas(),map,{exportGeoVisible:{coast:true,states:true,counties:false},exportStyle:true});
-  assert.equal(calls.length,4,'two strokes per geography layer (halo then dark core)');
-  assert.equal(calls[0].color,'#f8fbff','light outer halo');
-  assert.equal(calls[1].color,theme==='light'?'#1d2d3d':'#102638','dark central line');
-  assert.ok(calls[0].width>calls[1].width,'halo extends outside dark line');
-  assert.ok(calls[1].width>1.2,'dark center thick enough to survive PNG resampling');
-  assert.ok(calls[2].width>calls[3].width,'state outline also has a halo');
+  await c.redrawDifferenceBoundaries(canvas(),map,{exportGeoVisible:{coast:true,states:true,counties:false},exportStyle:false});
+  assert.equal(calls.length,4,'two strokes per geography layer (casing then inner stroke)');
+  assert.equal(calls[0].color,'#122533','themed casing color for live/export style');
+  assert.equal(calls[1].color,'#99aabb','themed inner stroke preserves live palette');
+  assert.ok(calls[0].width>calls[1].width,'casing extends outside inner stroke');
+  assert.ok(calls[2].width>calls[3].width,'state outline also has a casing');
  }
  calls.length=0;
  await c.redrawDifferenceBoundaries(canvas(),map,{exportGeoVisible:{coast:true,counties:false}});
@@ -58,11 +57,11 @@ vm.runInContext(render+'\n'+code,c);
  assert.equal(await c.captureExportGeography(p,map,960,600),null,'do not invent absent geographies');
  assert.match(src,/drawWindExport\(ctx,captured\.geography,rect,im\);\s*drawWindExport\(ctx,captured\.wind,rect,im\);/,
   'draw two-tone outlines after map raster and before wind/contours');
- assert.match(src,/redrawDifferenceBoundaries\(outlines,map,\{exportGeoVisible:visible,exportStyle:true\}\)/,
-  'difference export uses two-tone outlines too');
+ assert.match(src,/redrawDifferenceBoundaries\(image,map,\{exportGeoVisible:visible,exportStyle:false\}\)/,
+  'difference export uses the same two-tone outlines as the live viewer');
  assert.match(src,/try\{exportGeography=await captureExportGeography\(/,
   'map export renders optional geography without blocking when unavailable');
- assert.match(src,/const hideExportCounties=sharpIndividual&&oldZoom<countyThreshold\(p\)/,
+ assert.match(src,/const frozenGeography=exportGeographyVisibility\(p,map\)/,
   'no counties added by temporary higher-res zoom');
- console.log('PASS all export types use two-tone geography, live casing contrast verified, cache and visibility honored');
+ console.log('PASS all export types use the live two-tone geography treatment, with cache and visibility honored');
 })().catch(e=>{console.error(e);process.exitCode=1});

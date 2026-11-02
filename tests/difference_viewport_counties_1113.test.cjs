@@ -25,6 +25,6 @@ diffMap.getContainer=()=>({clientWidth:900,clientHeight:250});
 assert.equal(sandbox.differenceViewportZoomAdjustment(diffMap,panel),0);
 assert.equal(sandbox.countyThreshold(diff.geo),4.25);
 assert.match(src,/const visible=differenceGeoVisibility\(map\)/);
-assert.match(src,/redrawDifferenceBoundaries\(outlines,map,\{exportGeoVisible:visible(?:,exportStyle:true)?\}\)/);
+assert.match(src,/redrawDifferenceBoundaries\(outlines,map,\{exportGeoVisible:visible,exportStyle:false\}\)/);
 assert.match(src,/st\.difference\.map\.jumpTo\(differenceCameraForViewport\(camera,st\.difference\.map\)\)/);
 console.log('PASS difference map matched geography, resize-adjusted counties, frozen PNG outlines');

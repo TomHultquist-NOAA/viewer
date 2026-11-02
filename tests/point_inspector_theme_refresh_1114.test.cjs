@@ -15,8 +15,8 @@ assert.match(inspector,/s\.lastPlot=\{kind:'sounding',rows,validTime,summary\}/)
 assert.match(inspector,/s\.lastPlot=\{kind:'series',points\}/);
 assert.match(inspector,/window\.EVUPointInspector=\{showMenu,scheduleSoundingRefresh,refreshTheme\}/);
 assert.match(viewer,/window\.EVUPointInspector\?\.refreshTheme\?\.\(\)/);
-assert.match(html,/js\/point-inspector\.js\?v=1\.1\.35-20261102/);
-assert.match(html,/js\/viewer\.js\?v=1\.1\.35-20261102/);
+assert.match(html,/js\/point-inspector\.js\?v=1\.1\.38-20261102/);
+assert.match(html,/js\/viewer\.js\?v=1\.1\.38-20261102/);
 
 const frameJS=section(inspector,'function frame(ctx,canvas,title,subtitle){','function axis(');
 const refreshJS=section(inspector,'function refreshTheme(){','window.EVUPointInspector=');

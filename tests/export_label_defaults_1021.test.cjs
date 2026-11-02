@@ -3,12 +3,12 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const dir=path.resolve(__dirname,'..');
 const html=fs.readFileSync(path.join(dir,'index.html'),'utf8'),js=fs.readFileSync(path.join(dir,'js/viewer.js'),'utf8'),css=fs.readFileSync(path.join(dir,'css/styles.css'),'utf8');
 const ctx=vm.createContext({el:{exportGifStart:{value:'7'},exportGifEnd:{max:'84',value:'9'},exportGifQuality:{value:'high'}}});
-const begin=js.indexOf('function resetDefaultGifRange(){');
+const begin=js.indexOf('const GIF_MAX_FRAMES=25;');
 const end=js.indexOf('function gifOutputDimensions(',begin);
 assert(begin>0&&end>begin);
 vm.runInContext(js.slice(begin,end),ctx);
 ctx.resetDefaultGifRange();
-assert.equal(ctx.el.exportGifStart.value,'0');assert.equal(ctx.el.exportGifEnd.value,'18','High resolution F000–F018 is default');
+assert.equal(ctx.el.exportGifStart.value,'0');assert.equal(ctx.el.exportGifEnd.value,'24','High resolution F000–F024 is default');
 ctx.el.exportGifQuality.value='standard';ctx.resetDefaultGifRange();
 assert.equal(ctx.el.exportGifEnd.value,'24','Standard resolution F000–F024 is default');
 ctx.el.exportGifEnd.max='12';ctx.resetDefaultGifRange();assert.equal(ctx.el.exportGifEnd.value,'12','Short cycles clamp available GIF range');

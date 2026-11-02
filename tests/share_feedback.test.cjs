@@ -9,6 +9,6 @@ assert.match(css, /\.share-link-toast\[hidden\]/);
 assert.match(css, /\.share-link-toast\{position:fixed/);
 assert.match(js, /shareFeedback\('success','Link copied'\)/);
 assert.match(js, /shareFeedback\('error','Unable to copy link/);
-assert.match(html, /css\/styles\.css\?v=1\.1\.35-20261102(?:b)?/);
-assert.match(html, /js\/viewer\.js\?v=1\.1\.35-20261102(?:b)?/);
+assert.match(html, /css\/styles\.css\?v=1\.1\.38-20261102(?:b)?/);
+assert.match(html, /js\/viewer\.js\?v=1\.1\.38-20261102(?:b)?/);
 console.log('PASS: visible share success/error, accessible live announcement and 1.0.6 assets');
