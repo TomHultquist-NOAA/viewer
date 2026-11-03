@@ -1,0 +1,22 @@
+
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.join(__dirname,'..');
+const js=fs.readFileSync(path.join(root,'js/viewer.js'),'utf8');
+const guide=fs.readFileSync(path.join(root,'USER_GUIDE.md'),'utf8');
+const readme=fs.readFileSync(path.join(root,'README.md'),'utf8');
+const cfg=JSON.parse(fs.readFileSync(path.join(root,'config.json'),'utf8'));
+assert.equal(cfg.panels.length,9);
+assert.equal(cfg.gfsPanels.length,6);
+assert.match(js,/function outlineStyleKey\(\)\{return String\(st\.modelSet/);
+assert.match(js,/function updateLiveGeography\(\)/);
+assert.match(js,/function updateMapBackground\(\)/);
+assert.doesNotMatch(js,/overlayStrokeWidth\('mapOutlines',\(!minor&&id\.startsWith\('coast'\)\?overlayStrokeWidth\('mapBackground'/, 'Map background width cannot modify map-outline width');
+assert.match(js,/const step=st\.modelSet==='gfs-versions'\?3:1/);
+assert.match(js,/if\(p\?\.cfg\?\.differencePanel\)\{clearContours\(p\);return;\}/);
+assert.match(guide,/Live maps use one clean stroke without the export halo/);
+assert.match(guide,/without meteorological contours/);
+assert.match(readme,/Model-set feature parity/);
+console.log('PASS model-set layout, shared map styling, independent widths, difference contours, guide');

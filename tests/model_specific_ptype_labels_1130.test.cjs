@@ -58,5 +58,5 @@ assert.equal(globalLabel,'Precipitation type (model-specific)','shared legend mu
 assert.match(js,/st\.field==='ptype'\?'Precipitation type \(model-specific\)':fieldMeta\.label/,'all-panel PNG/GIF title must be neutral');
 assert.match(js,/const name=String\(p\.title\.textContent/,'comparison captions must use corrected panel title');
 assert.match(js,/clipText\(ctx,p\.title\.textContent/,'single-panel PNG/GIF titles must use corrected panel title');
-assert.match(html,/js\/viewer\.js\?v=1\.1\.38-20261102/,'new viewer code must bypass browser cache');
+assert.match(html,/js\/viewer\.js\?v=1\.1\.40-20261102/,'new viewer code must bypass browser cache');
 console.log('PASS all eight model-specific Ptype labels across initial draw, overlay redraw, missing data, PNG/GIF captions; PMM semantics retained');

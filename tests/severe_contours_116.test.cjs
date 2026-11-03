@@ -5,7 +5,7 @@ const start=src.indexOf('const CONTOUR_STEPS='),end=src.indexOf('function schedu
 assert(start>=0&&end>start);
 const context=vm.createContext({console,Float32Array,Math,Number});
 vm.runInContext(src.slice(start,end),context);
-for(const field of ['sbcape','mlcape','mucape','srh01','srh03','shear01','shear06','mxuphl','mxuphl_run','scp','stp','stp_fixed']){
+for(const field of ['sbcape','mlcape','mucape','srh01','srh03','shear01','shear06','mxuphl','mxuphl_run']){
  assert.equal(vm.runInContext(`contoursAvailable('${field}')`,context),true,`${field} has contour option`);
  assert.equal(vm.runInContext(`contourLevels('${field}',-200,6000,4.5,650,410).length>0`,context),true,`${field} has usable levels`);
 }
@@ -30,7 +30,6 @@ assert.equal(vm.runInContext('contourInterval("sbcape",2.5)',context),1000);
 assert.equal(vm.runInContext('contourInterval("sbcape",4.5)',context),500);
 assert.equal(vm.runInContext('contourInterval("sbcape",7)',context),250);
 assert.deepEqual(Array.from(vm.runInContext('contourLevels("sbcape",0,3000,4.5,650,410)',context)),[500,1000,1500,2000,2500]);
-assert.deepEqual(Array.from(vm.runInContext('contourLevels("stp",0,5,7,650,410)',context)),[.5,1,1.5,2,2.5,3,3.5,4,4.5]);
 // Confirm real drawContours performs nonempty strokes for a CAPE gradient.
 const strokes=[];
 const ctx={save(){},restore(){},setTransform(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},quadraticCurveTo(){},translate(){},rotate(){},setLineDash(){},stroke(){strokes.push(this.strokeStyle)},measureText(v){return{width:String(v).length*7}},strokeText(){},fillText(){}};
@@ -40,4 +39,4 @@ context.p={contourCanvas:canvas,map,cfg:{field:'sbcape'},rawField:{sampleField(x
 context.st={theme:'dark',contours:true};context.devicePixelRatio=1;context.globeFrontVisible=()=>true;
 vm.runInContext('drawContours(p,{field:p.rawField,key:"sbcape"})',context);
 assert(strokes.length>=2,'CAPE contour lines actually draw');
-console.log('PASS CAPE, SRH, shear, UH, composite and tornado indices contour toggles and meteorological contour thresholds');
+console.log('PASS CAPE, SRH, shear and UH contour toggles and meteorological contour thresholds');

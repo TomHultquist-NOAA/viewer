@@ -1,0 +1,51 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const js=fs.readFileSync(path.join(__dirname,'../js/viewer.js'),'utf8');
+const css=fs.readFileSync(path.join(__dirname,'../css/styles.css'),'utf8');
+const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+test('GFS interpolation on by default and model preferences isolated',()=>{
+ const start=js.indexOf(' let interpolationSaved=null;'),end=js.indexOf(' let spcSaved=null;',start);
+ assert.ok(start>0&&end>start);
+ const code=js.slice(start,end);
+ const store=new Map();
+ const localStorage={getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,v)};
+ function evaluate(modelSet){
+  let callback;
+  const el={interpolateToggleBtn:{checked:false,addEventListener:(_event,cb)=>callback=cb}};
+  const st={modelSet,interpolate:false,panels:[]};
+  vm.runInNewContext(code,{st,el,localStorage,applyRasterInterpolationFilter(){} });
+  return {st,el,change:()=>callback()};
+ }
+ let gfs=evaluate('gfs-versions');assert.equal(gfs.st.interpolate,true,'GFS default on');
+ gfs.el.interpolateToggleBtn.checked=false;gfs.change();assert.equal(store.get('omd_evu_interpolate_gfs'),'0');
+ assert.equal(evaluate('gfs-versions').st.interpolate,false,'GFS opt-out persists');
+ assert.equal(evaluate('rrfs-refs').st.interpolate,false,'RRFS default stays off');
+ const rrfs=evaluate('rrfs-refs');rrfs.el.interpolateToggleBtn.checked=true;rrfs.change();
+ assert.equal(store.get('omd_evu_interpolate'),'1');
+ assert.equal(evaluate('rrfs-refs').st.interpolate,true,'RRFS old preference preserved');
+ assert.equal(evaluate('gfs-versions').st.interpolate,false,'RRFS selection does not change GFS');
+ store.delete('omd_evu_interpolate_gfs');
+ assert.equal(evaluate('gfs-versions').st.interpolate,true,'GFS defaults on independently');
+ assert.match(js,/p\.interpolationEligible=klass===apgl\.Raster&&!m\.category&&!m\.ptype&&!m\.ptypeReflectivity/);
+});
+test('live light map is white and dark MSLP geography gets contrast without heavy casing',()=>{
+ const start=js.indexOf('function themeColors(){'),end=js.indexOf('function updateLiveGeography(){',start);
+ const st={theme:'light',field:'mslp'};
+ const context={st,FIELDS:{mslp:{bandColors:['#e9e9d0','#e2e8cf','#572d87']},t2m:{colors:[[0,'#422d92'],[.5,'#3266cb'],[1,'#d44730']]},apcp:{bandColors:['#c8eaf4']}}};vm.runInNewContext(js.slice(start,end),context);
+ const light=context.themeColors();
+ assert.equal(light.ocean,'#ffffff');assert.equal(light.land,'#ffffff');
+ assert.match(css,/html\[data-theme="light"\][^{]*\{[^}]*--map-bg:#ffffff/);
+ st.theme='dark';
+ const mslp=context.liveGeographyInk();
+ st.field='t2m';const temp=context.liveGeographyInk();
+ assert.notEqual(mslp.line,temp.line,'MSLP gets its own higher-contrast strokes');
+ assert.ok(mslp.casingOpacity>.7,'MSLP casing now provides strong contrast over mixed palettes');
+ st.field='apcp';const precip=context.liveGeographyInk();
+ assert.ok(precip.casingOpacity>.8,'intermittent-field geography preserved');
+ assert.match(html,/css\/styles\.css\?v=[^" ]+map=20261103/);
+ assert.match(html,/js\/viewer\.js\?v=[^" ]+map=20261103/);
+});

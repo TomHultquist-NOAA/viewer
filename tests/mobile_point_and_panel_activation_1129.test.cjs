@@ -9,7 +9,7 @@ assert.match(src,/bindTouchPointInspector\(p,m\)/);
 assert.match(src,/scrollRail\.addEventListener\('click'/);
 assert.match(css,/touch-action:pan-y/);
 assert.match(css,/\.panel-scroll-rail/);
-assert.match(html,/v=1\.1\.38-20261102/);
+assert.match(html,/v=1\.1\.40-20261102/);
 function extract(begin,end){const a=src.indexOf(begin),b=src.indexOf(end,a+begin.length);assert.ok(a>=0&&b>a);return src.slice(a,b);}
 const listeners={};let timer=null;const seen=[];
 const canvas={addEventListener(n,f){(listeners[n]??=[]).push(f)},getBoundingClientRect(){return {left:20,top:40,width:500,height:300}}};

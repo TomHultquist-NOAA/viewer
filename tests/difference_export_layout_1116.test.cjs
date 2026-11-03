@@ -11,7 +11,7 @@ for(const size of [[1920,1080],[1600,1200]]){
   const [w,h]=size,layout=ctx.standaloneExportLayout(w,h,large);
   assert.equal(layout.mapX,14);assert.equal(layout.mapY,large?100:60);
   assert.equal(layout.mapW,w-28);
-  assert.equal(layout.mapH,h-(large?100:60)-77);
+  assert.equal(layout.mapH,h-(large?100:60)-(large?104:77));
   assert.equal(layout.titleFont,Math.round(Math.max(15,Math.min(25,w/40))*(large?1.7:1)));
   assert.equal(layout.subtitleFont,Math.round(Math.max(11,Math.min(15,w/70))*(large?1.7:1)));
  }
@@ -25,5 +25,5 @@ assert.match(diff,/drawMapFramed\(cx,combined,layout\.mapX,layout\.mapY,layout\.
 assert.match(diff,/cx\.font=`bold \$\{layout\.titleFont\}px Arial`/);
 assert.match(diff,/cx\.font=`\$\{layout\.subtitleFont\}px Arial`/);
 assert.ok(!diff.includes('39*scale'),'difference-specific oversized font must be gone');
-assert.match(html,/viewer\.js\?v=1\.1\.38-20261102/);
+assert.match(html,/viewer\.js\?v=1\.1\.40-20261102/);
 console.log('PASS single-panel and difference PNG export aperture, typography and legend geometry consistent');

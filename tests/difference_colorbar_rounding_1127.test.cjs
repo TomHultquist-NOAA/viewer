@@ -11,8 +11,7 @@ vm.runInContext(source.slice(start,end)+'\nthis.ticks=differenceTicks;this.forma
 // endpoints, must have only integer labels, not rounded false endpoint labels.
 for(const [field,limit] of [
  ['mslp',12],['t2m',15],['rh2m',40],['shear01',20],['shear06',30],
- ['srh01',212.5],['srh03',262.5],['scp',7.5],['stp',3.75],
- ['stp_fixed',3.75],['sbcape',1500],['absv500',23.75],
+ ['srh01',212.5],['srh03',262.5],['sbcape',1500],['absv500',23.75],
  ['wspd10',30],['refc',30],['snow1h',6],['sden',150]
 ]){
  const t=Array.from(ctx.ticks(field,limit));
@@ -45,5 +44,5 @@ assert.deepEqual(Array.from(ctx.ticks('t2m',0)),[0]);
 assert.match(source,/function setDifferenceLegend\(field,range,unit\)\{\s*const ticks=differenceTicks\(field,range\)/);
 assert.match(source,/for\(const t of differenceTicks\(snap\.fieldKey,snap\.range\)\)/);
 assert.match(source,/node\.textContent=differenceNumber\(v\)/);
-assert.match(source,/cx\.fillText\(differenceNumber\(t\),x,H-15\)/);
+assert.match(source,/cx\.fillText\(differenceNumber\(t\),x,H-\(largeLabels\?20:15\)\)/);
 console.log('PASS whole-number difference ticks, justified fractional exceptions, and matched live/export legends');

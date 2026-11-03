@@ -25,7 +25,7 @@ const REFC_COLORS=[
 ];
 const FIELDS = {
  mslp:{label:'Mean sea level pressure (MSLP)',unit:'hPa',convert:'PaToHpa',
-  levels:[940,948,956,964,972,980,988,996,1004,1012,1020,1028,1036,1044,1052,1060],
+  levels:[960,966,972,978,984,990,996,1002,1008,1014,1020,1026,1032,1038,1044,1050],
   bandColors:['#572d87','#6d51a8','#637ac9','#518fc4','#59a5b7','#83bdb5','#b4d3c5','#e2e8cf','#faf4c0','#f8df91','#f5c36a','#eaa36a','#d88075','#b65e70','#8d465f']},
  refc:{label:'Composite reflectivity',unit:'dBZ',levels:REFC_LEVELS,bandColors:REFC_COLORS},
  refc_ptype:{label:'Reflectivity with precipitation type',unit:'dBZ',ptypeReflectivity:true},
@@ -85,11 +85,8 @@ for(const [key,label,unit,min,max] of [
  ['srh01','0–1 km storm-relative helicity','m² s⁻²',-200,650],['srh03','0–3 km storm-relative helicity','m² s⁻²',-200,850],
  ['sbcape','Surface-based CAPE','J kg⁻¹',0,6000],['mlcape','Mixed-layer CAPE','J kg⁻¹',0,6000],['mucape','Most-unstable CAPE','J kg⁻¹',0,7000],
  ['mxuphl','1-hour maximum updraft helicity (2–5 km)','m² s⁻²',-200,400],
- ['mxuphl_run','Accumulated maximum updraft helicity (2–5 km)','m² s⁻²',-200,400],
- ['scp','Supercell composite parameter (effective layer)','',0,30],
- ['stp','Significant tornado parameter with CIN (effective layer)','',0,15],
- ['stp_fixed','Significant tornado parameter (fixed layer)','',0,15]])
- FIELDS[key]={label,unit,min,max,...(['sbcape','mlcape','mucape'].includes(key)?{cutoff:10}:['scp','stp','stp_fixed'].includes(key)?{cutoff:.1}:{}),...(key.startsWith('shear')?{convert:'mpsToKt'}:{}),colors:[[0,'#dae7ee'],[.18,'#b1c8d5'],[.35,'#6faf99'],[.5,'#e0d76d'],[.7,'#eda04a'],[.87,'#d65a50'],[1,'#9d3272']],fraction:true};
+ ['mxuphl_run','Accumulated maximum updraft helicity (2–5 km)','m² s⁻²',-200,400]])
+ FIELDS[key]={label,unit,min,max,...(['sbcape','mlcape','mucape'].includes(key)?{cutoff:10}:{}),...(key.startsWith('shear')?{convert:'mpsToKt'}:{}),colors:[[0,'#dae7ee'],[.18,'#b1c8d5'],[.35,'#6faf99'],[.5,'#e0d76d'],[.7,'#eda04a'],[.87,'#d65a50'],[1,'#9d3272']],fraction:true};
 // Background transparency is a *display-only* choice. Keep genuinely zero
 // quantities unshaded (and tiny signed values near neutral unshaded) rather
 // than painting an entire domain, without hiding missing data or changing Zarr.
@@ -99,7 +96,6 @@ for(const [name,threshold] of Object.entries({
  cpofp:1,snowc:1,
  sbcape:10,mlcape:10,mucape:10,
  shear01:2,shear06:2,srh01:10,srh03:10,
- scp:.1,stp:.1,stp_fixed:.1,
  absv500:1,mxuphl:5,mxuphl_run:5
 }))FIELDS[name].clearZero=threshold;
 // Explicit near-zero transparent zone for hourly and run-max updraft helicity.
@@ -114,7 +110,7 @@ const FIELD_ORDER = [
  'mslp','t2m','dpt2m','rh2m','prate','apcp1h','apcp3h','apcp6h','apcp24h','apcp48h','apcp','frozr','frzr','tsnowp',
  'snow1h','snow3h','snow6h','snow24h','snow48h','asnow','cpofp','snowc','sden','weasd','snod',
  't925','t850','t700','absv500','wspd300','wspd10','gust',
- 'shear01','shear06','srh01','srh03','sbcape','mlcape','mucape','mxuphl','mxuphl_run','scp','stp','stp_fixed'
+ 'shear01','shear06','srh01','srh03','sbcape','mlcape','mucape','mxuphl','mxuphl_run'
 ];
 // Menu choices describe what this viewer can render; the catalogs decide what
 // each model and forecast hour can actually provide. Keep the two independent.
@@ -133,7 +129,7 @@ const FIELD_GROUP_DEFS = [
  {key:'snow',label:'Winter weather',fields:['snow1h','snow3h','snow6h','snow24h','snow48h','asnow','frzr','frozr','tsnowp','cpofp','weasd','snod','snowc','sden']},
  {key:'upperair',label:'Upper air',fields:['t925','t850','t700','absv500','wspd300']},
  {key:'shear',label:'Shear & helicity',fields:['shear01','shear06','srh01','srh03']},
- {key:'convective',label:'Instability & severe storms',fields:['sbcape','mlcape','mucape','mxuphl','mxuphl_run','scp','stp','stp_fixed']}
+ {key:'convective',label:'Instability & severe storms',fields:['sbcape','mlcape','mucape','mxuphl','mxuphl_run']}
 ];
 function fieldMenuGroups(){
  const menu=fieldMenuEntries(),byKey=new Map(menu.map(f=>[f.key,f]));
@@ -154,7 +150,7 @@ function fieldGroupFor(fieldKey){return FIELD_MENU_GROUPS.find(group=>group.fiel
 // 4 ice pellets (sleet), 5 mixed. Use one label table for hover and legends.
 const RADAR_REPORT_FIELDS=new Set(FIELD_GROUP_DEFS.find(g=>g.key==='radar').fields);
 const PTYPE_LABELS=['None / Unknown','Rain','Snow','Freezing Rain','Sleet','Mixed'];
-const PTYPE = ['#192939','#4bc86c','#55b2f0','#e75889','#b266d8','#f0c764'];
+const PTYPE = ['#192939','#209641','#51baff','#e75889','#b266d8','#f0c764'];
 // Public, preprocessed observation GeoJSON: no browser-side API tokens or proxy.
 const PTYPE_OBS_EMPTY={type:'FeatureCollection',features:[]};
 function obsValidDate(){return st.ref?new Date(Date.parse(st.ref.init_time)+st.hour*3600000):null;}
@@ -278,7 +274,7 @@ async function refreshObservationOverlay(){
 // Preliminary SPC reports in 12Z–12Z files; no remote API calls in the browser.
 const SPC_EMPTY={type:'FeatureCollection',features:[]};
 const SPC_COLORS={tornado:'#e63737',wind:'#2e80dc',hail:'#35b86b'};
-const SPC_FIELDS=new Set(['refc','refc_ptype','shear01','shear06','srh01','srh03','sbcape','mlcape','mucape','mxuphl','mxuphl_run','scp','stp','stp_fixed']);
+const SPC_FIELDS=new Set(['refc','refc_ptype','shear01','shear06','srh01','srh03','sbcape','mlcape','mucape','mxuphl','mxuphl_run']);
 function spcVisible(){return st.spcEnabled&&SPC_FIELDS.has(st.field);}
 function spcWindow(){
  if(!st.ref)return null;
@@ -466,8 +462,8 @@ async function refreshLightningReports(){
 /* OMD EVU autumnplot-gl + MapLibre GL viewer. Zarr-v2 decoding stays browser-native. */
 'use strict';
 const $=id=>document.getElementById(id);
-const el=Object.fromEntries(['userGuideBtn','userGuideDialog','userGuideClose','userGuideDone','imageOpacity','imageOpacityLabel','interpolateToggleBtn','spcControl','spcToggleBtn','spcCount','lightningControl','lightningToggleBtn','lightningLegend','lightningCount','obsControl','obsSynoptic','obsMping','obsCount','obsAttribution','contourOption','mslp850Option','mslp850ToggleBtn','exportKindFieldset','exportGifChoice','exportGifOptions','exportGifStart','exportGifStartLabel','exportGifEnd','exportGifEndLabel','exportGifStep','exportGifDelay','exportGifQuality','exportLargeLabels','exportScroll','exportGifDelayLabel','exportGifSummary','modelSetSelect','differenceDialog','differenceDialogPair','differenceOpenBtn','differenceCancelBtn','differenceWindow','differenceMap','differenceMessage','differenceDragHandle','differenceWindowTitle','differenceWindowSubtitle','differenceCloseBtn','differenceSaveBtn','differenceSample','differenceLegendUnit','contourControl','contourToggleBtn','heightOption','heightToggleBtn','windOption','windToggleBtn','fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportDialogHelp','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels','legendResetBtn','legendRangePopup','legendRangeForm','legendRangeMessage','legendRangeError','legendMinSlider','legendMaxSlider','legendMinNumber','legendMaxNumber','legendRangeApplyBtn','legendRangeResetBtn','legendCancelBtn'].map(x=>[x,$(x)]));
-const st={lightningEnabled:false,lightningCache:new Map(),lightningCurrent:null,lightningLoadToken:0,spcEnabled:false,spcCache:new Map(),spcCurrent:[],spcLoadToken:0,imageOpacity:1,interpolate:false,overlayMSLP:true,overlayMSLP850:true,cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,overlaySevereWind:true,difference:{selected:[],open:false,map:null,layer:null,component:null,grid:null,token:0,timer:null,resizeObserver:null,geo:null,fieldKey:null,snapshot:null,saveBusy:false,mouseSampling:false,liveCanvas:null,liveToken:0,liveTimer:null,outlineCache:null,warmKey:null,warmSerial:0},mrmsAccumCache:null,alignedAccumCache:null,alignedSource:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,lastFieldByGroup:new Map(),hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0,obsCache:new Map(),obsCurrent:null,obsLoadToken:0,obsEnabled:{synoptic:true,mping:true},colorRanges:new Map(),legendSelection:null};
+const el=Object.fromEntries(['userGuideBtn','userGuideDialog','userGuideClose','userGuideDone','imageOpacity','imageOpacityLabel','interpolateToggleBtn','spcControl','spcToggleBtn','spcCount','lightningControl','lightningToggleBtn','lightningLegend','lightningCount','obsControl','obsSynoptic','obsMping','obsCount','obsAttribution','contourOption','mslp850Option','mslp850ToggleBtn','exportKindFieldset','exportGifChoice','exportGifOptions','exportGifStart','exportGifStartLabel','exportGifEnd','exportGifEndLabel','exportGifStep','exportGifDelay','exportGifQuality','exportLargeLabels','exportScroll','exportGifDelayLabel','exportGifSummary','modelSetSelect','differenceDialog','differenceDialogPair','differenceOpenBtn','differenceCancelBtn','differenceWindow','differenceMap','differenceMessage','differenceDragHandle','differenceWindowTitle','differenceWindowSubtitle','differenceCloseBtn','differenceSaveBtn','differenceSample','differenceLegendUnit','overlayStyleDialog','overlayStyleHeading','overlayStyleColor','overlayStyleWidth','overlayStyleWidthValue','overlayStyleClose','overlayStyleReset','overlayStyleDone','mapOutlinesToggleBtn','mapBackgroundToggleBtn','contourControl','contourToggleBtn','heightOption','heightToggleBtn','windOption','windToggleBtn','fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportDialogHelp','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels','differenceSharedLegend','differenceSharedLegendTitle','differenceSharedLegendCanvas','differenceSharedLegendLabels','legendResetBtn','legendRangePopup','legendRangeForm','legendRangeMessage','legendRangeError','legendMinSlider','legendMaxSlider','legendMinNumber','legendMaxNumber','legendRangeApplyBtn','legendRangeResetBtn','legendCancelBtn'].map(x=>[x,$(x)]));
+const st={mapOutlines:true,mapBackground:true,overlayStyles:{},mapOutlineFieldStyles:{},lightningEnabled:false,lightningCache:new Map(),lightningCurrent:null,lightningLoadToken:0,spcEnabled:false,spcCache:new Map(),spcCurrent:[],spcLoadToken:0,imageOpacity:1,interpolate:false,overlayMSLP:true,overlayMSLP850:true,cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,overlaySevereWind:true,difference:{selected:[],open:false,map:null,layer:null,component:null,grid:null,token:0,timer:null,resizeObserver:null,geo:null,fieldKey:null,snapshot:null,saveBusy:false,mouseSampling:false,liveCanvas:null,liveToken:0,liveTimer:null,outlineCache:null,warmKey:null,warmSerial:0},mrmsAccumCache:null,alignedAccumCache:null,alignedSource:null,geoCache:new Map(),geoInflight:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,lastFieldByGroup:new Map(),hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0,obsCache:new Map(),obsCurrent:null,obsLoadToken:0,obsEnabled:{synoptic:true,mping:true},colorRanges:new Map(),legendSelection:null};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -600,9 +596,41 @@ function fieldInfo(v,requested=st.field,sourceModel=''){
  return {...meta,colors,fraction:meta.fraction||!!meta.copyColors&&!!FIELDS[meta.copyColors].fraction,
   ensembleMeanFraction:meanFraction,label,unit:meanFraction?'fraction':meta.unit};
 }
+// Fixed display-unit deadbands; independent of forecast lead and model run.
+// The original signed data are never changed; only pixels near zero are masked.
+const DIFFERENCE_NEUTRAL_BY_FIELD={
+ mslp:2,t2m:3,dpt2m:3,t925:1.5,t850:1.5,t700:1.5,
+ rh2m:6,wspd10:5,wspd300:5,gust:6,apcp:.15,apcp1h:.08,apcp3h:.12,
+ apcp6h:.2,apcp24h:.35,apcp48h:.5,prate:.08,asnow:1,snod:1,
+ shear01:4,shear06:5,srh01:30,srh03:40,absv500:2,
+ sbcape:100,mlcape:100,mucape:100
+};
+function differenceNeutralThreshold(field,range){
+ const value=DIFFERENCE_NEUTRAL_BY_FIELD[field];
+ return Math.min(range*.45,Number.isFinite(value)?value:range*.10);
+}
+// Precomputed GFS comparison grids contain signed deltas, not absolute
+// meteorological quantities. Give them a symmetric diverging color scale.
+function panelFieldInfo(p,v){
+ const base=fieldInfo(v,p?.cfg?.field||st.field,p?.ds?.model||p?.cfg?.source);
+ if(!p?.cfg?.differencePanel)return base;
+ const ranges={mslp:15,t2m:15,dpt2m:15,t925:10,t850:10,t700:10,
+  rh2m:30,wspd10:25,wspd300:25,gust:30,apcp:3,asnow:12,
+  prate:1,sbcape:1200,mlcape:1200,mucape:1200,absv500:15,
+  shear01:25,shear06:30,srh01:200,srh03:300};
+ const range=ranges[st.field]||20;
+ return {...base,differenceField:true,label:base.label+' difference',
+  convert:base.convert==='F'?'deltaF':base.convert==='C'?'deltaC':base.convert,
+  min:-range,max:range,fraction:false,ensembleMeanFraction:false,levels:undefined,bandColors:undefined,category:undefined,
+  // Use chromatic, extremely pale blue/red next to physical zero rather
+  // than a neutral gray center. The true near-zero band is transparent.
+  colors:[[-range,'#244b99'],[-range*.5,'#7ca4dd'],[-range*.08,'#e9f3ff'],
+          [0,'#ffffff'],[range*.08,'#fff0ea'],
+          [range*.5,'#e99483'],[range,'#b52332']],clearZero:differenceNeutralThreshold(st.field,range),cutoff:undefined};
+}
 // A raw Zarr chunk is converted ONCE into the display units used by the GPU
 // field, its color map and its hover readout. Never convert sampled GPU values.
-function convert(x,m){switch(m.convert){case 'F':return(x-273.15)*1.8+32;case 'C':return x-273.15;case 'mmtoin':return x/25.4;case 'mtoin':return x*39.37007874;case 'rateToInHr':return x*3600/25.4;case 'mpsToKt':return x*1.9438444924406;case 'vort1e5':return x*1e5;case 'PaToHpa':return x/100;default:return x;}}
+function convert(x,m){switch(m.convert){case 'F':return(x-273.15)*1.8+32;case 'deltaF':return x*1.8;case 'C':return x-273.15;case 'deltaC':return x;case 'mmtoin':return x/25.4;case 'mtoin':return x*39.37007874;case 'rateToInHr':return x*3600/25.4;case 'mpsToKt':return x*1.9438444924406;case 'vort1e5':return x*1e5;case 'PaToHpa':return x/100;default:return x;}}
 function formatReadout(x,m){
  if(!Number.isFinite(x)||x < -1e9)return '—';
  if(m.ptypeReflectivity){
@@ -639,17 +667,165 @@ function layout(){
  // MapLibre must never resize a temporarily hidden panel to 0 x 0.
  for(const p of st.panels){if(p.map&&(!st.expandedPanel||st.expandedPanel===p))p.map.resize();}
 }
-// Two-tone geographic ink: a thin contrasting casing keeps the political and
-// coastal lines visible against BOTH bright and dark model color ramps.
-// Unlike the heavier export pass, these live widths stay deliberately subtle.
+// Live geography uses a single clean outline stroke. Export geography retains
+// its existing two-tone casing; do not modify export rendering.
+const STYLE_LAYERS=['mapOutlines','mapBackground','contours','wind','height','temperature'];
+const OVERLAY_STYLE_DEFAULTS={mapOutlines:'#f4f8fc',mapBackground:'#0b2238',contours:'#ffffff',wind:'#102538',height:'#102538',temperature:'#ffffff'};
+// Map-outline overrides belong to the displayed model set and meteorological
+// field, not to all plots. Fields without an override retain adaptive ink.
+function outlineStyleKey(){return String(st.modelSet||'rrfs')+'|'+String(st.field||'');}
+function overlayStyle(layer){return layer==='mapOutlines'
+ ?(st.mapOutlineFieldStyles[outlineStyleKey()]||{color:null,width:1})
+ :(st.overlayStyles[layer]||{color:null,width:1});}
+function overlayStrokeWidth(layer,base){return base*Math.max(.5,Math.min(4,Number(overlayStyle(layer).width)||1));}
+function overlayStrokeColor(layer,fallback){return /^#[0-9a-f]{6}$/i.test(overlayStyle(layer).color||'')?overlayStyle(layer).color:fallback;}
+function mapBackgroundPaint(){
+ if(!st.mapBackground)return st.theme==='dark'?'#ffffff':'#000000';
+ return overlayStrokeColor('mapBackground',themeColors().ocean);
+}
+function updateMapBackground(){
+ const background=mapBackgroundPaint(),on=st.mapBackground;
+ for(const p of [...st.active,...(st.difference.open&&st.difference.map?[{map:st.difference.map}]:[])]){
+  const m=p.map;if(!m?.setPaintProperty)continue;
+  for(const [id,property,value] of [['background','background-color',background],['land-fill','fill-color',on?overlayStrokeColor('mapBackground',themeColors().land):background],
+    ['land-detail-mask','fill-color',background],['land-detail-fill','fill-color',on?overlayStrokeColor('mapBackground',themeColors().land):background],['lakes-detail-fill','fill-color',background]]){
+   try{if(m.getLayer(id))m.setPaintProperty(id,property,value);}catch(_){}
+  }
+ }
+}
+function redrawStyledOverlays(){
+ updateMapBackground();updateLiveGeography();
+ for(const p of st.panels){scheduleContourRedraw(p);scheduleWindRedraw(p);}
+ if(st.difference.open){st.difference.outlineCache=null;scheduleDifferenceLiveRender();}
+}
+function readOverlayPreferences(){
+ try{
+  st.mapOutlines=localStorage.getItem('omd_evu_map_outlines')!=='0';
+  st.mapBackground=localStorage.getItem('omd_evu_map_background')!=='0';
+  const scoped=JSON.parse(localStorage.getItem('omd_evu_outline_field_styles')||'{}');
+  if(scoped&&typeof scoped==='object')for(const [key,item] of Object.entries(scoped)){
+   if(!/^[-a-zA-Z0-9_|]+$/.test(key)||!item||typeof item!=='object')continue;
+   st.mapOutlineFieldStyles[key]={color:/^#[0-9a-f]{6}$/i.test(item.color||'')?item.color:null,
+    width:Number.isFinite(Number(item.width))?Math.max(.5,Math.min(4,Number(item.width))):1};
+  }
+  const saved=JSON.parse(localStorage.getItem('omd_evu_overlay_styles')||'{}');
+  if(saved&&typeof saved==='object')for(const layer of STYLE_LAYERS){
+   if(layer==='mapOutlines')continue; // Old global overrides must not leak across fields.
+   const item=saved[layer];if(!item||typeof item!=='object')continue;
+   const color=/^#[0-9a-f]{6}$/i.test(item.color||'')?item.color:null;
+   const width=Number(item.width);
+   st.overlayStyles[layer]={color,width:Number.isFinite(width)?Math.max(.5,Math.min(4,width)):1};
+  }
+ }catch(_){}
+ el.mapOutlinesToggleBtn.checked=st.mapOutlines;el.mapBackgroundToggleBtn.checked=st.mapBackground;
+}
+function storeOverlayPreferences(){
+ try{
+  localStorage.setItem('omd_evu_map_outlines',st.mapOutlines?'1':'0');
+  localStorage.setItem('omd_evu_map_background',st.mapBackground?'1':'0');
+  localStorage.setItem('omd_evu_overlay_styles',JSON.stringify(st.overlayStyles));
+  localStorage.setItem('omd_evu_outline_field_styles',JSON.stringify(st.mapOutlineFieldStyles));
+ }catch(_){}
+}
+function setupOverlayStyleControls(){
+ readOverlayPreferences();
+ for(const [id,key] of [['mapOutlinesToggleBtn','mapOutlines'],['mapBackgroundToggleBtn','mapBackground']])
+  el[id].addEventListener('change',()=>{st[key]=el[id].checked;storeOverlayPreferences();redrawStyledOverlays();});
+ const dialog=el.overlayStyleDialog,color=el.overlayStyleColor,width=el.overlayStyleWidth;
+ let active=null;
+ const refresh=()=>{
+  if(!active)return;
+  const target=active==='mapOutlines'?st.mapOutlineFieldStyles:st.overlayStyles;
+  target[active==='mapOutlines'?outlineStyleKey():active]={color:color.value,width:Number(width.value)};
+  el.overlayStyleWidthValue.textContent=Number(width.value).toFixed(1)+'×';
+  storeOverlayPreferences();redrawStyledOverlays();
+ };
+ for(const box of document.querySelectorAll('[data-style-layer]')){
+  box.addEventListener('contextmenu',event=>{
+   event.preventDefault();event.stopPropagation();active=box.dataset.styleLayer;
+   const saved=overlayStyle(active);
+   const defaultColor=active==='mapOutlines'?liveGeographyInk().line:
+     active==='mapBackground'?mapBackgroundPaint():OVERLAY_STYLE_DEFAULTS[active];
+   color.value=saved.color||defaultColor;
+   width.value=String(saved.width||1);
+   el.overlayStyleWidthValue.textContent=Number(width.value).toFixed(1)+'×';
+   el.overlayStyleHeading.textContent=box.querySelector('span')?.textContent+' appearance';
+   if(!dialog.open)dialog.showModal();
+  });
+ }
+ color.addEventListener('input',refresh);width.addEventListener('input',refresh);
+ el.overlayStyleReset.addEventListener('click',()=>{
+  if(!active)return;
+  if(active==='mapOutlines')delete st.mapOutlineFieldStyles[outlineStyleKey()];
+  else delete st.overlayStyles[active];
+  color.value=active==='mapOutlines'?liveGeographyInk().line:active==='mapBackground'?themeColors().ocean:OVERLAY_STYLE_DEFAULTS[active];
+  width.value='1';el.overlayStyleWidthValue.textContent='1.0×';storeOverlayPreferences();redrawStyledOverlays();
+ });
+ el.overlayStyleClose.onclick=()=>dialog.close();el.overlayStyleDone.onclick=()=>dialog.close();
+ dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
+}
 function themeColors(){return st.theme==='light'
- ?{ocean:'#d6e6ee',land:'#e8eee5',line:'#283d4b',minor:'#465d6c',boundaryCasing:'#f6faff',grid:'#97a6b0'}
+ ?{ocean:'#ffffff',land:'#ffffff',line:'#283d4b',minor:'#465d6c',boundaryCasing:'#ffffff',grid:'#97a6b0'}
  :{ocean:'#0b2238',land:'#1d3541',line:'#e5eff3',minor:'#c0d2dc',boundaryCasing:'#0c1a28',grid:'#3c6474'};}
+// Live geography on continuous fields: avoid bright white/black double-strokes.
+// Intermittent fields keep the established high-contrast casing for visibility.
+const INTERMITTENT_FIELDS=new Set(['refc','refc_ptype','ptype','crain','csnow','cicep','cfrzr',
+ 'prate','apcp','apcp1h','apcp3h','apcp6h','apcp24h','apcp48h',
+ 'snow1h','snow3h','snow6h','snow24h','snow48h','asnow',
+ 'frzr','frozr','tsnowp','weasd','snod','snowc','cpofp','mxuphl','mxuphl_run']);
+// Choose live boundary ink from the selected field's actual palette rather than
+// assuming that every continuous weather field has a dark or light background.
+// A contrasting two-tone stroke remains legible over either half of a diverging
+// palette; unlike export styling these widths remain appropriate for live maps.
+function paletteContrastColors(p=null){
+ const difference=!!p?.cfg?.differencePanel;
+ const requested=st.field,meta=FIELDS[requested]||{};
+ // Use the actual field's documented colorbar stops (not the geographic
+ // background). Difference panels have a separate, signed colorbar.
+ const colors=difference?['#244b99','#7ca4dd','#e9f3ff','#fff0ea','#e99483','#b52332']:
+  meta.bandColors||meta.colors?.map(stop=>Array.isArray(stop)?stop[1]:stop)||
+  (meta.copyColors?FIELDS[meta.copyColors]?.colors?.map(stop=>stop[1]):null)||[];
+ const luminosity=hex=>{
+  if(typeof hex!=='string'||!/^#[0-9a-f]{6}$/i.test(hex))return null;
+  const channels=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255)
+   .map(t=>t<=.04045?t/12.92:((t+.055)/1.055)**2.4);
+  return .2126*channels[0]+.7152*channels[1]+.0722*channels[2];
+ };
+ const luminances=colors.map(luminosity).filter(x=>x!==null);
+ const darkFraction=luminances.length?luminances.filter(x=>x<.24).length/luminances.length:.5;
+ return darkFraction>=.5
+  ?{line:'#f9fbf5',minor:'#eff5ef',boundaryCasing:'#0a2433'}
+  :{line:'#102836',minor:'#173b4c',boundaryCasing:'#f7fbf8'};
+}
+function liveGeographyInk(p=null){
+ const standard=themeColors();
+ if(st.theme!=='dark'||INTERMITTENT_FIELDS.has(st.field))return {...standard,casingOpacity:.87,minorCasingOpacity:.7};
+ const colors=paletteContrastColors(p);
+ return {...standard,...colors,casingOpacity:.83,minorCasingOpacity:.73};
+}
+function updateLiveGeography(){
+ for(const p of [...(st.active||[]),...(st.difference.open&&st.difference.map?[{map:st.difference.map,cfg:{differencePanel:true}}]:[])]){
+  const ink=liveGeographyInk(p),m=p.map;if(!m?.setPaintProperty)continue;
+  for(const id of ['coast','coast-detail','country','country-detail','states','counties']){
+   const minor=id==='states'||id==='counties';
+   try{if(m.getLayer(id)){
+    m.setPaintProperty(id,'line-color',(typeof overlayStrokeColor==='function'?overlayStrokeColor('mapOutlines',minor?ink.minor:ink.line):minor?ink.minor:ink.line));
+    m.setPaintProperty(id,'line-opacity',st.mapOutlines?(minor?.95:.97):0);
+    m.setPaintProperty(id,'line-width',overlayStrokeWidth('mapOutlines',minor?(id==='counties'?.73:.94):(id.endsWith('detail')?1.14:1.12)));
+   }}catch(_){}
+   try{if(m.getLayer(id+'-casing')){
+    // Disable only the LIVE MapLibre casing; export canvases keep their
+    // original two-stroke outlines and do not depend on this layer's opacity.
+    m.setPaintProperty(id+'-casing','line-opacity',0);
+   }}catch(_){}
+  }
+ }
+}
 function mapStyle(){
  // MapLibre must finish startup before asking its web workers to parse GeoJSON.
  // A true source-free style also makes map failures distinguishable from slow geography.
  const c=themeColors();
- return {version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':c.ocean}}]};
+ return {version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':mapBackgroundPaint()}}]};
 }
 // Same visibility threshold for county lines and high-detail shorelines/borders.
 // High-detail basemap is now used at every zoom; counties retain their own threshold.
@@ -681,31 +857,31 @@ function detailMaskData(){
  return {type:'FeatureCollection',features:[{type:'Feature',properties:{},geometry:{type:'Polygon',coordinates:[ring]}}]};
 }
 function addGeographySkeleton(m){
- const c=themeColors(),empty=()=>({type:'geojson',data:{type:'FeatureCollection',features:[]}}),detail=detailThreshold();
+ const c=liveGeographyInk(),empty=()=>({type:'geojson',data:{type:'FeatureCollection',features:[]}}),detail=detailThreshold();
  const line=(id,source,color,width,opacity=.9)=>({id,type:'line',source,paint:{'line-color':color,'line-width':width,'line-opacity':opacity}});
  for(const key of ['land','coast','country','states','counties','land_detail','lakes_detail','coast_detail','country_detail'])
   if(!m.getSource(key))m.addSource(key,empty());
  if(!m.getSource('detail-mask'))m.addSource('detail-mask',{type:'geojson',data:detailMaskData()});
  const layers=[
-  {id:'land-fill',type:'fill',source:'land',paint:{'fill-color':c.land,'fill-opacity':1}},
+  {id:'land-fill',type:'fill',source:'land',paint:{'fill-color':st.mapBackground!==false&&typeof overlayStrokeColor==='function'?overlayStrokeColor('mapBackground',c.land):(typeof mapBackgroundPaint==='function'?mapBackgroundPaint():c.land),'fill-opacity':1}},
   // Higher-resolution shoreline fills are enabled only after BOTH regional land
   // and lake polygons have arrived, avoiding partial/misleading basemap displays.
-  {id:'land-detail-mask',type:'fill',source:'detail-mask',minzoom:24,paint:{'fill-color':c.ocean,'fill-opacity':1}},
-  {id:'land-detail-fill',type:'fill',source:'land_detail',minzoom:24,paint:{'fill-color':c.land,'fill-opacity':1}},
-  {id:'lakes-detail-fill',type:'fill',source:'lakes_detail',minzoom:24,paint:{'fill-color':c.ocean,'fill-opacity':1}},
+  {id:'land-detail-mask',type:'fill',source:'detail-mask',minzoom:24,paint:{'fill-color':(typeof mapBackgroundPaint==='function'?mapBackgroundPaint():c.ocean),'fill-opacity':1}},
+  {id:'land-detail-fill',type:'fill',source:'land_detail',minzoom:24,paint:{'fill-color':st.mapBackground!==false&&typeof overlayStrokeColor==='function'?overlayStrokeColor('mapBackground',c.land):(typeof mapBackgroundPaint==='function'?mapBackgroundPaint():c.land),'fill-opacity':1}},
+  {id:'lakes-detail-fill',type:'fill',source:'lakes_detail',minzoom:24,paint:{'fill-color':(typeof mapBackgroundPaint==='function'?mapBackgroundPaint():c.ocean),'fill-opacity':1}},
   // Each casing is immediately BELOW its matching inner stroke but ABOVE the
   // raster. Both layers share one GeoJSON source, camera and zoom visibility.
-  line('coast-casing','coast',c.boundaryCasing,2.50,.87),
+  line('coast-casing','coast',c.boundaryCasing,2.50,0),
   line('coast','coast',c.line,1.17,.97),
-  {...line('coast-detail-casing','coast_detail',c.boundaryCasing,2.45,.87),minzoom:detail},
+  {...line('coast-detail-casing','coast_detail',c.boundaryCasing,2.45,0),minzoom:detail},
   {...line('coast-detail','coast_detail',c.line,1.14,.97),minzoom:detail},
-  line('country-casing','country',c.boundaryCasing,2.40,.87),
+  line('country-casing','country',c.boundaryCasing,2.40,0),
   line('country','country',c.line,1.09,.97),
-  {...line('country-detail-casing','country_detail',c.boundaryCasing,2.40,.87),minzoom:detail},
+  {...line('country-detail-casing','country_detail',c.boundaryCasing,2.40,0),minzoom:detail},
   {...line('country-detail','country_detail',c.line,1.09,.97),minzoom:detail},
-  line('states-casing','states',c.boundaryCasing,2.00,.83),
+  line('states-casing','states',c.boundaryCasing,2.00,0),
   line('states','states',c.minor,.94,.95),
-  {...line('counties-casing','counties',c.boundaryCasing,1.65,.66),minzoom:countyThreshold()},
+  {...line('counties-casing','counties',c.boundaryCasing,1.65,0),minzoom:countyThreshold()},
   {...line('counties','counties',c.minor,.73,.82),minzoom:countyThreshold()},
  ];
  for(const layer of layers)if(!m.getLayer(layer.id))m.addLayer(layer);
@@ -759,7 +935,7 @@ function createPanel(cfg,i){const card=document.createElement('section');card.cl
  scrollRail.addEventListener('click',e=>{e.stopPropagation();const next=st.panels[p.i+1]||st.panels[0];if(next&&next!==p)next.card.scrollIntoView({behavior:'smooth',block:'start'});});
  save.addEventListener('click',e=>{e.stopPropagation();openExportDialog('panel',p,e);});
  expand.addEventListener('click',e=>{e.stopPropagation();setExpandedPanel(st.expandedPanel===p?null:p);});
- compareCheck.addEventListener('change',()=>setDifferenceSelection(p,compareCheck.checked));
+ if(st.modelSet==='gfs-versions'){compareCheck.hidden=true;compare.hidden=true;}else compareCheck.addEventListener('change',()=>setDifferenceSelection(p,compareCheck.checked));
  if(cfg.placeholder){p.status='missing';card.classList.add('analysis-placeholder');p.title.textContent='Analysis · verifying data';p.sub.textContent='RAP F000 / MRMS · planned';setNote(p,cfg.placeholderText||'Verifying analysis data not yet available');}
  else setNote(p,'Waiting for catalog…');return p;
 }
@@ -816,6 +992,7 @@ function unionCycles(sources,preferredId){
    const key=cycleKey(ds.init_time);if(!key)continue;
    if(!merged.has(key))merged.set(key,{id:key,init_time:key,model:'',grid:null,variables:[],entries:[],sourceIds:[]});
    const c=merged.get(key);c.entries.push({source,ds});c.sourceIds.push(source.id);
+   if(ds.is_case===true)c.is_case=true;
   }
  }
  // Prefer the RRFS grid when available, otherwise whichever source is present.
@@ -830,8 +1007,10 @@ async function boot(){try{
  st.cfg=await json('config.json');
  const sets=st.cfg.modelSets||[{id:'rrfs-refs',label:'RRFS / REFS',enabled:true}];
  el.modelSetSelect.replaceChildren(...sets.map(set=>{const o=new Option(set.enabled===false?`${set.label} (coming soon)`:set.label,set.id);o.disabled=set.enabled===false;return o;}));
- el.modelSetSelect.value=st.cfg.defaultModelSet||'rrfs-refs';
- el.modelSetSelect.addEventListener('change',()=>{if(el.modelSetSelect.value!==(st.cfg.defaultModelSet||'rrfs-refs'))el.modelSetSelect.value=st.cfg.defaultModelSet||'rrfs-refs';});
+ st.modelSet=q.get('set')==='gfs-versions'?'gfs-versions':'rrfs-refs';
+ el.modelSetSelect.value=st.modelSet;
+ if(st.modelSet==='gfs-versions'){st.cfg.panels=st.cfg.gfsPanels;st.cfg.primarySource='gfs_v16';st.cfg.defaultField='mslp';st.cfg.defaultForecastHour=0;}
+ el.modelSetSelect.addEventListener('change',()=>{const url=new URL(location.href);url.searchParams.set('set',el.modelSetSelect.value);url.searchParams.delete('run');url.searchParams.delete('fhr');url.searchParams.delete('field');location.assign(url.href);});
  st.chunkStore=new CompressedZarrStore();void st.chunkStore.open();st.mode=(q.get('map')||st.cfg.display?.mapProjection)==='globe'?'globe':'lambert';el.mapViewSelect.value=st.mode;
  st.mapView=sharedCameraFromQuery();
  // A deep link supplies the camera for its chosen mode, but the alternate
@@ -863,7 +1042,7 @@ async function boot(){try{
   st.alignedSource={id:'aligned_analysis',url,datasets:cat.datasets};
  }catch(err){console.info('Aligned analysis not yet published:',err);}
 
- st.cycles=unionCycles(results,st.cfg.primarySource||'rrfs');
+ st.cycles=unionCycles(results.filter(src=>st.modelSet==='gfs-versions'?src.id==='gfs_v16'||src.id==='gfs_v17':!src.id.startsWith('gfs_')),st.cfg.primarySource||'rrfs');
  if(!st.cycles.length)throw Error('No model cycles found in any configured catalog');
  // Old shared URLs use dataset IDs (e.g. rrfs_20261008_0000). Accept those
  // as well as the new canonical UTC cycle key; no URL parameter -> latest.
@@ -876,7 +1055,11 @@ async function boot(){try{
  const menu=fieldMenuEntries(),ordered=menu.map(entry=>entry.key);
  st.field=ordered.includes(q.get('field'))?q.get('field'):ordered.includes(st.cfg.defaultField)?st.cfg.defaultField:ordered[0];
  initializeFieldMenu();
- el.cycleSelect.replaceChildren(...st.cycles.map(c=>new Option(fmt(c.init_time),c.id)));
+ el.cycleSelect.replaceChildren(...st.cycles.map(c=>{
+  const option=new Option(`${fmt(c.init_time)}${c.is_case?' • Case':''}`,c.id);
+  if(c.is_case){option.classList.add('case-cycle');option.style.color='#d1a0ff';option.style.fontWeight='700';}
+  return option;
+ }));
  const defaultDelay=Number(st.cfg?.display?.loopIntervalMs??850);
  st.loopSpeedIndex=LOOP_INTERVALS.reduce((best,ms,i)=>Math.abs(ms-defaultDelay)<Math.abs(LOOP_INTERVALS[best]-defaultDelay)?i:best,2);
  if(q.has('speed')){const idx=Number(q.get('speed'));if(Number.isInteger(idx)&&idx>=0&&idx<LOOP_INTERVALS.length)st.loopSpeedIndex=idx;}
@@ -1139,9 +1322,20 @@ function availableHours(){
  }
  return [...available].sort((a,b)=>a-b);
 }
-function refreshHours(){const vars=timelineVariables(),hours=Math.max(1,...vars.map(v=>v.shape?.[0]||0),...st.ref.entries.flatMap(({ds})=>(ds.variables||[]).map(v=>v.shape?.[0]||0)));const available=new Set(availableHours());el.fcstSelect.replaceChildren(...Array.from({length:hours},(_,i)=>new Option(`F${pad3(i)}${available.has(i)?'':' · missing'}`,i)));st.hour=Math.max(0,Math.min(hours-1,st.hour));}
+function forecastHourChoices(){
+ if(!st.ref)return [0];
+ const vars=timelineVariables();
+ const count=Math.max(1,...vars.map(v=>v.shape?.[0]||0),...st.ref.entries.flatMap(({ds})=>(ds.variables||[]).map(v=>v.shape?.[0]||0)));
+ const step=st.modelSet==='gfs-versions'?3:1;
+ return Array.from({length:Math.ceil(count/step)},(_,i)=>i*step);
+}
+function refreshHours(){
+ const hours=forecastHourChoices(),available=new Set(availableHours());
+ el.fcstSelect.replaceChildren(...hours.map(h=>new Option(`F${pad3(h)}${available.has(h)?'':' · missing'}`,h)));
+ if(!hours.includes(st.hour))st.hour=hours.reduce((best,h)=>Math.abs(h-st.hour)<Math.abs(best-st.hour)?h:best,hours[0]);
+}
 function syncUI(){
- updateContourControl();
+ updateContourControl();updateLiveGeography();
  syncFieldMenus();el.cycleSelect.value=st.ref.id;el.fcstSelect.value=String(st.hour);el.mapViewSelect.value=st.mode;
  try{const u=new URL(location.href);
   // An automatically chosen latest cycle is NOT pinned into the address bar:
@@ -1180,11 +1374,21 @@ function bind(){
   try{localStorage.setItem('omd_evu_image_opacity',String(st.imageOpacity));}catch(_){}
   for(const p of st.panels)p.lastKey=null;void renderAll();
  });
- let interpolationSaved=null;try{interpolationSaved=localStorage.getItem('omd_evu_interpolate');}catch(_){}
- st.interpolate=interpolationSaved==='1';el.interpolateToggleBtn.checked=st.interpolate;
+ // Model-set-specific defaults: GFS continuous fields start interpolated;
+ // RRFS/REFS retains its established off-by-default preference. A saved
+ // GFS choice always takes precedence, including an explicit user opt-out.
+ let interpolationSaved=null;
+ try{interpolationSaved=st.modelSet==='gfs-versions'
+   ?localStorage.getItem('omd_evu_interpolate_gfs')
+   :localStorage.getItem('omd_evu_interpolate');}catch(_){}
+ st.interpolate=st.modelSet==='gfs-versions' ? interpolationSaved!=='0' : interpolationSaved==='1';
+ el.interpolateToggleBtn.checked=st.interpolate;
  el.interpolateToggleBtn.addEventListener('change',()=>{
   st.interpolate=el.interpolateToggleBtn.checked;
-  try{localStorage.setItem('omd_evu_interpolate',st.interpolate?'1':'0');}catch(_){}
+  try{
+   if(st.modelSet==='gfs-versions')localStorage.setItem('omd_evu_interpolate_gfs',st.interpolate?'1':'0');
+   else localStorage.setItem('omd_evu_interpolate',st.interpolate?'1':'0');
+  }catch(_){}
   // Change the sampler parameters on the existing GPU textures directly.
   // Re-uploading the same field is unnecessary: WGLTexture.setImageData()
   // does not update TEXTURE_MAG_FILTER/TEXTURE_MIN_FILTER on an existing
@@ -1211,6 +1415,7 @@ function bind(){
  for(const id of ['userGuideClose','userGuideDone'])el[id].onclick=()=>el.userGuideDialog.close();
  el.userGuideBtn.onclick=()=>el.userGuideDialog.showModal();
  el.userGuideDialog.addEventListener('click',event=>{if(event.target===el.userGuideDialog)el.userGuideDialog.close();});
+ setupOverlayStyleControls();
  el.mapViewSelect.onchange=()=>switchProjection(el.mapViewSelect.value);
  el.contourToggleBtn.onchange=()=>{
   const mslp=st.field==='mslp';
@@ -1386,6 +1591,7 @@ function setTheme(theme,save){
    }
    if(m.getLayer?.('evu-observed-mping'))refreshMpingTriangleTheme(m);
  }
+ updateMapBackground();updateLiveGeography();
  // The live difference overlay is a canvas; refresh its ink on theme changes.
  if(st.difference.open&&st.difference.snapshot){st.difference.outlineCache=null;scheduleDifferenceLiveRender();}
  // Repaint already-open Skew-T and point-series canvases as well. Their
@@ -1494,11 +1700,19 @@ function choose(p,hourOverride=st.hour){const src=st.sources.get(p.cfg.source||s
    return{error:'48-hour snowfall analysis needs forecast lead F048 or later',ds:null};
   if((snowWindow||nohrscRunningSnow)&&(vt.getUTCHours()%6||(snowWindow>6&&vt.getUTCHours()%12)))
    return{error:`NOHRSC ${snowWindow}-hour snowfall analysis valid only at ${snowWindow===6?'00/06/12/18':'00/12'} UTC`,ds:null};
-  const requested=nohrscRunningSnow?'snow6h':field==='snowc'?'snowpresence':precipitationWindow?'apcp':field==='snow48h'?'snow24h':field;
+  const isPrecip=field==='apcp'||!!precipitationWindow;
+  const requested=nohrscRunningSnow?'snow6h':field==='snowc'?'snowpresence':isPrecip?'apcp':field==='snow48h'?'snow24h':field;
   const wanted=vt.toISOString();
-  const candidates=list.filter(d=>cycleKey(d.init_time)===wanted&&d.variables?.some(v=>v.name===requested&&v.available_hours?.includes(0))&&(!precipitationWindow||d.product==='mrms_apcp')&&(!nohrscRunningSnow||d.product==='nohrsc_6h'));
+  const candidates=list.filter(d=>cycleKey(d.init_time)===wanted&&d.variables?.some(v=>v.name===requested&&v.available_hours?.includes(0))&&(!nohrscRunningSnow||d.product==='nohrsc_6h'));
   const analysisRank=d=>d.product==='urma'?0:d.product==='rtma'?1:2;
-  ds=candidates.sort((a,b)=>analysisRank(a)-analysisRank(b))[0];
+  // Precipitation must come from ONE consistent source over the full
+  // accumulation window. Promote to Stage IV only when every hour exists;
+  // otherwise retain a complete MRMS interval, never a mixed grid/QPE.
+  if(isPrecip&&hourOverride>0){
+   const window=precipitationWindow||hourOverride;
+   const source=preferredPrecipitationSource(src,st.ref,hourOverride,window);
+   ds=candidates.find(d=>d.product===source);
+  }else ds=candidates.sort((a,b)=>analysisRank(a)-analysisRank(b))[0];
   if(snowWindow===48){
    if(!ds||ds.product!=='nohrsc_24h')return{error:`NOHRSC 48-hour snowfall needs 24-hour analysis ending at ${fmt(vt)}`,ds:null};
    const previous=nohrsc24hRecord(src,new Date(vt.getTime()-24*3600000));
@@ -1508,17 +1722,14 @@ function choose(p,hourOverride=st.hour){const src=st.sources.get(p.cfg.source||s
    const missing=missingNohrscRunningHours(src,st.ref,hourOverride);
    if(missing.length)return{error:`NOHRSC running snowfall unavailable: ${missing.length} missing 6-hour analyses since initialization; first ${missing[0]}`,ds:null};
   }
-  if(precipitationWindow&&ds){
-   const missing=missingMrmsIntervalHours(src,st.ref,hourOverride,precipitationWindow);
-   if(missing.length)return{error:`MRMS ${precipitationWindow}-hour precipitation unavailable: ${missing.length} missing hourly QPE input(s); first ${missing[0]}`,ds:null};
-  }
-  if(field==='apcp'&&ds?.product==='mrms_apcp'&&hourOverride>0){
-   const missing=missingMrmsHours(src,st.ref,hourOverride);
-   if(missing.length)return{error:`MRMS running total unavailable: missing ${missing.length} 1-hour QPE input(s); first ${missing[0]}`,ds:null};
+  if(isPrecip&&hourOverride>0&&!ds){
+   const window=precipitationWindow||hourOverride;
+   return{error:`Precipitation analysis unavailable: neither Stage IV nor MRMS has all ${window} required hours; missing hourly QPE input(s) ending ${fmt(vt)}. No partial or mixed-source total is shown.`,ds:null};
   }
   if(!ds)return{error:(snowWindow||nohrscRunningSnow)?`NOHRSC ${nohrscRunningSnow?'6-hour input for running':snowWindow+'-hour'} snowfall missing from browser analysis catalog for ${fmt(wanted)}. ${nohrscCatalogDetail(src,nohrscRunningSnow||snowWindow===6?'nohrsc_6h':'nohrsc_24h',wanted,requested)}`:`Analysis unavailable for ${fmt(wanted)} (${FIELDS[field]?.label||field}); source latency or no verifier`,ds:null};
   return{ds,v:ds.variables.find(v=>v.name===requested),h:0};
  }
+ if(p.cfg.timeMode==='gfs-analysis'){const at=cycleKey(valid(st.ref,hourOverride));ds=list.find(d=>cycleKey(d.init_time)===at);if(!ds)return{error:`GFSv16 F000 analysis missing from published catalog at ${fmt(valid(st.ref,hourOverride))} (available only at matching 00/06/12/18 UTC cycles)`};const v=ds.variables.find(x=>x.name===field);if(!v||!v.available_hours?.includes(0))return{error:`GFSv16 F000 ${field} not published for ${fmt(valid(st.ref,hourOverride))}`};return{ds,v,h:0};}
  if(mode==='latest')ds=list[0];else if(mode==='nearest')ds=list.slice().sort((a,b)=>Math.abs(Date.parse(a.init_time)-Date.parse(st.ref.init_time))-Math.abs(Date.parse(b.init_time)-Date.parse(st.ref.init_time)))[0];else if(mode==='selected')ds=list.find(d=>cycleKey(d.init_time)===st.ref.id);else ds=list.find(d=>d.id===mode);
  if(!ds)return{error:`No matching cycle for ${fmt(st.ref.init_time)}`};if(p.cfg.runOffset){ds=list[list.indexOf(ds)+Number(p.cfg.runOffset)];if(!ds)return{error:'Cycle offset unavailable'};}
  const storedName=field==='refc_ptype'?'refc':snowWindow?'asnow':precipitationWindow?'apcp':field;
@@ -2000,9 +2211,9 @@ async function activateInternal(p,source){
  catch(e){if(/Map initialization was canceled/.test(String(e?.message||e)))return;throw e;}
  if(!m||p.map!==m)return;
  p._used=++st.clock;
- await renderPanel(p,st.seq);scheduleDifferenceRefresh();
+ await renderPanel(p,st.seq);updateMapBackground();updateLiveGeography();scheduleDifferenceRefresh();
 }
-async function renderAll(){window.EVUPointInspector?.scheduleSoundingRefresh();void refreshObservationOverlay();void refreshSPCReports();void refreshLightningReports();if(st.prefetchContext!==null&&st.prefetchContext!==prefetchContextKey())cancelQueuedPrefetches();st.seq++;invalidateDifferenceForViewChange();st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateStatus();schedulePrefetch();scheduleDifferenceRefresh();}}
+async function renderAll(){window.EVUPointInspector?.scheduleSoundingRefresh();void refreshObservationOverlay();void refreshSPCReports();void refreshLightningReports();if(st.prefetchContext!==null&&st.prefetchContext!==prefetchContextKey())cancelQueuedPrefetches();st.seq++;invalidateDifferenceForViewChange();st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateMapBackground();updateLiveGeography();updateStatus();schedulePrefetch();scheduleDifferenceRefresh();}}
 // The compressed-byte store is optional. CacheStorage is available under HTTPS
 // (or localhost), survives browser reloads, and holds many forecast hours without
 // filling the decoded GPU-data caches. Missing/quota-restricted storage simply
@@ -2227,10 +2438,30 @@ async function getDisplayData(src,ds,v,h,m,onProgress){
 // Model fields are cycle-to-date; MRMS QPE is an exact one-hour interval.
 function precipitationAccumulationHours(field){const match=/^apcp(1|3|6|24|48)h$/.exec(field||'');return match?Number(match[1]):0;}
 function snowAccumulationHours(field){const match=/^snow(1|3|6|24|48)h$/.exec(field||'');return match?Number(match[1]):0;}
-function mrmsHourlyRecord(src,instant){
+function precipitationHourlyRecord(src,instant,product){
  const key=new Date(instant).toISOString();
- return src?.datasets?.find(ds=>ds.product==='mrms_apcp'&&cycleKey(ds.init_time)===key&&
-   ds.variables?.some(v=>v.name==='apcp'&&v.available_hours.includes(0)));
+ return src?.datasets?.find(ds=>ds.product===product&&cycleKey(ds.init_time)===key&&
+   ds.variables?.some(v=>v.name==='apcp'&&v.available_hours?.includes(0)));
+}
+function mrmsHourlyRecord(src,instant){return precipitationHourlyRecord(src,instant,'mrms_apcp');}
+function precipitationSourceLabel(product){return product==='stageiv_apcp'?'Stage IV':'MRMS';}
+function missingPrecipitationHours(src,ref,lead,window,product){
+ const missing=[];let grid=null;
+ for(let hr=Math.max(1,lead-window+1);hr<=lead;hr++){
+  const record=precipitationHourlyRecord(src,valid(ref,hr),product);
+  const variable=record?.variables.find(v=>v.name==='apcp');
+  if(!record||!variable){missing.push(fmt(valid(ref,hr)));continue;}
+  const signature=accumulationGridKey(record,variable);
+  if(grid!==null&&grid!==signature)missing.push(fmt(valid(ref,hr))+' (grid mismatch)');
+  if(grid===null)grid=signature;
+ }
+ return missing;
+}
+function preferredPrecipitationSource(src,ref,lead,window){
+ for(const product of ['stageiv_apcp','mrms_apcp']){
+  if(!missingPrecipitationHours(src,ref,lead,window,product).length)return product;
+ }
+ return null;
 }
 // NOHRSC has native 6-h and 24-h products only. The 48-hour analysis is
 // built from exactly two non-overlapping 24-hour fields, valid 24 hours apart.
@@ -2306,30 +2537,26 @@ async function nohrsc48hTotal(p,ds,v,m,onProgress,seq){
  return sumSnowAnalysisArrays(current,earlier);
 }
 function missingMrmsIntervalHours(src,ref,lead,window){
- const missing=[];
- for(let hr=Math.max(1,lead-window+1);hr<=lead;hr++){
-  if(!mrmsHourlyRecord(src,valid(ref,hr)))missing.push(fmt(valid(ref,hr)));
- }
- return missing;
+ return missingPrecipitationHours(src,ref,lead,window,'mrms_apcp');
 }
 function missingMrmsHours(src,ref,lead){return missingMrmsIntervalHours(src,ref,lead,lead);}
 function accumulationGridKey(ds,v){return JSON.stringify([ds.grid,v.shape.slice(1)]);}
 async function mrmsWindowTotal(p,ds,v,lead,window,m,onProgress,seq){
- if(lead<window)throw Error(`Need F${pad3(window)} or later for a complete ${window}-hour MRMS accumulation`);
- const src=p.src,reference=st.ref;
- const missing=missingMrmsIntervalHours(src,reference,lead,window);
- if(missing.length)throw Error(`MRMS ${window}-hour precipitation unavailable: missing ${missing.length} hourly QPE input(s); first ${missing[0]}`);
+ const src=p.src,reference=st.ref,product=ds.product,label=precipitationSourceLabel(product);
+ if(lead<window)throw Error(`Need F${pad3(window)} or later for a complete ${window}-hour ${label} accumulation`);
+ const missing=missingPrecipitationHours(src,reference,lead,window,product);
+ if(missing.length)throw Error(`${label} ${window}-hour precipitation unavailable: missing ${missing.length} hourly QPE input(s); first ${missing[0]}`);
  const n=v.shape[1]*v.shape[2],total=new Float32Array(n);
  for(let hour=lead-window+1;hour<=lead;hour++){
   if(seq!==st.seq)return null;
-  const record=mrmsHourlyRecord(src,valid(reference,hour));
+  const record=precipitationHourlyRecord(src,valid(reference,hour),product);
   const rv=record.variables.find(x=>x.name==='apcp');
   if(accumulationGridKey(record,rv)!==accumulationGridKey(ds,v))
-   throw Error(`MRMS ${window}-hour total unavailable: hourly grids differ at ${fmt(record.init_time)}`);
-  onProgress(`MRMS ${window}-h total: adding hour ${hour-lead+window} of ${window}…`);
+   throw Error(`${label} ${window}-hour total unavailable: hourly grids differ at ${fmt(record.init_time)}`);
+  onProgress(`${label} ${window}-h total: adding hour ${hour-lead+window} of ${window}…`);
   const values=await getDisplayData(src,record,rv,0,m,()=>{});
   if(seq!==st.seq)return null;
-  if(values.length!==n)throw Error('MRMS hourly precipitation grid shape mismatch');
+  if(values.length!==n)throw Error(`${label} hourly precipitation grid shape mismatch`);
   for(let i=0;i<n;i++){
    const a=total[i],b=values[i];
    total[i]=Number.isFinite(a)&&Number.isFinite(b)&&b>=0?a+b:NaN;
@@ -2338,10 +2565,10 @@ async function mrmsWindowTotal(p,ds,v,lead,window,m,onProgress,seq){
  return total;
 }
 async function mrmsRunningTotal(p,ds,v,lead,m,onProgress,seq){
- const src=p.src,reference=st.ref;
- const missing=missingMrmsHours(src,reference,lead);
- if(missing.length)throw Error(`MRMS running total unavailable: ${missing.length} hourly QPE input(s) missing; first ${missing[0]}. No partial sum shown.`);
- const key=String(src.url)+'|'+reference.init_time+'|'+accumulationGridKey(ds,v);
+ const src=p.src,reference=st.ref,product=ds.product,label=precipitationSourceLabel(product);
+ const missing=missingPrecipitationHours(src,reference,lead,lead,product);
+ if(missing.length)throw Error(`${label} running total unavailable: ${missing.length} hourly QPE input(s) missing; first ${missing[0]}. No partial sum shown.`);
+ const key=String(src.url)+'|'+product+'|'+reference.init_time+'|'+accumulationGridKey(ds,v);
  const previous=st.mrmsAccumCache;
  let total,from=0;
  if(previous?.key===key&&previous.upto<=lead){total=previous.data.slice();from=previous.upto;}
@@ -2349,14 +2576,14 @@ async function mrmsRunningTotal(p,ds,v,lead,m,onProgress,seq){
  if(lead===0)return total;
  for(let hour=from+1;hour<=lead;hour++){
   if(seq!==st.seq)return null;
-  const record=mrmsHourlyRecord(src,valid(reference,hour));
+  const record=precipitationHourlyRecord(src,valid(reference,hour),product);
   const rv=record.variables.find(x=>x.name==='apcp');
   if(accumulationGridKey(record,rv)!==accumulationGridKey(ds,v))
-   throw Error(`MRMS running total unavailable: hourly grids differ at ${fmt(record.init_time)}`);
-  onProgress(`MRMS total: adding hour ${hour} of ${lead}…`);
+   throw Error(`${label} running total unavailable: hourly grids differ at ${fmt(record.init_time)}`);
+  onProgress(`${label} total: adding hour ${hour} of ${lead}…`);
   const values=await getDisplayData(src,record,rv,0,m,()=>{});
   if(seq!==st.seq)return null;
-  if(values.length!==total.length)throw Error('MRMS hourly precipitation grid shape mismatch');
+  if(values.length!==total.length)throw Error(`${label} hourly precipitation grid shape mismatch`);
   for(let i=0;i<total.length;i++){
    const a=total[i],b=values[i];
    total[i]=(Number.isFinite(a)&&Number.isFinite(b)&&b>=0)?a+b:NaN;
@@ -2382,9 +2609,9 @@ async function getPanelDisplayData(p,ds,v,h,m,onProgress,seq){
   return nohrscRunningTotal(p,ds,v,m,onProgress,seq);
  if(st.field==='snow48h'&&p.cfg.timeMode==='analysis')
   return nohrsc48hTotal(p,ds,v,m,onProgress,seq);
- if(window&&p.cfg.timeMode==='analysis'&&ds.product==='mrms_apcp')
+ if(window&&p.cfg.timeMode==='analysis'&&['mrms_apcp','stageiv_apcp'].includes(ds.product))
   return mrmsWindowTotal(p,ds,v,st.hour,window,m,onProgress,seq);
- if(st.field==='apcp'&&p.cfg.timeMode==='analysis'&&ds.product==='mrms_apcp')
+ if(st.field==='apcp'&&p.cfg.timeMode==='analysis'&&['mrms_apcp','stageiv_apcp'].includes(ds.product))
   return mrmsRunningTotal(p,ds,v,st.hour,m,onProgress,seq);
  const current=await getDisplayData(p.src,ds,v,h,m,onProgress);
  if(st.field==='refc_ptype'){
@@ -2432,8 +2659,20 @@ async function chunk(src,ds,v,h,onProgress=()=>{},opts={}){
 }
 function gridFromDataset(ds,v){const g=ds.grid||{},[_,ny,nx]=v.shape;
  if(g.GRIB_gridType==='regular_ll'){
-  if(typeof apgl.PlateCarreeGrid!=='function')throw Error('This autumnplot-gl build lacks PlateCarreeGrid for MRMS. Update vendor/autumnplot-gl.js');
-  return new apgl.PlateCarreeGrid(nx,ny,Number(g.longitude_min),Number(g.latitude_min),Number(g.longitude_max),Number(g.latitude_max));
+  if(typeof apgl.PlateCarreeGrid!=='function')throw Error('This autumnplot-gl build lacks PlateCarreeGrid for regular latitude/longitude grids');
+  // Native GFS catalogs use GRIB_* bounds (0..360 longitude), whereas MRMS
+  // catalogs use longitude_min/max. The old MRMS-only lookup yielded NaNs
+  // for every GFS panel, so the GPU reported ready but drew nothing.
+  const coordinate=(plain,grib)=>Number(g[plain]??g['GRIB_'+grib]);
+  let west=coordinate('longitude_min','longitudeOfFirstGridPointInDegrees');
+  let east=coordinate('longitude_max','longitudeOfLastGridPointInDegrees');
+  const south=coordinate('latitude_min','latitudeOfFirstGridPointInDegrees');
+  const north=coordinate('latitude_max','latitudeOfLastGridPointInDegrees');
+  if(![west,east,south,north].every(Number.isFinite))throw Error('Missing regular lat/lon grid bounds in catalog');
+  // A global 0..360 grid needs consistent unwrapped longitudes to render
+  // in MapLibre's western-hemisphere Mercator world copy.
+  if(west>=0&&east>180){west-=360;east-=360;}
+  return new apgl.PlateCarreeGrid(nx,ny,west,south,east,north);
  }
  if(g.GRIB_gridType&&g.GRIB_gridType!=='lambert')throw Error('Unsupported geographic grid '+g.GRIB_gridType);
  const get=(name,alt)=>Number(g['GRIB_'+name]??alt);const a=Number(st.cfg.display.earthRadiusM||6371229);
@@ -2455,8 +2694,8 @@ function sampledColors(colors,n){
 // GPU without resampling two incompatible grids or smoothing across categories.
 // Each type owns an 80-dBZ band: [10,80) in class 1, [90,160) in class 2, etc.
 const REFC_PTYPE_SHADES=[
- ['#16482c','#40ba59','#f0d947','#e99b2d'], // rain: green -> yellow -> orange at high dBZ
- ['#163866','#3699db','#c3f3ff'], // snow, blue
+ ['#14532e','#209641','#f0d947','#e99b2d'], // rain: green -> yellow -> orange at high dBZ
+ ['#16467f','#51baff','#c3f3ff'], // snow, blue
  ['#62233e','#e64c83','#ffcadf'], // freezing rain, pink
  ['#3a245b','#a457d2','#edc6ff'], // ice pellets, violet
  ['#61451e','#cfa348','#fff0a1']  // mixed, yellow/amber
@@ -2580,7 +2819,7 @@ function clearZeroBand(p,threshold){
 }
 function pal(m,v){
  const base=basePal(m,v),opaqueBase=m.clearZero?makeZeroPaletteOpaque(base):base;
- const selected=adjustableColorbar(m)?st.colorRanges.get(st.field):null;
+ const selected=adjustableColorbar(m)&&!m.differenceField?st.colorRanges.get(st.field):null;
  let result=opaqueBase;
  if(selected){
   const {min,max}=paletteRange(opaqueBase);
@@ -2702,7 +2941,7 @@ function makeColormap(m,v){
  return new apgl.ColorMap(o.levels,o.colors.map(c=>imageColorAlpha(c,opacity)),
   {underflow_color:'#00000000',overflow_color:imageColorAlpha(o.colors.at(-1),opacity)});
 }
-function processedData(raw,m,v){const out=new Float32Array(raw.length);for(let i=0;i<out.length;i++){const x=raw[i];out[i]=Number.isFinite(x)&&Math.abs(x)<1e15?convert(x,m):-1e10;}return out;}
+function processedData(raw,m,v){const out=new Float32Array(raw.length);for(let i=0;i<out.length;i++){const x=raw[i];out[i]=Number.isFinite(x)&&x>-1e9&&Math.abs(x)<1e15?convert(x,m):-1e10;}return out;}
 // Conventional 10-m meteorological wind barbs (knots). The underlying vectors
 // are the native UGRD/VGRD 10-m Zarr chunks; no directional approximation.
 // Display density is based on map zoom, rather than source grid spacing.
@@ -2719,8 +2958,8 @@ function strokeBarb(ctx){
  // The wind field spans both dark and pale colors. Dark navy ink with a fine
  // light keyline stays legible without the thick white-looking old halo.
  const ink=st.theme==='dark'?'#061624':'#142839';
- ctx.strokeStyle='rgba(240,250,255,.76)';ctx.lineWidth=2.8;ctx.stroke();
- ctx.strokeStyle=ink;ctx.lineWidth=1.65;ctx.stroke();
+ ctx.strokeStyle='rgba(240,250,255,.76)';ctx.lineWidth=overlayStrokeWidth('wind',2.8);ctx.stroke();
+ ctx.strokeStyle=overlayStrokeColor('wind',ink);ctx.lineWidth=overlayStrokeWidth('wind',1.65);ctx.stroke();
 }
 function barbGeometry(ctx,x,y,dirX,dirY,speed,shaftLength){
  // Standard NWS/SPC-style, Northern Hemisphere wind-barb geometry.
@@ -2780,7 +3019,7 @@ function barbGeometry(ctx,x,y,dirX,dirY,speed,shaftLength){
  for(const triangle of pennants){
   ctx.beginPath();ctx.moveTo(...triangle[0]);ctx.lineTo(...triangle[1]);
   ctx.lineTo(...triangle[2]);ctx.closePath();
-  ctx.fillStyle=ink;ctx.fill();
+  ctx.fillStyle=overlayStrokeColor('wind',ink);ctx.fill();
   ctx.strokeStyle='rgba(240,250,255,.76)';ctx.lineWidth=2.5;ctx.stroke();
   ctx.strokeStyle=ink;ctx.lineWidth=.9;ctx.stroke();
  }
@@ -2812,8 +3051,7 @@ const CONTOUR_STEPS={
  // Base intervals are in display units and are thinned further for small maps.
  sbcape:[1000,500,250],mlcape:[1000,500,250],mucape:[1000,500,250],
  shear01:[20,10,5],shear06:[20,10,5],srh01:[100,50,25],srh03:[100,50,25],
- mxuphl:[100,50,25],mxuphl_run:[100,50,25],
- scp:[5,2,1],stp:[2,1,.5],stp_fixed:[2,1,.5]
+ mxuphl:[100,50,25],mxuphl_run:[100,50,25]
 };
 const CONTOUR_STANDARD_STEPS=[.25,.5,1,2,2.5,5,10,20,25,50,100,200,250,500,1000,2000];
 const CONTOUR_PRECIP=[.01,.05,.10,.25,.5,.75,1,1.5,2,3,4,5,7,10,15,20];
@@ -3026,6 +3264,8 @@ function contourLabelPosition(path,fraction){
  return null;
 }
 function drawContours(p,{field=p.contourField||p.rawField,key=p.cfg?.field||st.field,append=false,always=false,exportScale=1}={}){
+ // Difference panels never render meteorological contours, regardless of toggles or export.
+ if(p?.cfg?.differencePanel){clearContours(p);return;}
  const canvas=p.contourCanvas,map=p.map;
  if(!canvas||!map)return;
  const w=map.getContainer().clientWidth||map.getCanvas().clientWidth;
@@ -3093,6 +3333,7 @@ function drawContours(p,{field=p.contourField||p.rawField,key=p.cfg?.field||st.f
  // Heights: dark SOLID core with a pale halo, opposite to the
  // temperature/other shaded-field contours. The optional upper-air scalar
  // isolines use matching DASHED halo + core, so their styles cannot merge.
+ const styleLayer=heightContour?'height':plottedField==='t850'&&always?'temperature':'contours';
  const lineColors=(heightContour||isobarContour)
   ? ['rgba(255,255,255,.96)','rgba(11,24,38,.96)']
   : [st.theme==='dark'?'rgba(5,17,30,.94)':'rgba(255,255,255,.95)',
@@ -3101,7 +3342,7 @@ function drawContours(p,{field=p.contourField||p.rawField,key=p.cfg?.field||st.f
  ctx.save();
  ctx.setLineDash(dash);
  for(const [width,color] of ((heightContour||isobarContour)?[[4.8,lineColors[0]],[2.1,lineColors[1]]]:[[3.2,lineColors[0]],[1.35,lineColors[1]]])){
-  ctx.beginPath();ctx.lineWidth=width*strokeScale;ctx.strokeStyle=color;
+  ctx.beginPath();ctx.lineWidth=(typeof overlayStrokeWidth==='function'?overlayStrokeWidth(styleLayer,width*strokeScale):width*strokeScale);ctx.strokeStyle=(width===2.1||width===1.35)?(typeof overlayStrokeColor==='function'?overlayStrokeColor(styleLayer,color):color):color;
   for(const {paths} of all)for(const path of paths)strokeContourPath(ctx,path);
   ctx.stroke();
  }
@@ -3126,10 +3367,10 @@ function drawContours(p,{field=p.contourField||p.rawField,key=p.cfg?.field||st.f
    if(x<tw/2+8||x>w-tw/2-8||y<fontSize+7||y>h-fontSize-7)continue;
    if(used.some(v=>Math.hypot(x-v[0],y-v[1])<Math.max(84,tw+36)))continue;
    ctx.save();ctx.translate(x,y);ctx.rotate(angle);
-   ctx.lineWidth=3.6*(exportContours?Math.min(1.35,Math.sqrt(strokeScale)):1);ctx.lineJoin='round';
+   ctx.lineWidth=(typeof overlayStrokeWidth==='function'?overlayStrokeWidth(styleLayer,3.6):3.6)*(exportContours?Math.min(1.35,Math.sqrt(strokeScale)):1);ctx.lineJoin='round';
    ctx.strokeStyle=(heightContour||isobarContour)?'rgba(255,255,255,.98)':st.theme==='dark'?'rgba(5,17,30,.98)':'rgba(255,255,255,.98)';
    ctx.strokeText(label,0,0);
-   ctx.fillStyle=(heightContour||isobarContour)?'#0b1826':st.theme==='dark'?'#fff':'#102637';ctx.fillText(label,0,0);
+   ctx.fillStyle=(typeof overlayStrokeColor==='function'?overlayStrokeColor(styleLayer,(heightContour||isobarContour)?'#0b1826':st.theme==='dark'?'#fff':'#102637'):(heightContour||isobarContour)?'#0b1826':st.theme==='dark'?'#fff':'#102637');ctx.fillText(label,0,0);
    ctx.restore();used.push([x,y]);
    break; // One label per line before moving to the next geographic contour.
   }
@@ -3142,10 +3383,12 @@ function scheduleContourRedraw(p,settleMs=0){
  if(p.contourRedrawTimer!==null){clearTimeout(p.contourRedrawTimer);p.contourRedrawTimer=null;}
  if(p.contourRafId!==null){cancelAnimationFrame(p.contourRafId);p.contourRafId=null;}
  p.contourFrameRequested=false;
+ if(p.cfg?.differencePanel){clearContours(p);return;}
  const plottedField=p.cfg?.field||st.field;
- const canHeight=!!(overlayHeightVisible(plottedField)&&p.heightField);
- const alwaysMSLP=plottedField==='mslp'&&st.overlayMSLP;
- const mslp850=plottedField==='mslp'&&st.overlayMSLP850&&!!p.temperature850Field;
+ const differencePanel=!!p.cfg?.differencePanel;
+ const canHeight=!differencePanel&&!!(overlayHeightVisible(plottedField)&&p.heightField);
+ const alwaysMSLP=!differencePanel&&plottedField==='mslp'&&st.overlayMSLP;
+ const mslp850=!differencePanel&&plottedField==='mslp'&&st.overlayMSLP850&&!!p.temperature850Field;
  if((!st.contours&&!canHeight&&!alwaysMSLP&&!mslp850)||(!contoursAvailable(plottedField)&&!canHeight&&!alwaysMSLP&&!mslp850)||!p.rawField||p.status==='missing'||p.status==='error'){
   clearContours(p);return;
  }
@@ -3170,7 +3413,7 @@ function scheduleContourRedraw(p,settleMs=0){
    if(overlayHeightVisible(fieldName)&&heightKey&&p.heightField){
     drawContours(p,{field:p.heightField,key:heightKey,always:true});
     if(st.contours&&contoursAvailable(fieldName))drawContours(p,{field:p.contourField||p.rawField,key:fieldName,append:true});
-   }else if(fieldName==='mslp'){
+   }else if(fieldName==='mslp'&&!differencePanel){
     let drew=false;
     if(st.overlayMSLP){drawContours(p,{always:true});drew=true;}
     if(st.overlayMSLP850&&p.temperature850Field){drawContours(p,{field:p.temperature850Field,key:'t850',always:true,append:drew});drew=true;}
@@ -3196,7 +3439,7 @@ function drawWindBarbs(p,exportStyle=null){
  if(c.width!==cw)c.width=cw;if(c.height!==ch)c.height=ch;
  const ctx=c.getContext('2d');if(!ctx)return;
  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
- if(!p.wind||!windComponentNames(p.cfg?.field||st.field)||!overlayWindVisible(p.cfg?.field||st.field))return;
+ if(p.cfg?.differencePanel||!p.wind||!windComponentNames(p.cfg?.field||st.field)||!overlayWindVisible(p.cfg?.field||st.field))return;
  const {u,v}=p.wind;
  const zoom=m.getZoom();
  const spacing=exportStyle?.spacingPx>0?exportStyle.spacingPx:barbSpacing(zoom);
@@ -3263,7 +3506,7 @@ function heightVariableName(field){return field==='t925'?'h925':field==='t850'?'
 // catalog at the *same valid time*, even when analysis MSLP and RAP 850 hPa
 // reside in separate aligned-analysis products.
 async function prepareMSLP850Contours(p,ds,h,seq){
- if(!st.overlayMSLP850||!p.map||p.cfg?.field&&p.cfg.field!=='mslp'||st.field!=='mslp'||!ds)return;
+ if(p.cfg?.differencePanel||!st.overlayMSLP850||!p.map||p.cfg?.field&&p.cfg.field!=='mslp'||st.field!=='mslp'||!ds)return;
  const candidates=[ds,...(p.src?.datasets||[]).filter(d=>d!==ds)];
  const time=cycleKey(ds.init_time);
  const matching=candidates.find(d=>cycleKey(d.init_time)===time&&
@@ -3280,6 +3523,7 @@ async function prepareMSLP850Contours(p,ds,h,seq){
  }catch(e){console.warn('MSLP 850-hPa temperature overlay unavailable',e);}
 }
 function overlayPlotDescriptor(p){
+ if(p?.cfg?.differencePanel)return 'Difference shading';
  const field=p?.cfg?.field||st.field;
  if(field==='mslp'){
   const layers=['MSLP shading'];
@@ -3291,7 +3535,7 @@ function overlayPlotDescriptor(p){
  // overlays or animation redraw. The menu label is intentionally generic,
  // whereas HRRR/REFS Ptype and REFS Mean PMM products are not interchangeable.
  const meta=fieldInfo(p?.v||{name:field},field,p?.ds?.model||p?.cfg?.source);
- const parts=[meta.label];
+ const parts=[p?.ds?.product==='nohrsc_6h'&&field==='asnow'?'Accumulated snowfall':meta.label];
  if(heightVariableName(field)&&st.overlayHeight&&p?.heightField)parts.push('height');
  if(windComponentNames(field)&&overlayWindVisible(field)&&p?.wind)parts.push(field.startsWith('shear')?'shear barbs':field.startsWith('srh')?'right-mover barbs':'wind barbs');
  if(st.contours&&contoursAvailable(field))parts.push('shaded-field contours');
@@ -3303,7 +3547,7 @@ function updatePanelPlotTitle(p){
 }
 async function prepareHeightContours(p,ds,h,seq){
  const name=heightVariableName(p.cfg?.field||st.field);
- if(!name||!p.map)return;
+ if(p.cfg?.differencePanel||!name||!p.map)return;
  const v=ds.variables.find(v=>v.name===name&&v.available_hours.includes(h));
  if(!v)return;
  try{
@@ -3341,7 +3585,7 @@ function scaledShearField(data,scale){
 }
 async function prepareWindBarbs(p,ds,h,seq){
  const names=windComponentNames(p.cfg?.field||st.field);
- if(!p.map||!names)return;
+ if(!p.map||!names||p.cfg?.differencePanel)return;
  const u=ds.variables.find(v=>v.name===names[0]),v=ds.variables.find(v=>v.name===names[1]);
  if(!u||!v||!u.available_hours.includes(h)||!v.available_hours.includes(h))return;
  try{
@@ -3477,12 +3721,13 @@ function vorticityShadeData(p,ds,v,h,m,raw){
 function analysisDisplaySource(ds){
  const raw=String(ds?.product||ds?.model||'').trim();
  if(!raw)return 'Analysis';
- const known=/^(nohrsc|mrms|urma|rtma|rap)(?:[_-]|$)/i.exec(raw);
- return known?known[1].toUpperCase():raw.replace(/[_-]+/g,' ').toUpperCase();
+ const known=/^(stageiv|nohrsc|mrms|urma|rtma|rap)(?:[_-]|$)/i.exec(raw);
+ return known?(known[1]==='stageiv'?'Stage IV':known[1].toUpperCase()):raw.replace(/[_-]+/g,' ').toUpperCase();
 }
 function panelDisplayTitle(p,fieldDescription){
  if(p?.cfg?.timeMode==='analysis'){
   const source=analysisDisplaySource(p.ds);
+
   return source==='Analysis'?`Analysis · ${fieldDescription}`:`Analysis · ${source} · ${fieldDescription}`;
  }
  return `${String(p?.cfg?.label||p?.cfg?.id||'Panel')} · ${fieldDescription}`;
@@ -3522,9 +3767,9 @@ function installRasterInterpolation(component,p){
   return result;
  };
 }
-async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContours(p);p.heightField=null;p.rawField=null;p.contourField=null;p.temperature850Field=null;p.diffDisplayData=null;const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=panelDisplayTitle(p,fieldInfo(selected.v||{name:p.cfg.field||st.field},p.cfg.field||st.field,selected.ds?.model||p.cfg.source).label);p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?(p.cfg.timeMode==='analysis'?`Valid ${fmt(valid(selected.ds,selected.h))}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
+async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContours(p);p.heightField=null;p.rawField=null;p.contourField=null;p.temperature850Field=null;p.diffDisplayData=null;const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=panelDisplayTitle(p,st.field==='asnow'&&selected.ds?.product==='nohrsc_6h'?'Accumulated snowfall':fieldInfo(selected.v||{name:p.cfg.field||st.field},p.cfg.field||st.field,selected.ds?.model||p.cfg.source).label);p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?(p.cfg.timeMode==='analysis'?`Valid ${fmt(valid(selected.ds,selected.h))}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
  if(selected.error||!selected.v||!Number.isInteger(selected.h)||selected.h<0||selected.h>=selected.v.shape[0]||!selected.v.available_hours.includes(selected.h)){if(p.layer&&p.map?.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);p.layer=null;p.component=null;p.rawField=null;p.contourField=null;p.lastKey=null;p.status='missing';p.save.disabled=true;setNote(p,selected.error||`No ${selected.v.name} for F${pad3(selected.h)}`);legend(p,null);syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);updateStatus();if(st.difference.open&&st.difference.selected.includes(p))scheduleDifferenceRefresh();return;}
- const {ds,v,h}=selected,m=fieldInfo(v,st.field,ds?.model||p.cfg.source);p.status='loading';p.loadSince=Date.now();p.save.disabled=true;updateStatus();p.busy=true;
+ const {ds,v,h}=selected;const m=panelFieldInfo(p,v);p.status='loading';p.loadSince=Date.now();p.save.disabled=true;updateStatus();p.busy=true;
  // When this hour is cached, replace its texture silently: status overlays make
  // a smooth loop appear to flash even though nothing needs downloading.
  const rawUrl=new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',p.src.url)).href;
@@ -3539,7 +3784,7 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContou
  const modelPriorUrl=new URL(`${ds.path}/${v.name}/${priorHour}.0.0`,new URL('.',p.src.url)).href;
  const priorCached=!derivedModel||priorHour<=0||rawCached(modelPriorUrl);
  const priorHot=!derivedModel||priorHour<=0||st.cache.has(modelPriorUrl)||st.displayCache.has(displayKey(p.src,ds,v,priorHour,m));
- const mrmsCheckpoint=st.field==='apcp'&&derivedAnalysis&&st.mrmsAccumCache?.upto===st.hour&&st.mrmsAccumCache?.key===String(p.src.url)+'|'+st.ref.init_time+'|'+accumulationGridKey(ds,v);
+ const mrmsCheckpoint=st.field==='apcp'&&derivedAnalysis&&st.mrmsAccumCache?.upto===st.hour&&st.mrmsAccumCache?.key===String(p.src.url)+'|'+ds.product+'|'+st.ref.init_time+'|'+accumulationGridKey(ds,v);
  const ptypeVariable=st.field==='refc_ptype'?ds.variables.find(x=>x.name==='ptype'):null;
  const ptypeUrl=ptypeVariable?new URL(`${ds.path}/ptype/${h}.0.0`,new URL('.',p.src.url)).href:null;
  const ptypeWarm=!ptypeUrl||rawCached(ptypeUrl);
@@ -3588,7 +3833,7 @@ async function renderPanel(p,seq){if(!p.map)return;clearWindBarbs(p);clearContou
  finally{clearTimeout(deadline);}
  p.lastKey=signature;}
 
- p.rawField=rawField;p.contourField=/^snow(?:1h|3h|6h|24h|48h)$/.test(st.field)||st.field==='asnow'?rawField:field;p.diffDisplayData=data;scheduleContourRedraw(p);legend(p,m);if(windComponentNames(p.cfg?.field||st.field))await prepareWindBarbs(p,ds,h,seq);if(heightVariableName(p.cfg?.field||st.field))await prepareHeightContours(p,ds,h,seq);if(st.field==='mslp'&&st.overlayMSLP850)await prepareMSLP850Contours(p,ds,h,seq);updatePanelPlotTitle(p);await waitPaint(p.map);if(seq!==st.seq||!p.map||p.contextLost)return;
+ p.rawField=rawField;p.contourField=/^snow(?:1h|3h|6h|24h|48h)$/.test(st.field)||st.field==='asnow'?rawField:field;p.diffDisplayData=data;scheduleContourRedraw(p);legend(p,m);updateDifferenceSharedLegend();if(!p.cfg?.differencePanel&&windComponentNames(p.cfg?.field||st.field))await prepareWindBarbs(p,ds,h,seq);if(!p.cfg?.differencePanel&&heightVariableName(p.cfg?.field||st.field))await prepareHeightContours(p,ds,h,seq);if(!p.cfg?.differencePanel&&st.field==='mslp'&&st.overlayMSLP850)await prepareMSLP850Contours(p,ds,h,seq);updatePanelPlotTitle(p);await waitPaint(p.map);if(seq!==st.seq||!p.map||p.contextLost)return;
  // Reconcile all observation layers after asynchronous weather layer replacement.
  syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);
  p.status='ready';p.renderedSeq=seq;p.save.disabled=false;clearNote(p);if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});// The PNG export path explicitly captures a finished render frame. Avoid stale blank snapshots here.
@@ -3705,7 +3950,45 @@ function visibleSharedTicks(ticks,width){
  const ids=[...new Set(Array.from({length:max},(_,i)=>Math.round(i*(ticks.length-1)/(max-1))))];
  return ids.map(i=>ticks[i]);
 }
+function differenceSharedPalette(){
+ if(st.modelSet!=='gfs-versions'||!st.field)return null;
+ const panel=st.panels.find(p=>p.cfg?.differencePanel);
+ if(!panel)return null;
+ // A field change updates the controls before asynchronous panel loads complete.
+ // Never use panel.v from the previous field: it leaves the difference title and
+ // color map stuck at (for example) 700 hPa when MSLP has been selected.
+ const requested=st.field;
+ const v=(panel.v?.name===requested?panel.v:null)||
+  st.ref?.entries?.flatMap(({ds})=>ds.variables||[]).find(item=>item.name===requested)||
+  {name:requested,attrs:{}};
+ const m=panelFieldInfo(panel,v);
+ return {v,m,palette:pal(m,v),ticks:legendTicks(m,v)};
+}
+function updateDifferenceSharedLegend(){
+ const section=el.differenceSharedLegend;
+ if(!section)return;
+ const data=differenceSharedPalette();
+ section.hidden=!data;
+ if(!data)return;
+ const {m,palette,ticks}=data,c=el.differenceSharedLegendCanvas,ctx=c.getContext('2d');
+ if(!ctx)return;
+ ctx.clearRect(0,0,c.width,c.height);
+ const colors=legendSwatches(m,palette);
+ for(let i=0;i<colors.length;i++){
+  const [a,b]=legendColorSpan(palette,i,colors.length);
+  ctx.fillStyle=colors[i];ctx.fillRect(Math.round(a*c.width),0,Math.ceil((b-a)*c.width)+1,c.height);
+ }
+ el.differenceSharedLegendTitle.textContent=`${m.label}${m.unit?' ('+m.unit+')':''} · near zero transparent`;
+ el.differenceSharedLegendLabels.replaceChildren();
+ for(const tick of visibleSharedTicks(ticks,section.clientWidth||innerWidth)){
+  const span=document.createElement('span');span.className='shared-legend-tick';span.textContent=tick.label;
+  span.style.left=`${Math.max(0,Math.min(100,tick.pos*100))}%`;
+  if(tick.pos<.001)span.dataset.end='first';else if(tick.pos>.999)span.dataset.end='last';
+  el.differenceSharedLegendLabels.append(span);
+ }
+}
 function updateSharedLegend(){
+ updateDifferenceSharedLegend();
  if(!el.sharedLegendCanvas||!el.sharedLegendLabels)return;
  const data=sharedPalette();
  const c=el.sharedLegendCanvas,ctx=c.getContext('2d');
@@ -3733,7 +4016,7 @@ function updateSharedLegend(){
  }
 }
 async function waitPaint(map){if(!map)return;map.triggerRepaint();await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));await sleep(100);}
-function playbackHours(){if(!st.ref)return[];return st.cfg.loopOnlyAvailableHours?availableHours():Array.from({length:Math.max(1,...st.ref.entries.flatMap(({ds})=>(ds.variables||[]).map(v=>v.shape?.[0]||0)))},(_,i)=>i);}
+function playbackHours(){if(!st.ref)return[];const choices=forecastHourChoices();return st.cfg.loopOnlyAvailableHours?availableHours().filter(h=>choices.includes(h)):choices;}
 function nextHour(dir=1){const hours=playbackHours();if(!hours.length)return null;const ix=hours.indexOf(st.hour),idx=(ix<0?(dir>0?-1:0):ix)+dir;return hours[(idx+hours.length)%hours.length];}
 async function step(dir){const h=nextHour(dir);if(h===null)return;st.prefetchDirection=dir<0?-1:1;st.hour=h;syncUI();await renderAll();}
 // Adaptive, bidirectional prefetch. Keep the speculative queue alive across
@@ -3810,11 +4093,11 @@ function prefetchCandidates(timeline,disk,batchLimit){
     const snow=old?.variables.find(v=>v.name==='snow24h');
     if(old&&snow)enqueue(src,old,snow,0);
    }
-   if((st.field==='apcp'||precipitationAccumulationHours(st.field))&&p.cfg.timeMode==='analysis'&&ds.product==='mrms_apcp'){
+   if((st.field==='apcp'||precipitationAccumulationHours(st.field))&&p.cfg.timeMode==='analysis'&&['mrms_apcp','stageiv_apcp'].includes(ds.product)){
     const window=precipitationAccumulationHours(st.field);
     const last=window||Math.max(1,Math.floor(Number(d.prefetchMrmsRecentHours??3)));
     for(let t=Math.max(1,requested-last+1);t<=requested;t++){
-     const record=mrmsHourlyRecord(src,valid(st.ref,t));
+     const record=precipitationHourlyRecord(src,valid(st.ref,t),ds.product);
      const variable=record?.variables.find(x=>x.name==='apcp');
      if(record&&variable)enqueue(src,record,variable,0);
     }
@@ -4277,10 +4560,10 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   catch(err){console.warn('Optional export geography overlay unavailable:',err);}
   if(sharpIndividual)exportObservations=snapshotIndividualExportObservations(map,cssW,cssH);
   const plottedField=p.cfg?.field||st.field;
-  const withHeight=Boolean(overlayHeightVisible(plottedField)&&p.heightField);
-  const withScalar=Boolean(st.contours&&plottedField!=='mslp'&&contoursAvailable(plottedField));
-  const withMSLP=plottedField==='mslp'&&st.overlayMSLP;
-  const withMSLP850=plottedField==='mslp'&&st.overlayMSLP850&&!!p.temperature850Field;
+  const withHeight=Boolean(!p.cfg?.differencePanel&&overlayHeightVisible(plottedField)&&p.heightField);
+  const withScalar=Boolean(!p.cfg?.differencePanel&&st.contours&&plottedField!=='mslp'&&contoursAvailable(plottedField));
+  const withMSLP=!p.cfg?.differencePanel&&plottedField==='mslp'&&st.overlayMSLP;
+  const withMSLP850=!p.cfg?.differencePanel&&plottedField==='mslp'&&st.overlayMSLP850&&!!p.temperature850Field;
   // The final export cell can be far wider than the interactive panel.
   // Keep existing screen contour styles unchanged while ensuring published
   // PNG/GIF contour lines retain presentation-scale visibility.
@@ -4297,7 +4580,7 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
    else drawContours(p,{exportScale:contourExportScale});
    contourPNG=p.contourCanvas.toDataURL('image/png');
   }
-  if(p.wind&&windComponentNames(plottedField)&&overlayWindVisible(plottedField)&&p.windCanvas){
+  if(!p.cfg?.differencePanel&&p.wind&&windComponentNames(plottedField)&&overlayWindVisible(plottedField)&&p.windCanvas){
    // Match the appearance of an enlarged viewer panel; do not use the
    // export-only MapLibre zoom to choose density or unscaled glyph sizes.
    const exportBarbs=sharpIndividual
@@ -4415,7 +4698,7 @@ function panelMapRatio(p){
 // causing a small geographic crop mismatch at the same output dimensions.
 function standaloneExportLayout(w,h,largeLabels){
  const headerTop=largeLabels?100:60;
- return {headerTop,mapX:14,mapY:headerTop,mapW:w-28,mapH:h-headerTop-77,
+ return {headerTop,mapX:14,mapY:headerTop,mapW:w-28,mapH:h-headerTop-(largeLabels?104:77),
   titleFont:Math.round(Math.max(15,Math.min(25,w/40))*(largeLabels?1.7:1)),
   subtitleFont:Math.round(Math.max(11,Math.min(15,w/70))*(largeLabels?1.7:1)),
   titleY:largeLabels?30:19,subtitleY:largeLabels?73:43};
@@ -4469,7 +4752,7 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
  ctx.fillText(clipText(ctx,p.sub.textContent,w-36),x+18,y+layout.subtitleY);
  // In large comparison grids, a narrow vertical bar gives the map noticeably
  // more height. Individual/short-grid exports retain a horizontal colorbar.
- const side=verticalLegend?Math.max(75,Math.min(102,Math.round(w*.09))):0;
+ const side=verticalLegend?Math.max(largeLabels?108:75,Math.min(largeLabels?142:102,Math.round(w*(largeLabels?.14:.09)))):0;
  const boxX=x+layout.mapX,boxY=y+layout.mapY,boxW=layout.mapW-side,boxH=verticalLegend?h-(headerTop+14):layout.mapH;
  ctx.fillStyle=light?'#d6e6ee':'#0b2238';ctx.fillRect(boxX,boxY,boxW,boxH);
  const captured=await panelImage(p,boxW,boxH,st.lastExportFraming,true);
@@ -4487,14 +4770,14 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
  if(p.status!=='ready')return;
  if(verticalLegend){
   const lx=boxX+boxW+13,ly=boxY+29,lw=14,lh=Math.max(20,boxH-41);
-  const m=fieldInfo(p.v,st.field,p.ds?.model||p.cfg.source),palette=pal(m,p.v),colors=legendSwatches(m,palette),n=colors.length;
-  ctx.fillStyle=fg;ctx.font='bold 12px Arial';ctx.textAlign='left';ctx.textBaseline='middle';
+  const m=panelFieldInfo(p,p.v),palette=pal(m,p.v),colors=legendSwatches(m,palette),n=colors.length;
+  ctx.fillStyle=fg;ctx.font=`bold ${largeLabels?23:15}px Arial`;ctx.textAlign='left';ctx.textBaseline='middle';
   ctx.fillText(clipText(ctx,m.unit||m.label,side-13),lx,boxY+11);
   for(let i=0;i<n;i++){const [a,b]=legendColorSpan(palette,i,n),top=Math.round(ly+lh*(1-b)),bottom=Math.round(ly+lh*(1-a));ctx.fillStyle=colors[i];ctx.fillRect(lx,top,lw,bottom-top);}
   ctx.strokeStyle=muted;ctx.lineWidth=1;ctx.strokeRect(lx,ly,lw,lh);
   const ticks=p.legendTicks||legendTicks(m,p.v);
   const positions=ticks.length<=5?ticks:[...new Set(Array.from({length:5},(_,i)=>Math.round(i*(ticks.length-1)/4)))].map(i=>ticks[i]);
-  ctx.font='11px Arial';ctx.textAlign='left';ctx.fillStyle=muted;
+  ctx.font=`${largeLabels?29:14}px Arial`;ctx.textAlign='left';ctx.fillStyle=muted;
   for(const tick of positions){
    const ty=ly+lh*(1-tick.pos);
    ctx.fillRect(lx+lw,ty-.5,4,1);
@@ -4503,20 +4786,20 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
   }
   ctx.textBaseline='middle';
  }else{
-  const m=fieldInfo(p.v,st.field,p.ds?.model||p.cfg.source),palette=pal(m,p.v),colors=legendSwatches(m,palette),n=colors.length;
+  const m=panelFieldInfo(p,p.v),palette=pal(m,p.v),colors=legendSwatches(m,palette),n=colors.length;
   const fullLegend=`${m.label}${m.unit?' ('+m.unit+')':''}`;
-  ctx.fillStyle=fg;ctx.font=`bold ${Math.max(12,Math.min(16,w/58))}px Arial`;
-  ctx.fillText(clipText(ctx,fullLegend,w-30),x+18,y+h-61);
+  ctx.fillStyle=fg;ctx.font=`bold ${Math.max(largeLabels?26:15,Math.min(largeLabels?32:20,w/(largeLabels?38:46)))}px Arial`;
+  ctx.fillText(clipText(ctx,fullLegend,w-30),x+18,y+h-(largeLabels?81:61));
   // Build the export legend from palette data, never stretch the small vertical
   // browser legend canvas into a horizontal gradient.
-  const bx=x+18,by=y+h-42,bw=w-36,bh=13;
+  const bx=x+18,by=y+h-(largeLabels?57:42),bw=w-36,bh=largeLabels?17:13;
   for(let i=0;i<n;i++){const [a,b]=legendColorSpan(palette,i,n),left=Math.round(bx+a*bw),right=Math.round(bx+b*bw);ctx.fillStyle=colors[i];ctx.fillRect(left,by,right-left,bh);}
-  const ticks=p.legendTicks||legendTicks(m,p.v);ctx.fillStyle=muted;ctx.font='11px Arial';
+  const ticks=p.legendTicks||legendTicks(m,p.v);ctx.fillStyle=muted;ctx.font=`${largeLabels?25:14}px Arial`;
   const shown=ticks.filter((_,i)=>ticks.length<=5||w>=850||i%2===0||i===ticks.length-1);
   for(const tick of shown){
    const tx=x+18+(w-36)*tick.pos;
    ctx.textAlign=tick.pos===0?'left':tick.pos===1?'right':'center';
-   ctx.fillText(tick.label,tx,y+h-15);ctx.fillRect(tx-.5,y+h-28,1,5);
+   ctx.fillText(tick.label,tx,y+h-(largeLabels?20:15));ctx.fillRect(tx-.5,by+bh,1,largeLabels?7:5);
   }
   ctx.textAlign='left';
  }
@@ -4649,26 +4932,27 @@ async function exportPanel(p,ratio='16:9',returnCanvas=false){
  if(returnCanvas)return c;
  await canvasPNG(c,`evu_${p.src?.id||'model'}_${p.v?.name||'missing'}_${p.ds?.id||'run'}_f${pad3(p.h??0)}_${ratio.replace(':','x')}.png`);
 }
-function drawSharedExportLegend(ctx,x,y,w,h){
- const data=sharedPalette();if(!data)return;
+function drawSharedExportLegend(ctx,x,y,w,h,difference=false){
+ const data=difference?differenceSharedPalette():sharedPalette();if(!data)return;
  const {m,palette,ticks}=data,light=st.theme==='light';
  const fg=light?'#1d2e42':'#eef4fa',muted=light?'#54687e':'#aebfd1';
  const title=`${m.label}${m.unit?' ('+m.unit+')':''}`;
  const left=x+Math.max(4,Math.round(w*.07)),right=x+w-Math.max(4,Math.round(w*.07));
- const barW=right-left,barY=y+Math.round(h*.33),barH=Math.max(12,Math.min(20,Math.round(h*.25)));
+ const largeLabels=!!st.exportLargeLabels;
+ const barW=right-left,barY=y+Math.round(h*(largeLabels?.37:.33)),barH=Math.max(12,Math.min(largeLabels?24:20,Math.round(h*.25)));
  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=fg;
- ctx.font=`bold ${Math.max(15,Math.min(24,w/115))}px Arial`;
+ ctx.font=`bold ${largeLabels?Math.max(23,Math.min(33,w/70)):Math.max(15,Math.min(24,w/115))}px Arial`;
  ctx.fillText(clipText(ctx,title,barW),x+w/2,y+Math.round(h*.15));
  const colors=legendSwatches(m,palette),n=colors.length;
  colors.forEach((color,i)=>{const [a,b]=legendColorSpan(palette,i,n),from=Math.round(left+a*barW),to=Math.round(left+b*barW);ctx.fillStyle=color;ctx.fillRect(from,barY,to-from,barH);});
  ctx.strokeStyle=muted;ctx.lineWidth=1;ctx.strokeRect(left,barY,barW,barH);
- ctx.fillStyle=muted;ctx.font=`${Math.max(11,Math.min(17,w/160))}px Arial`;
+ ctx.fillStyle=muted;ctx.font=`${largeLabels?Math.max(30,Math.min(38,w/75)):Math.max(11,Math.min(17,w/160))}px Arial`;
  const shown=visibleSharedTicks(ticks,w*.9);
  for(const t of shown){
   const tx=left+barW*t.pos;
   ctx.textAlign=t.pos<.001?'left':t.pos>.999?'right':'center';
   ctx.fillRect(tx-.5,barY+barH,1,6);
-  ctx.fillText(t.label,tx,barY+barH+Math.min(18,Math.round(h*.26)));
+  ctx.fillText(t.label,tx,barY+barH+Math.min(largeLabels?25:18,Math.round(h*.26)));
  }
  ctx.textAlign='left';
 }
@@ -4680,7 +4964,8 @@ async function exportAll(ratio='16:9',returnCanvas=false){
  const pad=Math.max(12,Math.round(W*.006)),gap=1;
  const largeLabels=!!st.exportLargeLabels;
  const head=largeLabels?Math.max(89,Math.round(H*.078)):Math.max(51,Math.round(H*.036));
- const legendH=Math.max(58,Math.round(H*.050));
+ const dualLegend=st.modelSet==='gfs-versions'&&!!differenceSharedPalette();
+ const legendH=(largeLabels?Math.max(96,Math.round(H*.085)):Math.max(58,Math.round(H*.050)))*(dualLegend?2:1);
  const cellW=(W-2*pad-gap*(cols-1))/cols;
  const cellH=(H-head-2*pad-legendH-gap*(rows-1))/rows;
  if(cellW<100||cellH<130)throw Error('Export has too many panels for the chosen layout');
@@ -4707,7 +4992,10 @@ async function exportAll(ratio='16:9',returnCanvas=false){
    await drawExport(cx,p,px,py,cellW,cellH,false,true);
   }
   const legendY=head+pad+rows*cellH+(rows-1)*gap+6;
-  drawSharedExportLegend(cx,pad,legendY,W-2*pad,legendH-6);
+  if(dualLegend){
+   drawSharedExportLegend(cx,pad,legendY,W-2*pad,legendH/2-3);
+   drawSharedExportLegend(cx,pad,legendY+legendH/2,W-2*pad,legendH/2-3,true);
+  }else drawSharedExportLegend(cx,pad,legendY,W-2*pad,legendH-6);
   if(returnCanvas)return c;
   await canvasPNG(c,`omd_evu_autumnplot_${st.ref.id.replace(/[-:.]/g,'')}_f${pad3(st.hour)}_${n}panels_${ratio.replace(':','x')}.png`);
  }finally{el.saveAllPngBtn.disabled=false;updateStatus();}
@@ -4719,15 +5007,15 @@ async function exportAll(ratio='16:9',returnCanvas=false){
 // between e.g. HRRR, RRFS, REFS, MRMS, and RAP.
 const DIFFERENCE_BLOCKED_FIELDS=new Set(['refc_ptype','ptype','crain','csnow','cicep','cfrzr','snowpresence']);
 const DIFFERENCE_COLORS=[
- '#193a85','#2459a8','#337bc1','#5b9ed2','#8dbbdc','#bbd9ea','#e0eff5','#f3f8fa',
- '#fff6f1','#fce0d9','#f7baae','#ee8e7e','#e46759','#cb453e','#ab302f','#852027'
+ '#193a85','#2459a8','#337bc1','#5b9ed2','#8dbbdc','#bbd9ea','#deefff','#eef6ff',
+ '#fff1eb','#ffe3d9','#f7baae','#ee8e7e','#e46759','#cb453e','#ab302f','#852027'
 ];
-// Difference shading uses a transparent neutral center rather than painting
-// near-zero model/analysis agreement. Fade edges avoid a harsh blank stripe.
+// Difference shading uses very pale blue/red hues near a transparent zero
+// rather than a gray neutral center. The same hues appear in export legends. Fade edges avoid a harsh blank stripe.
 // The same alpha is used by the interactive difference and exported PNGs.
 function differenceZeroOpacity(value,range){
  if(!(Number.isFinite(value)&&Number.isFinite(range)&&range>0))return 0;
- const neutral=range*.025,fadeEnd=range*.065,amount=Math.abs(value);
+ const neutral=differenceNeutralThreshold(st.field,range),fadeEnd=Math.min(range*.85,neutral+range*.055),amount=Math.abs(value);
  return amount<=neutral?0:amount>=fadeEnd?1:(amount-neutral)/(fadeEnd-neutral);
 }
 const DIFFERENCE_LIMITS={mslp:12,t2m:15,dpt2m:15,t925:10,t850:10,t700:10,rh2m:40,
@@ -4741,8 +5029,8 @@ const DIFFERENCE_TICK_STEPS={mslp:4,t2m:5,dpt2m:5,t925:5,t850:5,t700:5,rh2m:10,
 function differenceAnalysisSource(p){
  if(p?.cfg?.timeMode!=='analysis')return '';
  const source=String(p.ds?.product||p.ds?.source||'').toLowerCase();
- const known=/^(mrms|rap|rtma|urma)(?:_|$)/.exec(source);
- return known?known[1].toUpperCase():(source?source.toUpperCase():'unavailable');
+ const known=/^(stageiv|mrms|rap|rtma|urma)(?:_|$)/.exec(source);
+ return known?(known[1]==='stageiv'?'Stage IV':known[1].toUpperCase()):(source?source.toUpperCase():'unavailable');
 }
 function differenceLabel(p){
  const label=p?.cfg?.label||p?.cfg?.id||'Panel',source=differenceAnalysisSource(p);
@@ -4750,7 +5038,7 @@ function differenceLabel(p){
 }
 // Difference color bars are fixed to meaningful field ranges, but their
 // labels should NOT inherit fractional endpoints that make no meteorological
-// sense (e.g. a 3.75-unit STP range or a 212.5-unit SRH range). Keep the
+// sense (e.g. a 212.5-unit SRH range). Keep the
 // original shading and mapping unchanged; put integer labels *inside* such
 // ranges rather than mislabeling the endpoints. Small liquid accumulations and
 // precipitation rates genuinely need fractional ticks.
@@ -4933,6 +5221,7 @@ async function openDifferenceWindow(){
   map.resize();
   map.jumpTo(differenceCameraForViewport(camera,map));
   addGeographySkeleton(map);
+  updateLiveGeography();
   diff.geo={map,geoApplied:new Set(),geoPending:new Set(),geoTimer:null};
   startGeography(diff.geo);
   map.on('movestart',()=>{if(diff.liveCanvas&&!diff.saveBusy)diff.liveCanvas.style.visibility='hidden';});
@@ -5058,10 +5347,10 @@ async function warmDifferenceAlignedHours(panel,key,serial){
     if(!seen.has(k)){seen.add(k);records.push(rec);}}
   };
   for(const hour of hours){
-   if(windowHours&&product==='mrms_apcp'){
-    // Bounded recent slices; older MRMS hours are loaded on demand.
+   if(windowHours&&['mrms_apcp','stageiv_apcp'].includes(product)){
+    // Bounded recent slices; older precipitation hours are loaded on demand.
     for(let h=Math.max(1,hour-1);h<=hour;h++)add(h,'apcp');
-   }else if(st.field==='apcp'&&product==='mrms_apcp'){
+   }else if(st.field==='apcp'&&['mrms_apcp','stageiv_apcp'].includes(product)){
     for(let h=Math.max(1,hour-1);h<=hour;h++)add(h,'apcp');
    }else if(st.field==='snow48h'&&product==='nohrsc_24h'){
     add(hour,'snow24h');add(hour-24,'snow24h');
@@ -5084,17 +5373,17 @@ async function alignedDisplayForAnalysis(panel,token){
  if(!st.alignedSource){try{await reloadAlignedCatalog();}catch(e){throw Error('Aligned analysis catalog is not available: '+String(e?.message||e));}}
  if(!product)throw Error('Cannot identify verifying analysis source.');
  if(precipWindow){
-  if(product!=='mrms_apcp')throw Error(`${precipWindow}-hour precipitation requires MRMS analysis.`);
-  if(st.hour<precipWindow)throw Error(`Need F${pad3(precipWindow)} for a complete ${precipWindow}-h MRMS interval.`);
+  if(!['mrms_apcp','stageiv_apcp'].includes(product))throw Error(`${precipWindow}-hour precipitation needs Stage IV or MRMS analysis.`);
+  if(st.hour<precipWindow)throw Error(`Need F${pad3(precipWindow)} for a complete ${precipWindow}-h precipitation interval.`);
   let sum=null,grid=null,recLast=null;
   for(let h=st.hour-precipWindow+1;h<=st.hour;h++){
    if(token!==st.difference.token)throw Error('Difference selection changed.');
-   const rec=await requireAlignedRecord('mrms_apcp',valid(st.ref,h),'apcp');
+   const rec=await requireAlignedRecord(product,valid(st.ref,h),'apcp');
    const vals=await getDisplayData(rec.src,rec.ds,rec.v,0,m,()=>{});
-   if(sum&&JSON.stringify(rec.ds.grid)!==JSON.stringify(grid))throw Error('Aligned MRMS grids differ within accumulation interval.');
+   if(sum&&JSON.stringify(rec.ds.grid)!==JSON.stringify(grid))throw Error('Aligned precipitation grids differ within accumulation interval.');
    if(!sum){sum=new Float32Array(vals);grid=rec.ds.grid;}
    else {
-    if(sum.length!==vals.length)throw Error('Aligned MRMS shapes differ.');
+    if(sum.length!==vals.length)throw Error('Aligned precipitation shapes differ.');
     for(let i=0;i<sum.length;i++)sum[i]=Number.isFinite(sum[i])&&Number.isFinite(vals[i])&&sum[i]>-1e9&&vals[i]>-1e9?sum[i]+vals[i]:-1e10;
    }
    recLast=rec;
@@ -5102,14 +5391,14 @@ async function alignedDisplayForAnalysis(panel,token){
   return {...recLast,data:sum,grid};
  }
  if(st.field==='apcp'){
-  // Match existing MRMS cycle-to-date definition; missing hours are never zero.
-  if(product!=='mrms_apcp')throw Error('Accumulated precipitation requires MRMS analysis.');
-  const key=st.ref.init_time;
+  // Match existing selected-source cycle-to-date definition; missing hours are never zero.
+  if(!['mrms_apcp','stageiv_apcp'].includes(product))throw Error('Accumulated precipitation needs Stage IV or MRMS analysis.');
+  const key=st.ref.init_time+'|'+product;
   let cache=st.alignedAccumCache;
   if(!cache||cache.key!==key||cache.hour>st.hour){cache={key,hour:0,data:null};}
   for(let h=cache.hour+1;h<=st.hour;h++){
    if(token!==st.difference.token)throw Error('Difference selection changed.');
-   const rec=await requireAlignedRecord('mrms_apcp',valid(st.ref,h),'apcp');
+   const rec=await requireAlignedRecord(product,valid(st.ref,h),'apcp');
    const values=await getDisplayData(rec.src,rec.ds,rec.v,0,m,()=>{});
    if(!cache.data)cache.data=new Float32Array(values);
    else for(let i=0;i<cache.data.length;i++){
@@ -5117,8 +5406,8 @@ async function alignedDisplayForAnalysis(panel,token){
    }
    cache.hour=h;st.alignedAccumCache=cache;
   }
-  if(!cache.data)throw Error('MRMS accumulation requires at least F001.');
-  const rec=await requireAlignedRecord('mrms_apcp',valid(st.ref,Math.max(1,st.hour)),'apcp');
+  if(!cache.data)throw Error('Precipitation accumulation requires at least F001.');
+  const rec=await requireAlignedRecord(product,valid(st.ref,Math.max(1,st.hour)),'apcp');
   return {...rec,data:cache.data,grid:rec.ds.grid};
  }
  if(st.field==='snow48h'){
@@ -5261,11 +5550,11 @@ async function paintDifferenceLive(snapshot){
  const visible=differenceGeoVisibility(map);
  if(Object.values(visible).some(Boolean)){
   const center=map.getCenter();
-  const key=JSON.stringify([width,height,center.lng,center.lat,map.getZoom(),map.getBearing(),map.getPitch(),st.mode,st.theme,visible]);
+  const key=JSON.stringify([width,height,center.lng,center.lat,map.getZoom(),map.getBearing(),map.getPitch(),st.mode,st.theme,st.mapOutlines,overlayStyle('mapOutlines'),visible]);
   let lines=diff.outlineCache?.key===key?diff.outlineCache.canvas:null;
   if(!lines){
    lines=document.createElement('canvas');lines.width=width;lines.height=height;
-   await redrawDifferenceBoundaries(lines,map,{exportGeoVisible:visible});
+   await redrawDifferenceBoundaries(lines,map,{exportGeoVisible:visible,liveNoHalo:true});
    if(token!==diff.liveToken||!diff.open||snapshot!==diff.snapshot||diff.saveBusy)return;
    diff.outlineCache={key,canvas:lines};
   }
@@ -5374,6 +5663,7 @@ async function captureSharpDifferenceFrame(map,snapshot,plotWidth,plotHeight,fra
  }
 }
 async function redrawDifferenceBoundaries(canvas,map,snapshot){
+ if(st.mapOutlines===false)return;
  const visible=snapshot.exportGeoVisible||{};
  const ctx=canvas.getContext('2d');if(!ctx)return;
  const w=map.getContainer().clientWidth,h=map.getContainer().clientHeight;
@@ -5387,9 +5677,8 @@ async function redrawDifferenceBoundaries(canvas,map,snapshot){
  for(const [id,kind,weight] of specs){
   if(!visible[id])continue;
   let data;try{data=await geoData(id);}catch(_){continue;}
-  // The dark ink remains visible over light shading; the thin light halo
-  // remains visible over dark shading. Both strokes follow the same path,
-  // so there is no geographic displacement or duplicate boundary data.
+  // Floating LIVE differences use one stroke; export canvases preserve the
+  // original contrasting casing and inner stroke without any changes.
   const inside=Math.max(kind==='minor'?.9:1.15,weight*scale*1.32);
   const outside=inside+Math.max(kind==='minor'?1.7:2.35,scale*(kind==='minor'?1.25:1.60));
   ctx.beginPath();let segments=0;
@@ -5410,10 +5699,12 @@ async function redrawDifferenceBoundaries(canvas,map,snapshot){
   if(segments){
    const liveWidth=Math.max(kind==='minor'?.85:1.1,weight*Math.min(sx,sy));
    ctx.globalAlpha=kind==='minor'?.68:.85;
-   ctx.strokeStyle=colors.boundaryCasing;ctx.lineWidth=liveWidth+(kind==='minor'?1.0:1.4);ctx.stroke();
+   if(!snapshot.liveNoHalo){
+    ctx.strokeStyle=colors.boundaryCasing;ctx.lineWidth=typeof overlayStrokeWidth==='function'?overlayStrokeWidth('mapOutlines',liveWidth+(kind==='minor'?1.0:1.4)):liveWidth+(kind==='minor'?1.0:1.4);ctx.stroke();
+   }
    ctx.globalAlpha=kind==='minor'?.86:.97;
-   ctx.strokeStyle=kind==='minor'?colors.minor:colors.line;
-   ctx.lineWidth=liveWidth;ctx.stroke();
+   ctx.strokeStyle=typeof overlayStrokeColor==='function'?overlayStrokeColor('mapOutlines',kind==='minor'?colors.minor:colors.line):(kind==='minor'?colors.minor:colors.line);
+   ctx.lineWidth=typeof overlayStrokeWidth==='function'?overlayStrokeWidth('mapOutlines',liveWidth):liveWidth;ctx.stroke();
   }
  }
  ctx.restore();
@@ -5513,10 +5804,11 @@ async function exportDifferencePNG(ratio='16:9',framing='fill'){
   const cc=combined.getContext('2d');
   cc.drawImage(image,0,0);cc.drawImage(overlay,0,0);cc.drawImage(outlines,0,0);
   drawMapFramed(cx,combined,layout.mapX,layout.mapY,layout.mapW,layout.mapH,framing);
-  const y=H-42,left=18,right=W-18,rampW=right-left;
-  const rampH=13;
-  cx.fillStyle=fg;cx.font=`bold ${Math.max(12,Math.min(16,W/58))}px Arial`;
-  cx.fillText(clipText(cx,snap.unit?`Difference (${snap.unit})`:'Difference',W-36),18,H-61);
+  const largeLabels=!!st.exportLargeLabels;
+  const y=H-(largeLabels?57:42),left=18,right=W-18,rampW=right-left;
+  const rampH=largeLabels?17:13;
+  cx.fillStyle=fg;cx.font=`bold ${largeLabels?Math.max(25,Math.min(32,W/45)):Math.max(12,Math.min(16,W/58))}px Arial`;
+  cx.fillText(clipText(cx,snap.unit?`Difference (${snap.unit})`:'Difference',W-36),18,H-(largeLabels?81:61));
   const gradient=cx.createLinearGradient(left,0,right,0);
   // Mirror the real difference raster, including its transparent zero band.
   const rgb=DIFFERENCE_COLORS.map(hex=>[1,3,5].map(k=>parseInt(hex.slice(k,k+2),16)));
@@ -5527,11 +5819,11 @@ async function exportDifferencePNG(ratio='16:9',framing='fill'){
   }
   cx.fillStyle=gradient;cx.fillRect(left,y,rampW,rampH);
   cx.strokeStyle=fg;cx.lineWidth=1;cx.strokeRect(left,y,rampW,rampH);
-  cx.fillStyle=fg;cx.font='11px Arial';cx.textAlign='center';
+  cx.fillStyle=fg;cx.font=`${largeLabels?30:11}px Arial`;cx.textAlign='center';
   for(const t of differenceTicks(snap.fieldKey,snap.range)){
    const x=left+((t+snap.range)/(snap.range*2))*rampW;
    cx.fillRect(x-.5,y+rampH,1,5);
-   cx.fillText(differenceNumber(t),x,H-15);
+   cx.fillText(differenceNumber(t),x,H-(largeLabels?20:15));
   }
   await canvasPNG(c,`evu_difference_${snap.fieldKey}_${snap.init.replace(/\D/g,'')}_f${pad3(snap.hour)}_${ratio.replace(':','x')}_${framing}.png`);
  }catch(err){

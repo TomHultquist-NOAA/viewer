@@ -14,17 +14,17 @@ const names=Array.from(fields,f=>f.key), labels=new Map(Array.from(fields,f=>[f.
 for (const key of [
  't925','t850','t700','absv500',
  'shear01','shear06','srh01','srh03','sbcape','mlcape','mucape',
- 'mxuphl','mxuphl_run','scp','stp','stp_fixed',
+ 'mxuphl','mxuphl_run',
  'apcp1h','apcp3h','apcp6h','snow1h','snow3h','snow6h'
 ]) assert.ok(names.includes(key),`Missing menu option ${key}`);
 for (const [key,label] of [
  ['t925','925 hPa forecast'],['t850','850 hPa forecast'],
  ['t700','700 hPa forecast'],['absv500','500 hPa forecast'],
- ['scp','Supercell composite parameter (effective layer)'],
- ['stp','Significant tornado parameter with CIN (effective layer)'],
- ['stp_fixed','Significant tornado parameter (fixed layer)']
+ ['mxuphl','1-hour maximum updraft helicity (2–5 km)']
 ]) assert.equal(labels.get(key),label,`Bad label for ${key}`);
 assert.ok(!names.includes('uphl'),'Instantaneous UH should not be offered');
+for (const key of ['scp','stp','stp_fixed']) assert.ok(!names.includes(key),`Unsupported field ${key} should not appear`);
+for (const key of ['scp','stp','stp_fixed']) assert.ok(!Object.prototype.hasOwnProperty.call(vm.runInContext('FIELDS',ctx),key),`Unsupported field ${key} should have no palette definition`);
 assert.equal(new Set(names).size,names.length,'Duplicate field entries');
 assert.ok(src.includes('const menu=fieldMenuEntries()'),'The boot path uses complete menu definitions');
 assert.ok(!src.includes("FIELD_ORDER.filter(n=>names.has("),'No catalog-driven field menu suppression');

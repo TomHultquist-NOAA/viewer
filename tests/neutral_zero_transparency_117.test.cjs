@@ -28,7 +28,7 @@ function transparentRuns(p){
  return runs;
 }
 `,ctx);
-for(const field of ['sbcape','mlcape','mucape','shear01','shear06','srh01','srh03','scp','stp','stp_fixed','absv500','mxuphl','mxuphl_run','u10','v10','wspd10','wspd300','gust','snowc','cpofp']){
+for(const field of ['sbcape','mlcape','mucape','shear01','shear06','srh01','srh03','absv500','mxuphl','mxuphl_run','u10','v10','wspd10','wspd300','gust','snowc','cpofp']){
  const p=vm.runInContext(`st.field='${field}'; pal(FIELDS['${field}'],{name:'${field}'})`,ctx);
  assert.equal(p.levels.length,p.colors.length+1,field+' palette structure');
  assert.equal(vm.runInContext(`colorAt(pal(FIELDS['${field}'],{}),0)`,ctx),'#00000000',field+' zero should be clear');
@@ -39,7 +39,7 @@ for(const field of ['sbcape','mlcape','mucape','shear01','shear06','srh01','srh0
 }
 // Every field carrying a zero threshold retains one and only one physical
 // near-zero interval after a range stretch that shifts the original palette.
-for(const field of ['sbcape','mlcape','mucape','shear01','shear06','srh01','srh03','scp','stp','stp_fixed','absv500','mxuphl','mxuphl_run','u10','v10','wspd10','wspd300','gust','snowc','cpofp']){
+for(const field of ['sbcape','mlcape','mucape','shear01','shear06','srh01','srh03','absv500','mxuphl','mxuphl_run','u10','v10','wspd10','wspd300','gust','snowc','cpofp']){
  const runs=vm.runInContext(`st.field='${field}';st.colorRanges.set('${field}',{min:-400,max:1000});transparentRuns(pal(FIELDS['${field}'],{}))`,ctx);
  assert.equal(runs.length,1,field+' must have exactly one contiguous transparent interval after a custom range change');
  assert(runs[0][0]<=0&&runs[0][1]>=0,field+' neutral interval remains centered on physical zero');
@@ -72,11 +72,14 @@ assert.notEqual(vm.runInContext(`st.field='mslp';colorAt(pal(FIELDS.mslp,{}),100
 assert.equal(vm.runInContext(`st.field='srh01';st.colorRanges.set('srh01',{min:-400,max:1000});colorAt(pal(FIELDS.srh01,{}),0)`,ctx),'#00000000','physical zero stays transparent after custom range');
 assert.notEqual(vm.runInContext(`colorAt(pal(FIELDS.srh01,{}),50)`,ctx),'#00000000','custom range does not erase meaningful SRH');
 const diffStart=source.indexOf('function differenceZeroOpacity('),diffEnd=source.indexOf('const DIFFERENCE_LIMITS',diffStart);
+const neutralStart=source.indexOf('const DIFFERENCE_NEUTRAL_BY_FIELD=');
+vm.runInContext(source.slice(neutralStart,source.indexOf('// Precomputed GFS comparison grids',neutralStart)),ctx);
 vm.runInContext(source.slice(diffStart,diffEnd),ctx);
+vm.runInContext("st.field='mslp'",ctx);
 assert.equal(vm.runInContext('differenceZeroOpacity(0,100)',ctx),0);
-assert.equal(vm.runInContext('differenceZeroOpacity(-2,100)',ctx),0);
+assert.equal(vm.runInContext('differenceZeroOpacity(-1,100)',ctx),0);
 assert.equal(vm.runInContext('differenceZeroOpacity(9,100)',ctx),1);
-const middle=vm.runInContext('differenceZeroOpacity(4,100)',ctx);
+const middle=vm.runInContext('differenceZeroOpacity(2.5,100)',ctx);
 assert(middle>0&&middle<1);
 assert.match(source,/205\*st\.imageOpacity\*differenceZeroOpacity\(v,range\)/,'difference renderer uses transparent alpha');
 console.log('PASS single physical-zero bands, custom-range transparency stability, valid dry-air shading, untouched temperature palettes, difference alpha');

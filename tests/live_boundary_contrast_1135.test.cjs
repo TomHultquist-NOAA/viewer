@@ -14,8 +14,8 @@ const take=(from,to)=>{
 const palette=take('function themeColors(){','function mapStyle(){');
 const skeleton=take('function addGeographySkeleton(m){','// When a user selects a field');
 const visibility=take('function updateGeographyVisibility(p){','function maybeDetailedGeography(p){');
-const st={theme:'dark',cfg:{display:{}}};
-const ctx=vm.createContext({st,console,detailThreshold:()=>0,countyThreshold:()=>4.25,detailMaskData:()=>({type:'FeatureCollection',features:[]}),themeColors:null});
+const st={theme:'dark',field:'mslp',cfg:{display:{}}};
+const ctx=vm.createContext({st,console,FIELDS:{mslp:{bandColors:['#572d87','#faf4c0','#8d465f']}},detailThreshold:()=>0,countyThreshold:()=>4.25,detailMaskData:()=>({type:'FeatureCollection',features:[]}),themeColors:null});
 vm.runInContext(palette+'\n'+skeleton+'\n'+visibility,ctx);
 const sources=new Map(),layers=new Map(),order=[];
 const zoom=[],layout=[];
@@ -56,5 +56,5 @@ assert.match(css,/\.interpolation-control \.contour-switch\{height:28px\}/,
  '28px compact desktop interpolation aligns with Map view');
 assert.match(css,/\.interpolation-control \.contour-switch\{height:32px;/,
  '32px interpolation matches non-desktop controls');
-assert.match(html, /css\/styles\.css\?v=1\.1\.38-20261102/);
+assert.match(html, /css\/styles\.css\?v=1\.1\.40-20261102/);
 console.log('PASS theme-dependent two-tone live borders, ordering above shading, synchronized visibility, and toolbar alignment');

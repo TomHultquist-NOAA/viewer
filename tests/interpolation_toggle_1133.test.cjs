@@ -12,7 +12,7 @@ const readme=fs.readFileSync(path.join(root,'README.md'),'utf8');
 
 assert.match(html,/<input type="checkbox" id="interpolateToggleBtn">/,'toggle must be unchecked by default');
 assert.match(html,/id="interpolateToggleBtn"[^>]*>/);
-assert.match(html,/js\/viewer\.js\?v=1\.1\.38-20261102/,'viewer cache token must change');
+assert.match(html,/js\/viewer\.js\?v=1\.1\.40-20261102/,'viewer cache token must change');
 assert.match(css,/\.interpolation-control/);
 assert.match(js,/localStorage\.getItem\('omd_evu_interpolate'\)/);
 assert.match(js,/localStorage\.setItem\('omd_evu_interpolate'/);
@@ -34,7 +34,7 @@ assert.match(guide,/off by default/);
 assert.match(guide,/nearest-neighbor rendering/);
 assert.match(readme,/Optional grid interpolation/);
 assert.match(readme,/off by default/);
-assert.match(readme,/RELEASE_1_1_38\.md/,'README must link to the current release note');
+assert.match(readme,/RELEASE_1_1_40\.md/,'README must link to the current release note');
 assert.doesNotMatch(readme,/RELEASE_1_1_31\.md/,'README must not link to an excluded superseded release note');
 
 // Exercise the actual WebGL sampler-parameter update, not just the requested

@@ -492,7 +492,7 @@
    if(field==='refc_ptype')name='refc';
    if(field==='asnow'||field==='snow6h'){name='snow6h';product='nohrsc_6h';}
    if(field==='snow24h'||field==='snow48h'){name='snow24h';product='nohrsc_24h';}
-   if(field==='apcp'||field.startsWith('apcp')){name='apcp';product='mrms_apcp';}
+   if(field==='apcp'||field.startsWith('apcp')){name='apcp';}
    if(field==='snow1h'||field==='snow3h')return null;
    if(field==='asnow'){
     if(h===0||h%6!==0)return null;let sum=0;
@@ -504,14 +504,16 @@
     if(!current||!old)return null;const a=await sampledValue(data.source,current,'snow24h',0,lon,lat,FIELDS.snow48h),b=await sampledValue(data.source,old,'snow24h',0,lon,lat,FIELDS.snow48h);return a===null||b===null?null:a+b;
    }
    if((field==='apcp'||field.startsWith('apcp')) && name==='apcp'){
-    // MRMS records contain one-hour QPE, not a ready-made 3/6/24/48-hour
-    // total. Combine the complete and non-overlapping intervals at the point.
+    // Stage IV and MRMS both publish one-hour APCP inputs here. Prefer a
+    // complete Stage IV interval; otherwise use MRMS only. Never mix them.
     const from=field==='apcp'?1:Math.max(1,h-duration+1);
     if(h===0||h<from||((field!=='apcp')&&h<duration))return null;
+    const product=preferredPrecipitationSource(data.source,{init_time:ref.toISOString()},h,h-from+1);
+    if(!product)return null;
     let total=0;
     for(let j=from;j<=h;j++){
      const time=valid({init_time:ref.toISOString()},j).toISOString();
-     const record=analysisAt(data.source,time,'apcp','mrms_apcp');
+     const record=analysisAt(data.source,time,'apcp',product);
      if(!record)return null;
      const value=await sampledValue(data.source,record,'apcp',0,lon,lat,FIELDS[field]||FIELDS.apcp);
      if(value===null)return null;total+=value;

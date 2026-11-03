@@ -28,8 +28,8 @@ assert.match(src,/overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:tr
 assert.match(src,/localStorage\.setItem\('omd_evu_height_overlay'/);
 assert.match(src,/localStorage\.setItem\(storage,st\[key\]/);
 assert.match(src,/!overlayWindVisible\(p\.cfg\?\.field\|\|st\.field\)/);
-assert.match(src,/const withHeight=Boolean\(overlayHeightVisible\(plottedField\)&&p\.heightField\)/);
-assert.match(src,/if\(p\.wind&&windComponentNames\(plottedField\)&&overlayWindVisible\(plottedField\)/);
+assert.match(src,/const withHeight=Boolean\(!p\.cfg\?\.differencePanel&&overlayHeightVisible\(plottedField\)&&p\.heightField\)/);
+assert.match(src,/if\(!p\.cfg\?\.differencePanel&&p\.wind&&windComponentNames\(plottedField\)&&overlayWindVisible\(plottedField\)/);
 const a=src.indexOf('function overlayHeightVisible(');
 const b=src.indexOf('function suspendContours(',a);
 vm.runInContext(src.slice(a,b),ctx);

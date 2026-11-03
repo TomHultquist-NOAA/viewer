@@ -8,7 +8,7 @@ assert.match(js,/el\.mslp850ToggleBtn\.onchange/);
 assert.match(js,/const isobarContour=plottedField==='mslp'/);
 assert.match(js,/const dashedScalar=.*upperAirScalar/);
 assert.match(js,/drawContours\(p,\{field:p\.temperature850Field,key:'t850',always:true,append:drew\}\)/);
-assert.match(js,/const withMSLP850=plottedField==='mslp'&&st\.overlayMSLP850/);
+assert.match(js,/const withMSLP850=!p\.cfg\?\.differencePanel&&plottedField==='mslp'&&st\.overlayMSLP850/);
 assert.match(js,/const matching=candidates\.find\(d=>cycleKey\(d\.init_time\)===time/);
 assert.match(js,/overlayPlotDescriptor\(p\)/);
 assert.match(js,/p\.title\.textContent=panelDisplayTitle\(p,overlayPlotDescriptor\(p\)\)/);

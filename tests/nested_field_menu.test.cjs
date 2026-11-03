@@ -12,7 +12,8 @@ assert.deepEqual(groups.map(g=>g.key),['radar','surface','precip','snow','uppera
 const flat=groups.flatMap(g=>g.fields),all=Array.from(vm.runInContext('fieldMenuEntries()',ctx),f=>f.key);
 assert.equal(flat.length,all.length);assert.equal(new Set(flat).size,all.length);
 assert.deepEqual([...flat].sort(),[...all].sort());
-for(const key of ['absv500','shear01','shear06','srh01','srh03','mxuphl','mxuphl_run','scp','stp','stp_fixed','snow48h','apcp48h'])assert(flat.includes(key));
+for(const key of ['absv500','shear01','shear06','srh01','srh03','mxuphl','mxuphl_run','snow48h','apcp48h'])assert(flat.includes(key));
+for(const key of ['scp','stp','stp_fixed'])assert(!flat.includes(key));
 assert.equal(groups.find(g=>g.key==='snow').fields.indexOf('asnow'),5);
 assert.match(html,/id="fieldMenuBtn"[^>]*aria-haspopup="menu"/);
 assert.match(html,/id="fieldMenuPopup"[^>]*hidden/);
