@@ -1,0 +1,1688 @@
+/* v1.2.45: terrain selection numbers remain visible but are excluded from clean panel recordings. */
+:root{--bg:#09111f;--panel:#07101c;--border:#294462;--text:#edf3fb;--muted:#aebdd0;--accent:#62adff;--shadow:0 12px 30px rgba(0,0,0,.34)}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;min-height:100%;background:var(--bg);color:var(--text);font-family:Arial,Helvetica,sans-serif}
+body{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:8px;padding:8px;height:100dvh;overflow:hidden}
+.toolbar{display:flex;gap:7px;align-items:flex-end;flex-wrap:wrap;background:linear-gradient(180deg,#13223b,#0d1728);border:1px solid rgba(98,173,255,.22);border-radius:16px;padding:10px 12px;box-shadow:var(--shadow)}
+.brand{display:flex;align-items:center;gap:7px;white-space:nowrap;align-self:center}.brand strong{font-size:16px;letter-spacing:.03em}.brand small{display:block;font-size:10px;color:var(--muted);margin-top:2px}.brandmark{width:35px;height:35px;border-radius:11px;background:linear-gradient(135deg,#62adff,#3182ca);color:#031322;font-size:22px;font-weight:900;display:grid;place-items:center}
+.control{display:grid;gap:5px;min-width:105px}.field-control{min-width:175px}.cycle-control{min-width:152px}.speed-control{min-width:95px}.control label{font-size:11px;color:#bac9dc;font-weight:700;letter-spacing:.02em}
+select,button,.display-box{height:38px;background:linear-gradient(180deg,#1a2b45,#14233a);color:var(--text);border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:0 8px;font-size:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}select option{background:#14233a;color:#edf3fb}button{cursor:pointer;font-weight:700;transition:background .13s,border-color .13s}button:hover:not(:disabled){background:#213a5c;border-color:rgba(98,173,255,.55)}button:disabled,select:disabled{opacity:.55;cursor:not-allowed}.display-box{display:flex;align-items:center;white-space:nowrap;min-width:133px}.spacer{flex:1 1 2px}.transport{display:inline-flex;align-items:center;gap:4px;height:38px;padding:3px;background:#14233a;border:1px solid rgba(255,255,255,.09);border-radius:999px}.round{height:29px;width:32px;padding:0;border:0;background:transparent;border-radius:18px;font-size:12px}.round.active{color:#d3ecff;background:rgba(98,173,255,.2);border:1px solid #4e84b7}.utility{white-space:nowrap;padding:0 9px}
+.helper{display:flex;align-items:center;justify-content:space-between;gap:10px;background:linear-gradient(180deg,#101d31,#0c1626);border:1px solid rgba(98,173,255,.16);border-radius:13px;padding:8px 11px;color:var(--muted);font-size:12px;line-height:1.4}.helper b{color:#f2f7ff}.catalog-badge{padding:3px 9px;background:#142843;border:1px solid #37516c;border-radius:20px;white-space:nowrap}
+.viewer-grid{--cols:1;display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));grid-auto-rows:minmax(185px,1fr);gap:8px;overflow-y:auto;overflow-x:hidden;min-height:0;min-width:0;padding:1px 3px 3px 1px;align-content:stretch}
+.viewer-grid.one-panel{grid-auto-rows:minmax(260px,1fr)}.startup{display:grid;place-items:center;grid-column:1/-1;color:var(--muted);font-size:15px}
+.panel-card{display:flex;flex-direction:column;min-width:0;min-height:215px;background:#0c1728;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}.panel-card.selected{border-color:var(--accent);box-shadow:0 0 0 1px rgba(98,173,255,.35),var(--shadow)}
+.panel-header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 9px;background:#10223a;min-width:0}.panel-name{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.panel-save{height:24px;border-radius:7px;font-size:10px;background:#1a3655;padding:0 8px;white-space:nowrap}
+.panel-viewport{position:relative;overflow:hidden;flex:1;min-height:125px;background:#07121e;cursor:crosshair;touch-action:none;user-select:none}.panel-viewport.dragging{cursor:crosshair}.image-layer{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;will-change:transform}.image-layer canvas{position:absolute;left:0;top:0;display:block}.plot-label{position:absolute;top:8px;left:8px;z-index:3;padding:5px 8px;background:rgba(3,11,19,.72);border:1px solid rgba(255,255,255,.15);border-radius:8px;max-width:calc(100% - 16px);pointer-events:none}.plot-label strong{display:block;font-size:11px}.plot-label span{display:block;font-size:10px;color:#d1ddea;padding-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.notice{display:none;position:absolute;z-index:5;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(6,14,25,.91);padding:12px 17px;border:1px solid #3b5877;border-radius:11px;color:#edf3fb;font-size:12px;text-align:center;max-width:90%;line-height:1.5}.notice.visible{display:block}.point-info{position:absolute;bottom:7px;left:7px;pointer-events:none;background:rgba(6,14,25,.86);border:1px solid #37516c;border-radius:8px;padding:5px 7px;font-size:10px;z-index:3;font-variant-numeric:tabular-nums;white-space:pre-line;max-width:calc(100% - 14px)}
+.panel-footer{min-width:0;background:#102036;border-top:1px solid #294462;padding:5px 8px 7px}.legend-title{font-size:10px;color:#dfe9f5;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.legend-canvas{width:100%;height:9px;border:1px solid #456080;border-radius:3px;display:block}.legend-labels{display:flex;justify-content:space-between;gap:3px;font-size:9px;color:#c6d6e9;margin-top:3px;font-variant-numeric:tabular-nums}.plot-footer{display:flex;justify-content:space-between;gap:15px;background:linear-gradient(180deg,#101d31,#0c1626);border:1px solid rgba(98,173,255,.16);border-radius:13px;padding:8px 13px;font-size:11px;color:var(--muted);line-height:1.5}
+@media(max-width:800px){body{height:auto;min-height:100dvh;overflow:auto;grid-template-rows:auto auto minmax(65vh,1fr) auto}.viewer-grid{overflow-y:visible;grid-auto-rows:minmax(260px,50vh)}.plot-footer{flex-wrap:wrap}.helper{display:block}.catalog-badge{display:inline-block;margin-top:6px}}
+@media(max-width:560px){body{padding:6px}.toolbar{padding:9px;gap:8px}.control,.cycle-control,.field-control{min-width:calc(50% - 8px);flex:1 1 130px}.panel-card{min-height:250px}}
+
+/* OMD EVU themes: user preference is saved locally, while the configured theme is the default. */
+:root,html[data-theme="dark"]{color-scheme:dark;--bg:#09111f;--panel:#0b1728;--card-head:#12233a;--border:#304761;--text:#e8f0fb;--muted:#a9bacf;--control:#182b45;--controlHover:#254063;--surface:#102139;--map-bg:#0d2132;--plot-label:rgba(6,16,30,.87);--plot-label-text:#d1e0f2;--highlight:#70b9ff}
+html[data-theme="light"]{color-scheme:light;--bg:#e8eef5;--panel:#ffffff;--card-head:#eff4f9;--border:#adbecf;--text:#1c3044;--muted:#52677c;--control:#fff;--controlHover:#e0ebf5;--surface:#f6f9fd;--map-bg:#ffffff;--plot-label:rgba(255,255,255,.88);--plot-label-text:#29435e;--highlight:#245e9e;--shadow:0 7px 20px rgba(27,56,90,.09)}
+html[data-theme] .toolbar,html[data-theme] .helper,html[data-theme] .plot-footer{background:var(--surface);color:var(--muted);border-color:var(--border)}
+html[data-theme] .toolbar{border-radius:13px}
+html[data-theme] .panel-card{background:var(--panel);border-color:var(--border)}
+html[data-theme] .panel-card.selected{border-color:var(--highlight);box-shadow:0 0 0 1px var(--highlight),var(--shadow)}
+html[data-theme] .panel-header,html[data-theme] .panel-footer{background:var(--card-head);border-color:var(--border)}
+html[data-theme] .panel-viewport{background:var(--map-bg)}
+html[data-theme] select,html[data-theme] button,html[data-theme] .display-box{background:var(--control);color:var(--text);border-color:var(--border);box-shadow:none}
+html[data-theme] select option{background:var(--control);color:var(--text)}
+html[data-theme] button:hover:not(:disabled){background:var(--controlHover);border-color:var(--highlight)}
+html[data-theme] .transport{background:var(--surface);border-color:var(--border)}
+html[data-theme] .round.active{background:var(--controlHover);border-color:var(--highlight);color:var(--highlight)}
+html[data-theme] .control label,html[data-theme] .helper b,html[data-theme] .legend-title{color:var(--text)}
+html[data-theme] .legend-labels{color:var(--muted)}
+html[data-theme] .plot-label{background:var(--plot-label);color:var(--text);border-color:var(--border);backdrop-filter:blur(3px)}
+html[data-theme] .plot-label span{color:var(--plot-label-text)}
+html[data-theme] .notice,html[data-theme] .point-info{background:var(--plot-label);color:var(--text);border-color:var(--border)}
+html[data-theme] .catalog-badge{background:var(--control);color:var(--muted);border-color:var(--border)}
+html[data-theme] .brandmark{width:43px;height:36px;font-size:13px;background:linear-gradient(135deg,#4da7ee,#2662a1);letter-spacing:-.5px;color:#fff}
+html[data-theme] .brand strong{font-size:16px;letter-spacing:0}
+html[data-theme] .brand small{font-size:11px}
+html[data-theme] .panel-viewport .image-layer{image-rendering:auto}
+.theme-toggle{min-width:88px}
+@media(max-width:800px){.theme-toggle{order:-1}}
+
+/* Choose between orthographic globe context and classic Lambert domain projection. */
+.map-view-control{min-width:100px}
+@media(max-width:560px){.map-view-control{min-width:115px;flex:1 1 115px}}
+
+/* The weather field is nearest-neighbor on zoom; vector geography stays smooth. */
+.image-layer canvas.field-canvas{image-rendering:auto}
+/* autumnplot-gl / MapLibre custom rendering surface */
+.panel-viewport{position:relative;overflow:hidden;touch-action:auto;cursor:crosshair}
+.map-frame{position:absolute;inset:0;z-index:0}
+.map-frame .maplibregl-canvas{cursor:crosshair}
+.map-frame .maplibregl-canvas:active{cursor:crosshair}
+.map-frame .maplibregl-control-container{pointer-events:none}
+.plot-label,.point-info,.notice{z-index:4}
+.map-snapshot{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:var(--map-bg);z-index:1;pointer-events:none}
+.panel-viewport .plot-label{max-width:calc(100% - 16px)}
+.panel-viewport .notice{font-weight:600}
+.panel-viewport.has-live-map .map-snapshot{display:none}
+.panel-footer .legend-canvas{height:13px}
+
+/* Footer link remains legible in dark and light mode. */
+.plot-footer a{color:inherit;text-decoration:underline;text-underline-offset:2px}.plot-footer a:hover{opacity:.8}
+
+/* Numeric legends: more exact ticks, scaled to panel widths via container queries. */
+.panel-card{container-type:inline-size}
+.panel-footer .legend-labels{display:block;position:relative;height:18px;margin-top:4px;font-variant-numeric:tabular-nums}
+.panel-footer .legend-tick{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap;font-size:9px;line-height:13px}
+.panel-footer .legend-tick:first-child{transform:none}
+.panel-footer .legend-tick:last-child{transform:translateX(-100%)}
+@container (max-width:610px){.panel-footer .legend-tick[data-odd="1"]{display:none}}
+
+/* v7.11 compact controls: one efficient row where space permits. */
+body{gap:6px}
+.toolbar{display:flex;align-items:center;gap:9px;padding:7px 10px;flex-wrap:wrap}
+.toolbar-brandline{display:contents}
+.toolbar-brand-actions{display:contents}
+.toolbar .brand{flex:0 0 auto;align-self:center}
+.toolbar .brandmark{width:36px;height:33px}
+.toolbar .brand strong{font-size:14px}
+.toolbar .brand small{font-size:10px}
+.toolbar-controls{display:flex;flex:1 1 900px;align-items:flex-end;gap:6px;flex-wrap:wrap;min-width:0}
+.toolbar-controls .control{gap:3px;min-width:0;flex:0 1 auto}
+.toolbar-controls .control label{font-size:10px}
+.toolbar-controls select{width:100%;font-size:11px;padding:0 6px}
+.toolbar-controls .field-control{width:190px;max-width:220px}
+.toolbar-controls .cycle-control{width:159px}
+.toolbar-controls .forecast-control{width:85px}
+.toolbar-controls .speed-control{width:81px}
+.toolbar-controls .map-view-control{width:121px}
+.toolbar select,.toolbar button,.toolbar .display-box{height:32px;border-radius:8px}
+.toolbar .transport{height:32px;padding:2px;gap:2px;flex:0 0 auto}
+.toolbar .round{height:26px;width:29px;font-size:11px}
+.toolbar .utility{font-size:11px;padding:0 8px}
+.toolbar-utilities{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.toolbar .theme-toggle{min-width:0;width:34px;height:34px;font-size:19px;padding:0;line-height:1;order:4;margin-left:auto;flex:0 0 34px}
+.helper{padding:5px 10px;font-size:11px;min-height:26px}
+.mobile-controls-btn{display:none}
+@media (max-width:800px){
+ body{grid-template-rows:auto auto minmax(65vh,1fr) auto}
+ .toolbar{display:block;padding:7px 9px}
+ .toolbar-brandline{display:flex;justify-content:space-between;gap:8px;align-items:center;min-width:0}
+ .toolbar-brand-actions{display:flex;align-items:center;gap:7px}
+ .mobile-controls-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap}
+ .toolbar .theme-toggle{margin:0;order:initial}
+ .toolbar-controls{display:none;flex:1 1 auto;margin-top:9px;border-top:1px solid var(--border);padding-top:9px;align-items:flex-end;gap:7px}
+ .toolbar-controls.is-open{display:flex}
+ .toolbar-controls .field-control{flex:2 1 180px;width:auto;max-width:none}
+ .toolbar-controls .cycle-control{flex:1 1 140px;width:auto}
+ .toolbar-controls .forecast-control{flex:0 1 88px;width:88px}
+ .toolbar-controls .speed-control{flex:0 1 88px;width:88px}
+ .toolbar-controls .map-view-control{flex:0 1 130px;width:130px}
+ .toolbar-utilities{flex:1 1 100%;}
+ .toolbar .brand small{font-size:9px}
+ .toolbar .brand strong{font-size:13px}
+ .toolbar .transport{margin:0}
+}
+@media (max-width:560px){
+ .toolbar-controls .control,.toolbar-controls .cycle-control,.toolbar-controls .field-control{min-width:0}
+ .toolbar-controls .field-control{flex:1 1 100%}
+ .toolbar-controls .cycle-control{flex:2 1 120px}
+ .toolbar-controls .forecast-control{flex:1 1 77px;width:auto}
+ .toolbar-controls .map-view-control{flex:1 1 115px;width:auto}
+ .toolbar-utilities{justify-content:space-between}
+ .toolbar .brandmark{width:33px;height:32px}
+}
+
+.theme-toggle{display:inline-flex;align-items:center;justify-content:center}
+.theme-toggle svg{display:block;width:19px;height:19px;flex:0 0 auto}
+
+
+/* v7.12: tight speed steppers and slide-export chooser */
+.toolbar-controls .speed-control{width:112px}
+.speed-buttons{display:flex;align-items:center;height:32px;border:1px solid var(--border);border-radius:8px;background:var(--control);overflow:hidden}
+.toolbar .speed-buttons button{height:30px;min-width:28px;padding:0;border:0;border-radius:0;font-size:17px;line-height:1;background:transparent}
+.speed-buttons output{display:inline-flex;flex:1;justify-content:center;align-items:center;min-width:36px;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.export-dialog{position:fixed;inset:auto;max-width:min(430px,calc(100vw - 24px));width:100%;padding:0;border:1px solid var(--border);border-radius:16px;background:var(--panel);color:var(--text);box-shadow:0 30px 90px #0008}
+.export-dialog::backdrop{background:rgba(2,8,18,.74);backdrop-filter:blur(3px)}
+.export-dialog form{padding:20px}
+.export-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.export-heading h2{font-size:18px;margin:0}
+.export-dialog .export-close{height:30px;width:30px;flex:0 0 30px;padding:0;font-size:24px}
+.export-dialog p{font-size:13px;color:var(--muted);line-height:1.5;margin:10px 0 17px}
+.export-ratios{margin:0;border:0;padding:0;display:grid;gap:9px}
+.export-ratios legend{font-size:12px;font-weight:700;padding:0;margin-bottom:10px}
+.export-choice{display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--border);border-radius:10px;background:var(--surface);cursor:pointer}
+.export-choice:has(input:checked){border-color:var(--highlight);box-shadow:0 0 0 1px var(--highlight)}
+.export-choice input{accent-color:var(--highlight);width:16px;height:16px;flex:none}
+.export-choice span{display:grid;gap:4px;font-size:13px}
+.export-choice small{font-size:11px;color:var(--muted)}
+.export-dialog .export-busy{margin:9px 0;min-height:14px;font-size:12px}
+.export-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
+.export-actions button{height:36px}
+.export-actions .export-primary{background:var(--highlight);color:var(--bg);border-color:var(--highlight);font-weight:700}
+@media(max-width:800px){.toolbar-controls .speed-control{flex:0 0 112px;width:112px}}
+
+/* v7.14: preserve the ninth verifying-analysis slot without initializing WebGL. */
+.panel-card.analysis-placeholder .panel-viewport{background:radial-gradient(ellipse at 50% 28%,rgba(72,111,155,.17),transparent 70%),var(--map-bg);}
+.panel-card.analysis-placeholder .notice{top:50%;left:50%;transform:translate(-50%,-50%);max-width:90%;width:max-content;text-align:center;white-space:normal;}
+.panel-card.analysis-placeholder .panel-footer{min-height:55px;}
+.panel-card.analysis-placeholder .legend-canvas{visibility:hidden;}
+
+/* v7.15: map-aligned 10-m wind barbs. Kept out of WebGL DOM to preserve plot engine. */
+.wind-overlay{position:absolute;inset:0;z-index:2;width:100%;height:100%;pointer-events:none;display:block;}
+.export-framing{border:0;padding:0;margin:16px 0 6px;display:grid;gap:8px;}
+.export-framing legend{font-size:12px;font-weight:700;margin-bottom:7px;}
+.export-framing label{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;}
+.export-framing input{accent-color:var(--highlight);}
+.export-framing small{font-size:11px;color:var(--muted);}
+
+
+/* v7.16: plot-first panels and responsive compact legends. */
+/* The model and valid time remain INSIDE the plot, not in a redundant header. */
+.panel-card .panel-header{display:none}
+.panel-viewport{min-height:0}
+.panel-viewport .plot-label{max-width:calc(100% - 55px)}
+.panel-viewport .panel-save{
+ position:absolute;right:7px;top:7px;z-index:7;
+ width:29px;height:29px;min-width:29px;padding:5px;
+ display:flex;align-items:center;justify-content:center;
+ border-radius:8px;border:1px solid var(--border);
+ background:var(--plot-label);color:var(--text);
+ backdrop-filter:blur(4px);opacity:.92;cursor:pointer;
+}
+.panel-viewport .panel-save svg{display:block;width:17px;height:17px;flex:0 0 auto}
+.panel-viewport .panel-save:disabled{opacity:.35;pointer-events:none}
+.panel-viewport .panel-save:hover:not(:disabled){opacity:1}
+/* Smaller horizontal legends: used for single/few panels and narrow screens. */
+.panel-footer{padding:3px 7px 4px}
+.panel-footer .legend-title{margin-bottom:2px;font-size:9px;line-height:11px}
+.panel-footer .legend-canvas{height:10px}
+.panel-footer .legend-labels{height:13px;margin-top:2px}
+.panel-footer .legend-tick{line-height:11px;font-size:8px}
+/* Right-side colorbars for 6+ panels on sufficiently wide 3+ column layouts. */
+.viewer-grid.vertical-legends .panel-card:not(.analysis-placeholder){flex-direction:row}
+.viewer-grid.vertical-legends .panel-card:not(.analysis-placeholder)>.panel-viewport{flex:1 1 auto;min-width:0;min-height:0}
+.viewer-grid.vertical-legends .panel-card:not(.analysis-placeholder)>.panel-footer{
+ flex:0 0 74px;width:74px;min-width:74px;position:relative;
+ border-top:0;border-left:1px solid var(--border);
+ padding:5px 5px;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-title{
+ font-size:9px;line-height:11px;text-align:center;
+ margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-canvas{
+ position:absolute;left:7px;top:23px;bottom:7px;
+ width:13px;height:calc(100% - 30px);border-radius:3px;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-labels{
+ position:absolute;left:24px;right:4px;top:23px;bottom:7px;
+ display:block;height:auto;margin:0;overflow:visible;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-tick{
+ left:0!important;top:auto;transform:translateY(-50%);
+ font-size:9px;line-height:10px;
+}
+.viewer-grid.vertical-legends .panel-footer .legend-tick[data-end="top"]{transform:translateY(0)}
+.viewer-grid.vertical-legends .panel-footer .legend-tick[data-end="bottom"]{transform:translateY(-100%)}
+@container (max-width:610px){.viewer-grid.vertical-legends .panel-footer .legend-tick[data-odd="1"]{display:block}}
+@media(max-width:800px){.panel-viewport{min-height:170px}}
+
+/* Analysis has no colorbar until RAP/MRMS analysis data are available. */
+.panel-card.analysis-placeholder>.panel-footer{display:none}
+
+
+/* v7.17: share one field legend and maximize every panel's map area. */
+.viewer-workspace{display:flex;flex-direction:column;min-width:0;min-height:0;gap:0;overflow:hidden;}
+.viewer-workspace>.viewer-grid{flex:1 1 auto;min-height:0;min-width:0;}
+.viewer-grid{gap:1px;padding:0;grid-auto-rows:minmax(120px,1fr);background:var(--border);}
+.panel-card,html[data-theme] .panel-card{min-height:100px;border:0;border-radius:0;box-shadow:none;}
+.panel-card.selected,html[data-theme] .panel-card.selected{border:0;box-shadow:inset 0 0 0 2px var(--highlight);}
+.panel-card>.panel-footer,.viewer-grid.vertical-legends .panel-card>.panel-footer{display:none;}
+.shared-legend{
+ flex:0 0 auto;min-height:47px;display:flex;align-items:center;gap:15px;
+ padding:4px 11px;background:var(--surface);color:var(--text);
+ border-top:1px solid var(--border);min-width:0;
+}
+.shared-legend-title{font-size:11px;font-weight:700;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;flex:0 1 240px;}
+.shared-legend-track{flex:1 1 auto;min-width:0;max-width:1000px;position:relative;align-self:center;}
+.shared-legend-canvas{display:block;width:100%;height:14px;border:1px solid var(--border);border-radius:2px;}
+.shared-legend-labels{height:16px;position:relative;margin-top:3px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.shared-legend-tick{position:absolute;top:0;font-size:10px;white-space:nowrap;transform:translateX(-50%);}
+.shared-legend-tick[data-end="first"]{transform:none;}
+.shared-legend-tick[data-end="last"]{transform:translateX(-100%);}
+@media(max-width:800px){
+ .viewer-workspace{overflow:visible;}
+ .viewer-workspace>.viewer-grid{overflow-y:visible;flex:0 0 auto;grid-auto-rows:minmax(255px,auto);}
+ .panel-card,html[data-theme] .panel-card{min-height:240px;}
+ .shared-legend{flex-wrap:wrap;gap:1px;min-height:56px;padding:5px 8px;}
+ .shared-legend-title{flex:1 1 100%;max-width:none;font-size:10px;}
+ .shared-legend-track{flex:1 1 100%;max-width:none;}
+ .shared-legend-tick{font-size:9px;}
+}
+
+
+/* v7.19: status and plotting credit share the instructions strip; no footer. */
+body{grid-template-rows:auto auto minmax(0,1fr);}
+.helper{display:flex;align-items:center;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;padding:5px 10px;}
+.helper-instructions{min-width:0;flex:1 1 360px;}
+.helper-status{display:inline-flex;align-items:center;justify-content:flex-end;gap:12px;min-width:0;flex:1 1 330px;text-align:right;font-size:10px;white-space:nowrap;}
+.helper-status #dataStatus{font-variant-numeric:tabular-nums;}
+.helper-credit a{color:inherit;text-decoration:underline;text-underline-offset:2px;}
+@media (max-width:1050px){.helper-status{justify-content:flex-start;text-align:left;flex-wrap:wrap;white-space:normal;}}
+@media (max-width:800px){body{grid-template-rows:auto auto minmax(65vh,1fr);}.helper{display:flex;gap:3px;}.helper-instructions,.helper-status{flex:1 1 100%;}.helper-status{justify-content:flex-start;}}
+
+/* v7.20: projected, noninteractive counterpart cursors. The real OS cursor
+   remains a normal white crosshair/pointer; these never intercept events. */
+.sync-crosshair{position:absolute;z-index:6;width:23px;height:23px;
+ transform:translate(-50%,-50%);pointer-events:none;user-select:none;
+ filter:drop-shadow(0 0 2px #051c2a);}
+.sync-crosshair::before,.sync-crosshair::after{content:'';position:absolute;background:#00f3e3;
+ box-shadow:0 0 0 1px rgba(7,32,42,.4);}
+.sync-crosshair::before{height:2px;width:23px;top:10.5px;left:0;}
+.sync-crosshair::after{width:2px;height:23px;left:10.5px;top:0;}
+.sync-crosshair[hidden]{display:none!important}
+/* Export dialog opens adjacent to the clicked toolbar button or panel icon. */
+.export-dialog{margin:0;inset:auto;max-height:calc(100dvh - 16px);overflow:auto}
+
+/* v7.20: give the common color scale the complete grid width. Keep its
+   field title centered directly above the swatches on desktop and mobile. */
+.shared-legend{flex-direction:column;justify-content:center;align-items:stretch;gap:2px;
+ padding:3px 16px 5px;min-height:49px;}
+.shared-legend-title{flex:0 0 auto;max-width:none;width:100%;font-size:11px;line-height:14px;
+ text-align:center;white-space:nowrap;}
+.shared-legend-track{flex:0 0 auto;width:100%;max-width:none;min-width:0;}
+.shared-legend-canvas{height:13px;}
+.shared-legend-labels{margin-top:1px;height:15px;}
+@media (max-width:800px){.shared-legend{gap:2px;padding:3px 9px 5px;min-height:49px;}
+ .shared-legend-title,.shared-legend-track{flex:0 0 auto;max-width:none;width:100%;}
+}
+
+
+/* v7.40: keep the glowing master crosshair locked to the actual mouse.
+   The previous white/glowing DOM overlay was painted one or more animation
+   frames after the OS pointer and could visibly trail it during movement.
+   Use a single native cursor image with a center-accurate (24,24) hotspot.
+   Geographic counterparts remain DOM overlays in the other panels. */
+@media (pointer: fine) {
+  .panel-viewport {cursor:url('cursor-master-glow.svg') 24 24,crosshair;}
+  .map-frame .maplibregl-canvas,
+  .map-frame .maplibregl-canvas:active {
+    cursor:url('cursor-master-glow.svg') 24 24,crosshair !important;
+  }
+}
+/* The native hand remains the only click target; a halo highlights it. */
+.panel-viewport .panel-save:hover:not(:disabled){
+ box-shadow:0 0 0 1px rgba(255,255,255,.9),0 0 9px 3px rgba(255,255,255,.50),
+ 0 0 21px 6px rgba(60,190,255,.55);
+ cursor:url('cursor-hand-glow.svg') 13 3,pointer;
+}
+
+
+/* v7.28: in-workspace single-panel focus. Keep the shared legend/toolbar.
+   Non-focused maps stay mounted but aren't resized at zero dimensions. */
+.panel-viewport .panel-expand{
+ position:absolute;right:7px;bottom:7px;z-index:9;
+ display:flex;align-items:center;justify-content:center;
+ width:29px;height:29px;min-width:29px;padding:5px;
+ border:1px solid var(--border);border-radius:8px;
+ background:var(--plot-label);color:var(--text);
+ backdrop-filter:blur(4px);opacity:.92;cursor:pointer;
+}
+.panel-viewport .panel-expand svg{width:17px;height:17px;display:block;pointer-events:none}
+.panel-viewport .panel-expand:hover,.panel-viewport .panel-expand:focus-visible{
+ opacity:1;box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 9px rgba(73,174,255,.48);
+}
+.viewer-workspace>.viewer-grid.focus-panel{
+ --cols:1;grid-template-columns:minmax(0,1fr);grid-auto-rows:minmax(0,1fr);
+ overflow:hidden;align-content:stretch;
+}
+.viewer-grid.focus-panel>.panel-card:not(.is-focused){display:none!important}
+/* Element Capture requires a self-contained stacking context so occluding
+   detached controls are NOT part of the recorded panel subtree. */
+.viewer-grid.focus-panel>.panel-card.is-focused{
+ grid-column:1;grid-row:1;width:100%;height:100%;min-width:0;min-height:0;
+ isolation:isolate;
+}
+@media(max-width:800px){
+ .viewer-workspace>.viewer-grid.focus-panel{
+  flex:0 0 auto;grid-template-columns:minmax(0,1fr);
+  grid-auto-rows:minmax(0,1fr);height:max(340px,65dvh);
+  overflow:hidden;
+ }
+ .viewer-grid.focus-panel>.panel-card.is-focused{min-height:0}
+}
+
+/* Full diagnostics for long analysis/grid errors; tap to see or copy details. */
+.notice.error-details{white-space:pre-line;overflow-wrap:anywhere;max-height:68%;overflow-y:auto;cursor:pointer;user-select:text;overscroll-behavior:contain}
+
+
+/* v7.37: desktop-only placement control. The <=800px mobile controls and
+   collapse/expand behavior remain exactly as before. */
+.controls-position-toggle{display:none!important}
+@media (min-width:801px){
+ .toolbar .controls-position-toggle{
+  display:inline-flex!important;align-items:center;justify-content:center;
+  width:34px;min-width:34px;height:34px;flex:0 0 34px;order:5;
+  padding:0;line-height:1;
+ }
+ .controls-position-toggle svg{display:block;width:19px;height:19px;flex:0 0 auto}
+ .controls-position-toggle:focus-visible{outline:2px solid var(--highlight);outline-offset:2px}
+ html[data-controls-position="left"] body{
+  grid-template-columns:clamp(220px,18vw,260px) minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr);
+ }
+ html[data-controls-position="left"] .toolbar{
+  grid-column:1;grid-row:1;min-height:0;min-width:0;
+  display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
+  justify-content:flex-start;gap:14px;padding:13px 11px;
+  overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;
+ }
+ html[data-controls-position="left"] .toolbar-brandline{
+  display:flex;flex-direction:column;gap:10px;align-items:stretch;
+ }
+ html[data-controls-position="left"] .toolbar .brand{
+  align-self:stretch;white-space:normal;min-width:0;
+ }
+ html[data-controls-position="left"] .toolbar .brand>div:last-child{min-width:0}
+ html[data-controls-position="left"] .toolbar .brand strong{font-size:14px;line-height:1.2;display:block}
+ html[data-controls-position="left"] .toolbar .brand small{font-size:10px}
+ html[data-controls-position="left"] .toolbar-brand-actions{
+  display:flex;align-items:center;justify-content:flex-end;gap:7px;
+ }
+ html[data-controls-position="left"] .toolbar .theme-toggle{
+  order:initial;margin:0;flex:0 0 34px;
+ }
+ html[data-controls-position="left"] .toolbar .controls-position-toggle{
+  order:initial;margin:0;
+ }
+ html[data-controls-position="left"] .toolbar-controls{
+  display:flex;flex:0 0 auto;flex-direction:column;align-items:stretch;
+  flex-wrap:nowrap;gap:11px;min-width:0;width:100%;
+ }
+ html[data-controls-position="left"] .toolbar-controls .control,
+ html[data-controls-position="left"] .toolbar-controls .field-control,
+ html[data-controls-position="left"] .toolbar-controls .cycle-control,
+ html[data-controls-position="left"] .toolbar-controls .forecast-control,
+ html[data-controls-position="left"] .toolbar-controls .speed-control,
+ html[data-controls-position="left"] .toolbar-controls .map-view-control{
+  width:100%;max-width:none;min-width:0;flex:0 0 auto;
+ }
+ html[data-controls-position="left"] .toolbar-controls .control label{font-size:11px}
+ html[data-controls-position="left"] .toolbar-controls select{width:100%}
+ html[data-controls-position="left"] .toolbar .transport{
+  align-self:stretch;justify-content:space-around;width:100%;margin:0;
+ }
+ html[data-controls-position="left"] .speed-buttons{width:100%}
+ html[data-controls-position="left"] .toolbar-utilities{
+  width:100%;display:grid;grid-template-columns:minmax(0,1fr);gap:7px;
+ }
+ html[data-controls-position="left"] .toolbar-utilities .utility{width:100%;min-width:0}
+ html[data-controls-position="left"] .toolbar>.helper{
+  flex:0 0 auto;width:100%;min-width:0;margin-top:auto;
+  display:flex;flex-direction:column;align-items:stretch;
+  justify-content:flex-start;gap:9px;padding:10px 9px;
+  text-align:left;overflow-wrap:break-word;
+ }
+ html[data-controls-position="left"] .toolbar>.helper .helper-instructions{
+  flex:0 0 auto;min-width:0;width:100%;line-height:1.65;
+ }
+ html[data-controls-position="left"] .toolbar>.helper .helper-status{
+  display:flex;flex:0 0 auto;flex-direction:column;align-items:flex-start;
+  justify-content:flex-start;gap:8px;text-align:left;
+  min-width:0;width:100%;white-space:normal;line-height:1.5;
+ }
+ html[data-controls-position="left"] .toolbar>.helper #dataStatus{
+  width:100%;white-space:normal;overflow-wrap:anywhere;
+ }
+ html[data-controls-position="left"] .toolbar>.helper .helper-credit{
+  width:100%;overflow-wrap:anywhere;
+ }
+ html[data-controls-position="left"] .viewer-workspace{
+  grid-column:2;grid-row:1;min-width:0;min-height:0;
+ }
+}
+
+/* v7.42: smooth labeled isolines above shading, below hover and panel controls. */
+.contour-overlay{position:absolute;inset:0;z-index:3;width:100%;height:100%;pointer-events:none;display:block}
+.contour-control[hidden]{display:none!important}
+.toolbar-controls .contour-control{width:112px;min-width:102px}
+.contour-switch{display:flex;align-items:center;gap:6px;height:32px;padding:3px 8px;
+ border:1px solid var(--border);border-radius:8px;background:var(--control);color:var(--text);
+ font-size:11px!important;white-space:nowrap;cursor:pointer}
+.contour-switch input{width:15px;height:15px;accent-color:var(--accent)}
+@media(min-width:801px){html[data-controls-position="left"] .toolbar-controls .contour-control{width:100%}}
+
+/* Wind barbs remain on top when contours are also enabled. */
+.wind-overlay{z-index:4}
+
+
+/* v7.47: distinct, high-contrast separators, independent of geographic boundaries. */
+html[data-theme="dark"]{--panel-divider:#7998b7}
+html[data-theme="light"]{--panel-divider:#566c85}
+.viewer-grid{gap:2px;background:var(--panel-divider)}
+.toolbar-controls .model-set-control{width:174px;min-width:148px}
+@media(max-width:800px){.toolbar-controls .model-set-control{flex:1 1 160px;width:auto}}
+@media(min-width:801px){html[data-controls-position="left"] .toolbar-controls .model-set-control{width:100%;max-width:none;min-width:0}}
+.panel-difference-selector{position:absolute;bottom:10px;left:10px;z-index:8;display:flex;align-items:center;gap:6px;
+ background:var(--plot-label);color:var(--text);padding:6px 8px;border:1px solid var(--panel-divider);border-radius:8px;
+ font-size:11px;cursor:pointer;line-height:1.25;box-shadow:0 2px 8px #0004;backdrop-filter:blur(5px)}
+.panel-difference-selector input{width:15px;height:15px;margin:0;accent-color:var(--highlight);cursor:pointer}
+.panel-difference-selector:has(input:checked){outline:2px solid var(--highlight);outline-offset:0}
+.panel-difference-selector:focus-within{outline:2px solid var(--highlight)}
+.difference-confirm{background:var(--panel);color:var(--text);border:1px solid var(--panel-divider);border-radius:13px;
+ max-width:min(450px,calc(100vw - 25px));padding:20px 22px;box-shadow:0 25px 70px #0008}
+.difference-confirm::backdrop{background:rgba(3,9,21,.47)}
+.difference-confirm h2{font-size:17px;margin:0 0 12px}
+.difference-confirm p{font-size:13px;line-height:1.55}
+.difference-confirm-hint{color:var(--muted)}
+.difference-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.difference-dialog-actions button{padding:8px 13px;border-radius:7px}
+#differenceOpenBtn{background:var(--highlight);color:var(--bg);font-weight:700}
+.difference-window[hidden]{display:none!important}
+.difference-window{position:fixed;z-index:80;left:max(16px,calc(50vw - 315px));top:12vh;
+ width:min(630px,calc(100vw - 24px));height:min(510px,75vh);min-width:300px;min-height:265px;
+ display:flex;flex-direction:column;background:var(--panel);color:var(--text);border:2px solid var(--panel-divider);
+ border-radius:12px;box-shadow:0 24px 76px #000a;overflow:hidden;resize:both}
+.difference-window-header{flex:0 0 auto;min-height:54px;display:flex;justify-content:space-between;align-items:center;
+ padding:8px 11px;background:var(--card-head);border-bottom:1px solid var(--panel-divider);
+ cursor:move;touch-action:none;user-select:none}
+.difference-window-heading{min-width:0;display:flex;flex-direction:column;gap:2px;pointer-events:none}
+.difference-window-heading strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.difference-window-heading small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.difference-window-close{font-size:20px!important;width:30px;height:30px;padding:0!important;line-height:1!important}
+.difference-map{position:relative;flex:1 1 auto;min-height:100px;background:var(--map-bg)}
+.difference-map .maplibregl-control-container{display:none}
+.difference-message{position:absolute;top:70px;left:12px;right:12px;margin:auto;padding:8px 10px;border:1px solid var(--border);
+ border-radius:7px;background:var(--plot-label);color:var(--text);text-align:center;z-index:3;font-size:12px;pointer-events:none}
+.difference-message[hidden]{display:none!important}
+.difference-window-legend{flex:0 0 44px;padding:5px 14px;background:var(--card-head);border-top:1px solid var(--panel-divider)}
+.difference-legend-ramp{height:12px;border:1px solid var(--border);background:linear-gradient(90deg,#133d8a 0%,#388ed0 20%,#b9d8e9 42%,rgba(246,247,248,.85) 44%,rgba(246,247,248,0) 47.5%,rgba(246,247,248,0) 52.5%,rgba(246,247,248,.85) 56%,#f6bcb1 58%,#e75d4c 80%,#98252d 100%)}
+.difference-legend-ticks{display:flex;justify-content:space-between;color:var(--text);font-size:11px;font-variant-numeric:tabular-nums;margin-top:3px}
+@media(max-width:800px){.difference-window{min-width:270px;top:10vh;left:8px;width:min(94vw,580px);height:min(65vh,490px)}}
+
+/* v7.48: Compact in-label compare selection; map label stays unchanged. */
+.panel-viewport .plot-label{display:flex;align-items:flex-start;gap:7px;pointer-events:none;max-width:calc(100% - 55px)}
+.plot-label-meta{min-width:0;overflow:hidden}
+.plot-label-meta strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-difference-selector{position:static;flex:0 0 auto;width:18px;height:20px;display:flex;align-items:center;justify-content:center;
+ padding:0;margin:0;gap:0;border:none;background:transparent;border-radius:3px;box-shadow:none;backdrop-filter:none;pointer-events:auto;cursor:pointer}
+.panel-difference-selector input{width:15px;height:15px;margin:0;accent-color:var(--highlight);cursor:pointer}
+.panel-difference-selector:has(input:checked),.panel-difference-selector:focus-within{outline:1px solid var(--highlight);outline-offset:1px}
+.difference-window-actions{display:flex;align-items:center;gap:8px}
+.difference-window-save{font-size:11px;padding:6px 9px!important;white-space:nowrap}
+.difference-window-save:disabled{opacity:.45}
+.difference-sample{position:absolute;left:9px;bottom:9px;right:9px;max-width:max-content;pointer-events:none;z-index:10;
+ border:1px solid var(--panel-divider);border-radius:6px;background:var(--plot-label);color:var(--text);padding:6px 8px;
+ font-size:11px;font-variant-numeric:tabular-nums;line-height:1.5;white-space:normal}
+.difference-sample[hidden]{display:none!important}
+.difference-window-legend{flex:0 0 67px;padding:8px 24px 4px;position:relative}
+.difference-legend-ticks{position:relative;height:17px;margin-top:3px;display:block;font-size:10px}
+.difference-legend-ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap;top:0}
+.difference-legend-ticks span:first-child{transform:translateX(0)}
+.difference-legend-ticks span:last-child{transform:translateX(-100%)}
+.difference-legend-ticks .difference-zero-tick{font-weight:700}
+.difference-legend-unit{text-align:center;color:var(--muted);font-size:10px}
+@media(max-width:520px){.difference-legend-ticks span:nth-child(even){display:none}}
+
+.difference-legend-ticks span[hidden]{display:none!important}
+/* Do not display stale difference colors as if they belong to a newly selected hour. */
+.difference-window .difference-message:not([hidden]){
+ top:55px;bottom:67px;left:0;right:0;display:flex;align-items:center;justify-content:center;
+ padding:16px 24px;border:0;border-radius:0;background:var(--panel);font-weight:600;z-index:6;
+}
+
+/* v0.48.3: Keep the difference region in the floating window during PNG capture. */
+.difference-map{overflow:hidden;isolation:isolate}
+.difference-map-host{position:absolute;inset:0;width:100%;height:100%}
+.difference-export-preview{position:absolute;inset:0;z-index:20;display:flex;align-items:center;
+ justify-content:center;overflow:hidden;pointer-events:none;background:var(--map-bg);color:var(--text)}
+.difference-export-preview img{position:absolute;width:100%;height:100%;object-fit:fill;inset:0}
+.difference-export-preview span{position:relative;z-index:1;font-size:12px;font-weight:600;
+ padding:8px 12px;background:var(--plot-label);border:1px solid var(--panel-divider);border-radius:6px}
+/* MapLibre adds its own relative-position class after loading vendor CSS;
+   the difference host must remain absolutely fitted to its flex parent. */
+#differenceMap > .difference-map-host.maplibregl-map{position:absolute;inset:0;width:100%;height:100%}
+
+/* v0.49.2: browser-visible difference raster drawn from the same native
+   difference field as Save PNG; pointer interactions remain on MapLibre. */
+.difference-map .difference-live-shading{
+ position:absolute;inset:0;z-index:2;width:100%;height:100%;
+ pointer-events:none;user-select:none;
+}
+
+/* Difference PNG button uses the exact 24x24 download icon from the main panels. */
+.difference-window-save{width:29px;height:29px;min-width:29px;padding:5px!important;display:flex;align-items:center;justify-content:center;border:1px solid var(--border);border-radius:8px;background:var(--plot-label);color:var(--text);cursor:pointer;opacity:.92}
+.difference-window-save svg{display:block;width:17px;height:17px;flex:0 0 auto}
+.difference-window-save:hover:not(:disabled){opacity:1}
+.difference-window-save:disabled{opacity:.35;cursor:not-allowed}
+
+
+
+/* v0.50.6: single nested field menu; appended directly beneath body to avoid
+   clipping by the left-oriented scrollable toolbar. Works in both themes. */
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.toolbar .share-link-btn{display:inline-flex;align-items:center;justify-content:center;order:6;flex:0 0 34px;width:34px;min-width:34px;height:34px;padding:0}
+.share-link-btn svg{width:19px;height:19px;display:block}
+.share-link-btn.is-copied{color:var(--highlight);border-color:var(--highlight)!important}
+@media(max-width:800px){.toolbar .share-link-btn{order:initial;flex:0 0 34px;margin:0}}
+.toolbar-controls .field-nested-control{width:205px;max-width:230px}
+.toolbar .field-menu-trigger{display:flex;align-items:center;justify-content:space-between;gap:9px;width:100%;height:32px;padding:0 9px;min-width:0;font-weight:600;text-align:left}
+.field-menu-trigger span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.field-menu-trigger svg{flex:none;width:14px;height:14px}
+.field-menu-trigger:focus-visible,.field-menu-popup button:focus-visible,.share-link-btn:focus-visible{outline:2px solid var(--highlight);outline-offset:2px}
+.field-menu-popup[hidden],.field-menu-branch[hidden]{display:none!important}
+.field-menu-popup{position:fixed;z-index:10000;box-sizing:border-box;
+ border:1px solid var(--border);border-radius:11px;background:var(--panel);color:var(--text);
+ padding:5px;box-shadow:0 16px 45px rgba(0,0,0,.42);max-height:min(76vh,530px);overflow:visible}
+.field-menu-categories,.field-menu-items{display:flex;flex-direction:column;gap:2px;max-height:min(74vh,515px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.field-menu-popup button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:auto;min-height:34px;
+ padding:8px 10px;text-align:left;border:0;border-radius:7px;font-size:12px;line-height:1.3;
+ background:transparent;color:var(--text);box-shadow:none;white-space:normal;font-weight:500;cursor:pointer}
+.field-menu-popup button:hover,.field-menu-popup button:focus-visible,.field-menu-popup button.is-active{background:var(--controlHover)}
+.field-menu-chevron{font-size:19px;line-height:1;color:var(--muted)}
+.field-menu-branch{box-sizing:border-box;position:absolute;top:-1px;left:calc(100% + 4px);width:298px;
+ padding:5px;border:1px solid var(--border);border-radius:11px;background:var(--panel);box-shadow:0 16px 45px rgba(0,0,0,.42);
+ max-height:min(76dvh,530px);display:flex;flex-direction:column;overflow:hidden}
+.field-menu-branch .field-menu-items{min-height:0;max-height:none;overflow-y:auto;flex:1 1 auto}
+.field-menu-popup[data-branch-side="left"] .field-menu-branch{left:auto;right:calc(100% + 4px)}
+.field-menu-branch-title{padding:7px 9px 8px;color:var(--muted);font-size:11px;font-weight:700;border-bottom:1px solid var(--border);margin-bottom:4px}
+.field-menu-back{display:none!important}
+.field-menu-item[aria-checked="true"]{color:var(--highlight);font-weight:700}
+.field-menu-check{flex:none;color:var(--highlight);font-size:15px;font-weight:700}
+@media(max-width:800px),(pointer:coarse){
+ .toolbar-controls .field-nested-control{flex:2 1 200px;width:auto;max-width:none}
+ .field-menu-popup{width:min(350px,calc(100vw - 16px));max-height:min(72dvh,480px)}
+ .field-menu-branch{position:static;left:auto;right:auto;width:100%;border:0;box-shadow:none;padding:0;max-height:calc(min(72dvh,480px) - 10px);min-height:0;overflow:hidden}
+ .field-menu-popup.is-drilled .field-menu-categories{display:none}
+ .field-menu-popup:not(.is-drilled) .field-menu-branch{display:none!important}
+ .field-menu-back{display:flex!important;color:var(--highlight)!important;font-weight:700!important}
+ .field-menu-back span{font-size:23px;line-height:13px}
+ .field-menu-branch-title{display:none}
+ .field-menu-categories{max-height:min(67dvh,450px)}
+ .field-menu-branch .field-menu-items{max-height:none;min-height:0;overflow-y:auto}
+ .field-menu-popup button{min-height:42px;font-size:13px}
+}
+@media(max-width:560px){.toolbar-controls .field-nested-control{flex:1 1 100%;width:100%}}
+@media(max-width:520px){.toolbar-brandline{flex-wrap:wrap;row-gap:6px}.toolbar .brand{flex:1 1 100%;min-width:0}.toolbar-brand-actions{margin-left:auto;justify-content:flex-end;flex-wrap:nowrap}}
+@media(min-width:801px){html[data-controls-position="left"] .toolbar-controls .field-nested-control{width:100%;max-width:none;min-width:0;flex:0 0 auto}}
+
+/* Theme button rules should not paint each menu item as a full button. */
+html[data-theme] .field-menu-popup button{background:transparent;border:0;box-shadow:none}
+html[data-theme] .field-menu-popup button:is(:hover,:focus-visible,.is-active){background:var(--controlHover)}
+
+@media(max-width:800px),(pointer:coarse){.field-menu-popup .field-menu-back{justify-content:flex-start!important;gap:12px}}
+
+/* 1.0.0: visible, unobtrusive share-link feedback outside toolbar overflow. */
+.share-link-toast[hidden]{display:none!important}
+.share-link-toast{position:fixed;z-index:11000;max-width:min(260px,calc(100vw - 20px));
+ padding:8px 12px;border:1px solid var(--border);border-radius:9px;
+ color:var(--text);background:var(--panel);box-shadow:0 8px 24px rgba(0,0,0,.32);
+ font:600 12px/1.3 Arial,Helvetica,sans-serif;pointer-events:none;white-space:normal}
+.share-link-toast[data-kind="success"]{border-color:var(--highlight, var(--accent))}
+.share-link-toast[data-kind="error"]{border-color:#e4a261}
+@media (prefers-reduced-motion:reduce){.share-link-toast{transition:none!important;animation:none!important}}
+
+/* v1.0.3 — one compact Overlays control; height, wind, contours and observations. */
+.toolbar-controls .overlays-control{width:auto;min-width:112px;max-width:315px}
+.overlays-switches,.obs-switches{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.overlays-switches .contour-switch{height:32px;min-width:0;padding:3px 8px;gap:5px}
+.overlays-switches .contour-switch input{accent-color:var(--highlight);width:14px;height:14px;margin:0}
+.overlays-switches [hidden],.obs-count[hidden],.obs-attribution[hidden]{display:none!important}
+.obs-count{display:block;font-size:10px;line-height:1.25;color:var(--muted);margin-top:2px;white-space:normal}
+.obs-attribution{display:block;font-size:9px;line-height:1.3;color:var(--muted);margin-top:2px}
+.obs-attribution a{color:var(--muted);text-decoration:underline;text-underline-offset:2px}
+@media(max-width:800px){.toolbar-controls .overlays-control{max-width:none;flex:1 1 auto}}
+@media(min-width:801px){html[data-controls-position="left"] .toolbar-controls .overlays-control{width:100%;max-width:none}}
+
+/* v1.0.7: PNG/GIF output choices and forecast-hour animation controls */
+.export-kind,.export-gif-options{border:0;border-bottom:1px solid var(--border);margin:0 0 12px;padding:0 0 12px;display:grid;gap:8px;}
+.export-kind legend,.export-gif-options legend{font-weight:700;font-size:12px;margin-bottom:5px;}
+.export-kind label{font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer;}
+.export-kind input,.export-gif-options input{accent-color:var(--highlight);}
+.export-gif-options{padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+.export-gif-row{display:grid;gap:5px;}
+.export-gif-row label{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:600;}
+.export-gif-row input[type=range]{width:100%;min-height:24px;}
+.export-gif-row select{width:100%;min-height:30px;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:6px;}
+.export-gif-options small{display:block;font-size:11px;color:var(--muted);line-height:1.35;}
+#exportGifSummary{font-weight:700;color:var(--text);}
+.export-dialog[open]{max-height:calc(100dvh - 16px);overflow:auto;}
+/* Author display rules must not override the HTML hidden attribute. */
+#exportGifOptions[hidden],#exportGifChoice[hidden],#mslp850Option[hidden]{display:none !important;}
+
+/* v1.0.8: difference-map sampling crosshair. MapLibre's canvas wins over inherited cursors. */
+#differenceMap,.difference-map-host,#differenceMap .maplibregl-canvas,#differenceMap .maplibregl-canvas-container{cursor:crosshair!important}
+.opacity-control{min-width:125px;max-width:175px}
+.opacity-control label{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.opacity-control input[type="range"]{width:100%;height:21px;margin:0;accent-color:var(--highlight);cursor:pointer}
+.opacity-control output{font-variant-numeric:tabular-nums}
+.spc-switches{display:inline-flex;flex:0 0 auto;align-items:center;gap:0;min-width:0}
+.spc-switches[hidden],#spcCount[hidden]{display:none!important}
+.helper-guide{height:auto!important;min-height:24px;padding:2px 11px!important;border-radius:8px!important;background:rgba(91,151,211,.14)!important;white-space:nowrap;color:var(--text);font-size:11px!important}
+.user-guide-dialog{width:min(850px,calc(100vw - 22px));max-height:min(90vh,850px);margin:auto;padding:0!important;border:1px solid var(--border);border-radius:16px;background:var(--panel);color:var(--text);box-shadow:0 22px 70px rgba(0,0,0,.5);overflow:hidden}
+.user-guide-dialog::backdrop{background:rgba(4,12,25,.73);backdrop-filter:blur(5px)}
+.user-guide-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;padding:21px 24px 13px;background:var(--panel);border-bottom:1px solid var(--border)}
+.user-guide-head h2{font-size:23px;line-height:1.2;margin:4px 0 5px}
+.user-guide-head small{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.user-guide-head p{margin:0;font-size:12px;color:var(--muted)}
+.user-guide-head button{font-size:22px;height:32px;width:34px;border-radius:9px}
+.user-guide-scroll{overflow-y:auto;overscroll-behavior:contain;max-height:calc(min(90vh,850px) - 177px);padding:22px 30px 26px;scroll-behavior:smooth}
+.user-guide-scroll section{padding:8px 0 19px;border-bottom:1px solid var(--border);scroll-margin-top:9px}
+.user-guide-scroll section:last-child{border:0}
+.user-guide-scroll h3{font-size:16px;line-height:1.4;margin:10px 0 8px}
+.user-guide-scroll p{font-size:13px;line-height:1.76;margin:6px 0 12px;color:var(--text)}
+.user-guide-scroll .guide-footnote{font-size:11px;color:var(--muted)}
+.guide-index{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.guide-index a{font-size:11px;text-decoration:none;color:var(--text);padding:7px 10px;border:1px solid var(--border);border-radius:999px;background:var(--panel-divider)}
+.user-guide-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--border);padding:12px 22px;background:var(--panel)}
+.user-guide-footer span{color:var(--muted);font-size:11px}
+.user-guide-footer button{padding:0 16px}
+@media(max-width:620px){.user-guide-head{padding:16px}.user-guide-scroll{padding:14px 18px;max-height:calc(90vh - 170px)}.user-guide-footer{padding:10px 14px}.helper-guide{margin-left:3px}}
+
+/* v1.0.9 — Match every MapLibre report/annotation popup to the active theme.
+   MapLibre's default popup background is white; its text can inherit our
+   dark theme's nearly-white text, yielding unreadable light-on-light labels.
+   These theme-scoped rules deliberately beat the library CSS, which is loaded
+   after styles.css. They also preserve newlines from Popup.setText(). */
+html[data-theme] .maplibregl-popup-content {
+  color:var(--text);
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:11px 30px 11px 13px;
+  box-shadow:0 9px 26px rgba(0,0,0,.32);
+  font:500 12px/1.55 Arial,Helvetica,sans-serif;
+  white-space:pre-line;
+  overflow-wrap:anywhere;
+}
+html[data-theme] .maplibregl-popup-content :is(p,span,div,strong,small) {color:inherit;}
+html[data-theme] .maplibregl-popup-content a {color:var(--highlight);text-decoration:underline;}
+html[data-theme] .maplibregl-popup-close-button {
+  position:absolute;top:3px;right:3px;
+  width:25px;height:25px;min-width:25px;
+  padding:0;border:0;border-radius:6px;box-shadow:none;
+  background:transparent;color:var(--text);
+  font-size:20px;line-height:25px;font-weight:600;
+}
+html[data-theme] .maplibregl-popup-close-button:hover,
+html[data-theme] .maplibregl-popup-close-button:focus-visible {
+  background:var(--controlHover);color:var(--text);
+  outline:2px solid var(--highlight);outline-offset:0;
+}
+/* Pointer triangles are drawn with borders: all map anchor positions must
+   follow the same panel color, otherwise a white triangle remains. */
+html[data-theme] :is(.maplibregl-popup-anchor-top,.maplibregl-popup-anchor-top-left,.maplibregl-popup-anchor-top-right) .maplibregl-popup-tip {border-bottom-color:var(--panel);}
+html[data-theme] :is(.maplibregl-popup-anchor-bottom,.maplibregl-popup-anchor-bottom-left,.maplibregl-popup-anchor-bottom-right) .maplibregl-popup-tip {border-top-color:var(--panel);}
+html[data-theme] .maplibregl-popup-anchor-left .maplibregl-popup-tip {border-right-color:var(--panel);}
+html[data-theme] .maplibregl-popup-anchor-right .maplibregl-popup-tip {border-left-color:var(--panel);}
+
+/* v1.0.10: viewport-safe export settings, consistent PNG/GIF sizing. */
+.export-dialog,.export-dialog[open]{
+  position:fixed;inset:0!important;top:0!important;left:0!important;
+  margin:auto!important;max-height:calc(100dvh - 24px);
+  height:auto;width:min(490px,calc(100vw - 22px));max-width:none;
+  overflow:hidden;
+}
+.export-dialog[open]{display:flex;flex-direction:column}
+.export-dialog form{display:flex;flex-direction:column;min-height:0;max-height:calc(100dvh - 26px);padding:0;overflow:hidden}
+.export-heading{flex:0 0 auto;padding:16px 18px 12px;border-bottom:1px solid var(--border);background:var(--panel)}
+.export-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:12px 18px 10px;overscroll-behavior:contain;scrollbar-width:thin}
+.export-scroll>.export-kind{margin-top:0}
+.export-scroll .export-gif-options{margin-bottom:10px}
+.export-dialog .export-scroll>p{margin:0 0 12px}
+.export-actions{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:8px;
+ padding:12px 18px;margin:0;border-top:1px solid var(--border);background:var(--panel)}
+.export-actions button{flex:0 0 auto}
+.export-dialog .export-busy{flex:1 1 auto;min-width:0;min-height:0;margin:0 7px 0 0;max-height:45px;overflow:auto;line-height:1.25}
+.export-ratios{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.export-ratios legend{grid-column:1/-1}
+.export-choice{padding:9px;min-width:0;gap:7px}
+.export-choice span{min-width:0}
+.export-framing{padding-top:6px}
+.export-gif-row select{font-size:12px}
+@media(max-height:560px){.export-heading{padding:9px 14px}.export-scroll{padding:9px 14px}.export-actions{padding:9px 14px}}
+@media(max-width:450px){.export-ratios{grid-template-columns:minmax(0,1fr)}.export-actions{gap:5px}.export-actions button{font-size:11px}}
+
+/* v1.0.10: reduce desktop toolbar scrolling without altering mobile layout. */
+@media(min-width:801px){
+ .toolbar{padding:6px 8px;gap:5px}
+ .toolbar-controls{gap:5px 6px;align-items:flex-end}
+ .toolbar-controls .control{gap:2px}
+ .toolbar-controls .control label{font-size:10px;line-height:12px}
+ .toolbar select,.toolbar button,.toolbar .display-box,.toolbar .field-menu-trigger{height:28px;border-radius:7px}
+ .toolbar .transport{height:28px;padding:1px;gap:1px}
+ .toolbar .round{width:27px;height:24px;font-size:10px}
+ .toolbar .utility{padding:0 6px;font-size:10px}
+ .toolbar .theme-toggle,.toolbar .controls-position-toggle,.toolbar .share-link-btn{width:30px!important;height:30px!important;min-width:30px!important;flex-basis:30px!important}
+ .toolbar-controls .model-set-control{width:145px;min-width:125px}
+ .toolbar-controls .field-nested-control{width:178px;max-width:190px}
+ .toolbar-controls .cycle-control{width:136px}
+ .toolbar-controls .forecast-control{width:70px}
+ .toolbar-controls .speed-control{width:91px}
+ .toolbar-controls .map-view-control{width:85px}
+ .toolbar-controls .opacity-control{width:111px;min-width:105px}
+ .toolbar-controls .opacity-control input{height:14px}
+ .toolbar .speed-buttons{height:28px}
+ .toolbar .speed-buttons button{height:26px;min-width:25px}
+ .toolbar .speed-buttons output{min-width:24px}
+ .toolbar-controls .overlays-control{max-width:260px;min-width:110px}
+ .overlays-switches,.obs-switches{gap:3px}
+ .overlays-switches .contour-switch,.toolbar-controls .contour-switch{height:27px;padding:2px 5px;gap:4px;font-size:10px!important}
+ .toolbar-controls .contour-switch input{width:13px;height:13px}
+ .toolbar-utilities{gap:4px}
+ .toolbar .brand{gap:5px}
+ .toolbar .brandmark{height:29px;width:30px}
+ .toolbar .brand strong{font-size:13px!important}
+ .toolbar .brand small{font-size:9px!important}
+ /* Left-side mode: combine related controls on shared rows, preserving touch targets. */
+ html[data-controls-position="left"] .toolbar{padding:9px 9px;gap:8px}
+ html[data-controls-position="left"] .toolbar-brandline{gap:6px}
+ html[data-controls-position="left"] .toolbar-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 6px;align-items:end}
+ html[data-controls-position="left"] .toolbar-controls .model-set-control,
+ html[data-controls-position="left"] .toolbar-controls .field-nested-control,
+ html[data-controls-position="left"] .toolbar-controls .overlays-control,
+ html[data-controls-position="left"] .toolbar-controls .opacity-control,
+ html[data-controls-position="left"] .toolbar .transport,
+ html[data-controls-position="left"] .toolbar-utilities{grid-column:1/-1;width:100%;max-width:none;min-width:0}
+ html[data-controls-position="left"] .toolbar-controls .cycle-control,
+ html[data-controls-position="left"] .toolbar-controls .forecast-control,
+ html[data-controls-position="left"] .toolbar-controls .speed-control,
+ html[data-controls-position="left"] .toolbar-controls .map-view-control{width:100%;min-width:0;max-width:none}
+ html[data-controls-position="left"] .toolbar .transport{margin:0;justify-content:space-between}
+ html[data-controls-position="left"] .toolbar-utilities{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+ html[data-controls-position="left"] .toolbar-utilities .utility{font-size:10px;padding:0 4px;white-space:normal;line-height:1.15}
+ html[data-controls-position="left"] .toolbar-controls .overlays-control{margin:0}
+ html[data-controls-position="left"] .toolbar-controls .contour-switch{font-size:10px!important}
+ html[data-controls-position="left"] .toolbar-controls .opacity-control input{height:16px}
+}
+
+/* v1.0.11: size export modal to its contents in PNG mode, not viewport height.
+   The GIF mode may fill the available height but keeps the scrollable options
+   and the action footer intact. Centering remains stable when format changes. */
+.export-dialog,.export-dialog[open]{
+  inset:auto!important;top:50%!important;left:50%!important;
+  right:auto!important;bottom:auto!important;
+  transform:translate(-50%,-50%);margin:0!important;
+  height:fit-content;width:min(470px,calc(100vw - 22px));
+  max-width:none;max-height:calc(100dvh - 24px);overflow:hidden;
+}
+.export-dialog[open]{display:flex;flex-direction:column}
+.export-dialog form{flex:0 1 auto;min-height:0;max-height:calc(100dvh - 26px);overflow:hidden}
+.export-scroll{flex:0 1 auto;min-height:0;overflow-y:auto}
+@media(max-width:450px){.export-dialog,.export-dialog[open]{width:calc(100vw - 20px)}}
+
+/* Keep the ordinary still-image form concise. GIF-only controls remain
+   in the independently scrolling section after the user opts into GIF. */
+.export-dialog .export-kind{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:10px;row-gap:5px}
+.export-dialog .export-kind legend{grid-column:1/-1}
+.export-dialog .export-kind label{white-space:nowrap;font-size:12px}
+
+/* v1.0.21 — optional presentation-size export labels, still compact on mobile. */
+.export-label-options{border:0;border-bottom:1px solid var(--border);margin:0 0 12px;padding:0 0 12px;}
+.export-label-options legend{font-weight:700;font-size:12px;margin-bottom:5px;}
+.export-label-options label{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13px;cursor:pointer;}
+.export-label-options input{accent-color:var(--highlight);width:16px;height:16px;margin-right:4px;}
+.export-label-options small{font-size:11px;color:var(--muted);}
+
+/* v1.1.4: modal numeric color-scale editing. */
+.shared-legend{position:relative;}
+.shared-legend-canvas.scale-adjustable{cursor:pointer;}
+/* v1.1.8: icon-only reset lives on a dedicated heading row, not over the
+   canvas or its end-of-range labels. Symmetric columns keep the title centered. */
+.shared-legend-heading{display:grid;grid-template-columns:24px minmax(0,1fr) 24px;
+ align-items:center;gap:3px;width:100%;min-width:0;min-height:23px;}
+.shared-legend-heading .shared-legend-title{grid-column:2;grid-row:1;min-width:0;max-width:none;flex:none;width:100%;}
+.legend-reset{grid-column:3;grid-row:1;position:static;justify-self:end;display:inline-flex;
+ align-items:center;justify-content:center;width:23px;height:23px;min-width:23px;
+ padding:2px;margin:0;border-radius:6px;box-sizing:border-box;
+ border:1px solid var(--border);background:var(--panel);color:var(--text);cursor:pointer;}
+.legend-reset svg{display:block;flex:none;pointer-events:none;}
+.legend-reset[hidden],.legend-range-popup[hidden]{display:none!important;}
+.legend-reset:hover{background:var(--control);filter:brightness(1.12);}
+.legend-reset:focus-visible{outline:2px solid var(--highlight);outline-offset:2px;}
+.legend-range-popup{position:fixed;inset:0;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);
+ margin:auto;width:min(485px,calc(100vw - 24px));padding:20px 22px;
+ background:var(--surface);color:var(--text);border:1px solid var(--border);
+ border-radius:14px;box-shadow:0 20px 65px #0009;font-size:14px;overflow-y:auto;}
+.legend-range-popup::backdrop{background:#06101ec7;backdrop-filter:blur(3px);}
+.legend-range-popup h2{font-size:19px;margin:0 0 8px;line-height:1.3;}
+.legend-range-popup p{margin:0 0 16px;line-height:1.5;color:var(--muted);}
+.legend-range-pair{margin:16px 0;}
+.legend-range-pair label{display:block;margin:0 0 7px;font-size:13px;font-weight:700;}
+.legend-range-controls{display:flex;align-items:center;gap:12px;}
+.legend-range-controls input[type="range"]{flex:1 1 auto;min-width:0;accent-color:var(--highlight);cursor:pointer;}
+.legend-range-controls input[type="number"]{width:112px;max-width:37%;padding:8px;border:1px solid var(--border);
+ border-radius:7px;background:var(--panel);color:var(--text);font:inherit;font-variant-numeric:tabular-nums;}
+.legend-range-error{color:#e88787!important;margin:4px 0 10px!important;}
+.legend-range-actions{display:flex;align-items:center;gap:8px;margin-top:22px;}
+.legend-range-spacer{flex:1 1 auto;}
+.legend-range-actions button{border:1px solid var(--border);border-radius:7px;padding:8px 12px;
+ color:var(--text);background:var(--card-head);cursor:pointer;}
+.legend-range-actions button[type="submit"]{background:var(--highlight);color:#081727;border-color:transparent;font-weight:700;}
+.legend-range-actions button:disabled{opacity:.5;cursor:not-allowed;}
+@media(max-width:460px){.legend-range-popup{padding:16px}.legend-range-controls{gap:7px}.legend-range-controls input[type="number"]{width:94px}}
+
+/* User Guide PDF action and compact toolbar guidance */
+.user-guide-head-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+.guide-pdf-link{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border:1px solid var(--border,#506079);border-radius:10px;color:inherit;text-decoration:none;background:transparent;flex-shrink:0}
+.guide-pdf-link:hover,.guide-pdf-link:focus-visible{background:rgba(125,160,198,.18);outline-offset:2px}
+.guide-pdf-link svg{width:21px;height:21px}
+.helper{gap:12px}
+/* Right-click location menu: above map canvases and below dialog overlays. */
+.evu-inspect-menu{position:fixed;z-index:6500;min-width:190px;max-width:250px;padding:7px;border-radius:12px;border:1px solid #52677f;background:#142336;color:#e7f2fd;box-shadow:0 15px 35px #050e1cc7}
+.evu-inspect-location{padding:6px 10px 8px;font-size:12px;opacity:.8;border-bottom:1px solid #4d6684}
+.evu-inspect-menu button{display:block;width:100%;padding:12px 10px;margin-top:4px;text-align:left;cursor:pointer;background:transparent;color:inherit;border:0;border-radius:7px;font-size:14px}
+.evu-inspect-menu button:hover,.evu-inspect-menu button:focus-visible{background:#304e6d}
+.evu-inspect-window{position:fixed;top:105px;left:50px;width:min(650px,calc(100vw - 20px));height:min(535px,calc(100vh - 20px));min-width:300px;min-height:260px;max-width:100vw;max-height:100vh;resize:both;overflow:hidden;z-index:4500;border:1px solid #4b637e;border-radius:12px;background:#101d2e;color:#e8f4ff;box-shadow:0 14px 45px #0009;display:flex;flex-direction:column}
+.evu-inspect-head{height:57px;min-height:57px;background:#1b3046;border-bottom:1px solid #436078;display:flex;align-items:center;gap:9px;padding:7px 11px;cursor:move;user-select:none;touch-action:none}
+.evu-inspect-title{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:3px;line-height:1.1}
+.evu-inspect-title strong{font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evu-inspect-title small{font-size:11px;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evu-inspect-icon{display:inline-flex;align-items:center;justify-content:center;width:33px;height:33px;border:1px solid #627b95;background:#233c53;color:#ebf4fd;border-radius:7px;cursor:pointer;flex:none}
+.evu-inspect-icon:hover,.evu-inspect-icon:focus-visible{background:#3d617e}
+.evu-inspect-icon svg{width:19px;height:19px}
+.evu-inspect-body{flex:1;overflow:auto;min-height:0;padding:4px 7px 7px;display:flex;flex-direction:column}
+.evu-inspect-status{margin:3px 5px 4px;min-height:17px;color:#a8c8e8;font-size:11px}
+.evu-inspect-canvas{width:100%;height:auto;max-height:calc(100% - 25px);object-fit:contain;flex:1;min-height:0}
+@media(max-width:560px){.evu-inspect-window{left:10px!important;top:70px!important;width:calc(100vw - 20px);height:min(60vh,490px);min-width:0}.evu-inspect-head{touch-action:auto}}
+
+/* v1.1.3: comprehensive HTML/PDF-equivalent guide (tables and lists). */
+.user-guide-scroll .guide-intro{padding:0 0 12px;border-bottom:1px solid var(--border)}
+.user-guide-scroll .guide-intro p:first-child{font-size:11px;font-weight:650;color:var(--muted)}
+.user-guide-scroll ul,.user-guide-scroll ol{padding-left:23px;margin:8px 0 15px}
+.user-guide-scroll li{font-size:13px;line-height:1.66;margin:4px 0;color:var(--text)}
+.user-guide-scroll table{display:block;overflow-x:auto;border-collapse:collapse;width:100%;max-width:100%;margin:13px 0 17px;font-size:12px;line-height:1.45}
+.user-guide-scroll th,.user-guide-scroll td{padding:9px 12px;text-align:left;vertical-align:top;border:1px solid var(--border)}
+.user-guide-scroll th{background:var(--panel-divider);font-weight:700;white-space:nowrap}
+.user-guide-scroll tbody tr:nth-child(even){background:var(--surface)}
+.user-guide-scroll section{scroll-margin-top:12px}
+@media(max-width:620px){.user-guide-scroll th,.user-guide-scroll td{padding:7px 9px;min-width:95px}}
+
+/* v1.1.10: SPC toggle shares the same wrap-aware row as contours and observations.
+   Counts/attribution live below, not inside a toggle item that could force wrapping. */
+.overlays-switches>.spc-switches{flex:0 0 auto;white-space:nowrap}
+.overlays-switches>.spc-switches>.contour-switch{margin:0;white-space:nowrap}
+
+/* Sounding analysis windows: larger canvas while preserving mobile layout. */
+.evu-inspect-window.evu-inspect-sounding{width:min(1210px,calc(100vw - 24px));height:min(830px,calc(100vh - 28px))}
+.evu-inspect-sounding .evu-inspect-body{padding:6px 10px 10px;gap:5px}
+.evu-inspect-sounding .evu-inspect-canvas{max-height:none;object-fit:contain;width:100%;flex:1}
+.evu-inspect-sounding .evu-inspect-status{font-size:12px;line-height:1.4;white-space:normal}
+@media(max-width:560px){.evu-inspect-window.evu-inspect-sounding{width:calc(100vw - 20px);height:min(70vh,585px);top:64px!important;left:10px!important}}
+
+/* GLM flash-age key, shown only when the observation overlay is enabled. */
+.glm-age-legend{display:flex;flex-wrap:wrap;align-items:center;gap:4px 9px;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.35;}
+.glm-age-legend[hidden]{display:none!important;}
+.glm-age-legend>span{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
+.glm-age-legend i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--glm-color);border:1px solid var(--fg,var(--text));}
+
+/* Mobile touch affordances: keep single-finger map pan on the map itself,
+ * while this separate rail gives a reliable vertical page-scroll target. */
+.panel-scroll-rail{display:none}
+@media (pointer:coarse) and (max-width:800px){
+ html[data-theme] .panel-scroll-rail{
+  position:absolute;right:0;top:22%;bottom:52px;z-index:10;
+  width:40px;min-height:72px;height:auto;display:flex;align-items:center;
+  justify-content:center;writing-mode:vertical-rl;transform:none;
+  padding:8px 9px;border:1px solid var(--border);border-right:0;
+  border-radius:10px 0 0 10px;background:var(--plot-label);
+  color:var(--text);font-size:11px;letter-spacing:.045em;opacity:.96;
+  touch-action:pan-y;overscroll-behavior-y:auto;user-select:none;
+ }
+ .panel-scroll-rail:active{background:var(--controlHover)}
+}
+/* A touch-opened point inspector is a full-screen-width, comfortably readable
+ * dialog rather than a small desktop window that can end up off-screen. */
+@media(max-width:560px){
+ .evu-inspect-window{height:min(76dvh,640px);max-height:calc(100dvh - 80px);resize:none}
+ .evu-inspect-body{padding:5px 4px 10px}
+ .evu-inspect-head{cursor:default}
+ .evu-inspect-menu{max-width:calc(100vw - 16px)}
+}
+
+
+/* Grid interpolation aligns vertically with the adjacent Map view select.
+ * The desktop toolbar uses 28px controls; mobile and sidebar use 32px. */
+.toolbar-controls .interpolation-control{min-width:112px;max-width:132px}
+.toolbar-controls .interpolation-control .contour-switch{height:32px;min-width:0;justify-content:flex-start}
+.toolbar-controls .interpolation-control .contour-switch input{margin:0}
+@media(min-width:801px){
+ .toolbar-controls .interpolation-control .contour-switch{height:28px}
+ html[data-controls-position="left"] .toolbar-controls .interpolation-control{width:100%;min-width:0;max-width:none}
+}
+@media(max-width:800px){.toolbar-controls .interpolation-control{flex:1 1 112px;width:auto;max-width:none}}
+
+/* Archived case cycles: extra text marker is retained on platforms that do not style native options. */
+#cycleSelect option.case-cycle { color: #a452db; font-weight: 700; }
+
+/* A second, independently scaled GFS comparison legend is visible only for GFS. */
+.difference-shared-legend[hidden]{display:none!important;}
+.difference-shared-legend{border-top:0;padding-top:0;min-height:42px;}
+
+/* Right-click an overlay label (checkbox, text, or padding) to edit its style. */
+.style-editable{cursor:context-menu}
+.map-layer-control{min-width:180px}
+.map-layer-control .overlays-switches{display:flex;gap:5px;flex-wrap:wrap}
+.map-layer-control .contour-switch{display:flex;align-items:center;gap:5px;padding:3px 7px}
+.overlay-style-dialog{border:1px solid var(--line,#708090);border-radius:14px;box-shadow:0 16px 48px #0007;padding:0;max-width:min(340px,calc(100vw - 24px));width:320px;background:var(--panel,#182c3a);color:var(--text,#eef4f7)}
+.overlay-style-dialog{max-height:min(88dvh,760px);overflow-y:auto;overscroll-behavior:contain}
+.overlay-style-dialog::backdrop{background:#0009}
+.overlay-style-heading{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #8884}
+.overlay-style-heading button{border:0;background:transparent;color:inherit;font-size:24px;cursor:pointer}
+.overlay-style-content{display:grid;gap:10px;padding:15px 16px}
+.overlay-style-content input[type=color]{width:100%;height:43px;border:1px solid #8888;border-radius:8px;background:transparent;cursor:pointer}
+.overlay-style-content input[type=range]{width:100%;accent-color:var(--accent,#60a5fa)}
+.overlay-style-actions{display:flex;justify-content:space-between;margin-top:8px;gap:10px}
+.overlay-style-actions button{padding:8px 15px;border-radius:8px;cursor:pointer}
+
+html[data-theme="light"] .overlay-style-dialog{background:#ffffff;color:#1b2b3b;border-color:#a2b4c4}
+
+/* Compact map layer controls on the same row, including narrow toolbars. */
+.map-layer-control .overlays-switches{display:flex;flex-direction:row;flex-wrap:nowrap;gap:5px}
+.map-layer-control .contour-switch{white-space:nowrap;flex:0 0 auto}
+
+/* Separate observed rotation-track units from forecast updraft-helicity colorbar. */
+.rotation-shared-legend[hidden]{display:none!important}
+.rotation-shared-legend{border-top:0;padding-top:0;min-height:42px}
+
+/* Density is available for vector and line overlays, not for solid background fill. */
+.overlay-style-density-row{display:grid;gap:6px}
+.overlay-style-density-row[hidden]{display:none!important}
+.overlay-style-density-row label{display:flex;justify-content:space-between;align-items:center}
+.overlay-style-density-row small{font-size:.78rem;line-height:1.35;opacity:.8}
+
+/* Optional enhanced-map features, deliberately off on first use. */
+.tracer-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:3;pointer-events:none;display:block;}
+.map-layer-control .overlays-switches{flex-wrap:wrap;max-width:365px;}
+.map-layer-control .contour-switch{font-size:11px;}
+.shortcuts-dialog{width:min(780px,calc(100vw - 22px));}
+.shortcut-list h3{font-size:15px;margin:20px 0 10px;padding-bottom:7px;border-bottom:1px solid var(--border);}
+.shortcut-grid{display:grid;grid-template-columns:minmax(90px,148px) minmax(0,1fr);gap:9px 17px;align-items:center;font-size:13px;line-height:1.5;}
+.shortcut-grid kbd{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 9px;font:600 12px ui-monospace,Consolas,monospace;text-align:center;color:var(--text);}
+.shortcuts-footnote{font-size:12px;color:var(--muted);margin-top:20px;line-height:1.65;}
+/* Keep tracer lines beneath pressure/height contours and wind barbs. */
+.tracer-overlay{z-index:2;}
+
+.overlay-style-theme-note{font-size:12px;line-height:1.5;color:var(--muted);margin:0 0 12px;}
+
+/* 3D repair: restore tight single-row toolbar groups when room is available.
+   Side controls and phones use wrapping rather than horizontal overflow. */
+.toolbar-controls .overlays-control{width:max-content;max-width:none;min-width:0;flex:0 1 auto}
+.toolbar-controls .overlays-control>.overlays-switches{display:flex;flex-flow:row nowrap;width:max-content;max-width:none;gap:3px;align-items:center}
+.toolbar-controls .overlays-control .obs-switches,.toolbar-controls .overlays-control .spc-switches{display:inline-flex;flex-flow:row nowrap;gap:3px}
+.map-layer-control{min-width:0;width:max-content;max-width:100%;flex:0 1 auto;gap:2px}
+.map-layer-heading{display:flex;align-items:center;gap:6px;justify-content:space-between;min-height:16px}
+.map-layer-heading>label{margin:0;line-height:15px}
+.toolbar .map-reset-icon{border:1px solid var(--border);border-radius:5px;background:var(--control);color:var(--text);
+ display:inline-flex;align-items:center;justify-content:center;width:21px;min-width:21px;height:19px;
+ padding:2px;cursor:pointer;margin-left:auto}
+.map-reset-icon svg{width:14px;height:14px;display:block;pointer-events:none}
+.map-layer-control .overlays-switches{display:flex;flex-flow:row nowrap;width:max-content;max-width:none;gap:3px}
+.map-layer-control .contour-switch{height:27px;flex:0 0 auto;padding:2px 5px;gap:4px;font-size:10px!important;white-space:nowrap}
+.map-layer-control .contour-switch input{width:13px;height:13px;margin:0}
+.helper-credit[data-state="error"]{color:#e89d58;font-weight:700}
+.helper-credit[data-state="loading"]{opacity:.82}
+@media(max-width:1000px){
+ .toolbar-controls .overlays-control>.overlays-switches{flex-wrap:wrap;width:auto}
+}
+@media(max-width:800px){
+ .map-layer-control{width:auto;max-width:none;flex:1 1 100%}
+ .map-layer-control .overlays-switches{flex-wrap:wrap;width:auto}
+ .toolbar-controls .overlays-control{max-width:none;width:auto;flex:1 1 100%}
+ .toolbar-controls .overlays-control>.overlays-switches{flex-wrap:wrap;width:auto}
+}
+@media(min-width:801px){
+ html[data-controls-position="left"] .map-layer-control{width:100%;max-width:none;min-width:0}
+ html[data-controls-position="left"] .map-layer-control .overlays-switches{flex-wrap:wrap;width:auto}
+ html[data-controls-position="left"] .toolbar-controls .overlays-control{width:100%;max-width:none}
+ html[data-controls-position="left"] .toolbar-controls .overlays-control>.overlays-switches{flex-wrap:wrap;width:auto}
+}
+
+/* v1.1.41: One compact flow per overlay group, with inline headings.
+   Wrap the pills in sidebars and phones rather than stacking four labels. */
+.toolbar-controls .overlays-control,.toolbar-controls .map-layer-control{display:flex;flex-flow:row wrap;align-items:center;align-content:flex-start;column-gap:5px;row-gap:2px}
+.toolbar-controls .overlays-control>label{flex:0 0 auto;margin:0;line-height:23px}
+.toolbar-controls .overlays-control>.overlays-switches,.toolbar-controls .map-layer-control>.overlays-switches{display:flex;flex-flow:row wrap;align-items:center;align-content:center;column-gap:3px;row-gap:2px;width:auto;max-width:100%;min-width:0}
+.toolbar-controls .overlays-control .obs-switches,.toolbar-controls .overlays-control .spc-switches{display:inline-flex;flex-wrap:wrap;gap:3px}
+.toolbar-controls .overlays-control .contour-switch,.toolbar-controls .map-layer-control .contour-switch{min-height:23px;height:25px;padding:2px 5px;gap:3px;font-size:10px!important}
+.toolbar-controls .map-layer-control .map-layer-heading{display:inline-flex;flex:0 0 auto;gap:3px;min-height:22px}
+.toolbar-controls .map-layer-control .map-layer-heading>label{line-height:21px}
+.toolbar-controls .map-layer-control .map-reset-icon{width:20px;min-width:20px;height:20px;margin-left:2px}
+.toolbar-controls .overlays-control>small{flex:0 0 100%}
+.toolbar-controls .overlays-control [hidden],.toolbar-controls .map-layer-control [hidden]{display:none!important}
+@media(min-width:801px){html[data-controls-position="left"] .toolbar-controls .overlays-control,html[data-controls-position="left"] .toolbar-controls .map-layer-control{width:100%;flex-wrap:wrap;justify-content:flex-start}}
+
+/* v1.1.42: Give Map layers its own full-width switch group. The former
+   inline heading consumed the first row's width in a narrow sidebar and
+   forced EACH checkbox onto a different line despite flex-wrap. Keep the
+   Reset button alongside the heading, not alongside the switch group. */
+.toolbar-controls .map-layer-control{
+ display:flex;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
+ row-gap:3px;min-width:0;
+}
+.toolbar-controls .map-layer-control>.map-layer-heading{
+ display:flex;flex:0 0 auto;align-items:center;justify-content:flex-start;
+ width:100%;min-width:0;
+}
+.toolbar-controls .map-layer-control>.overlays-switches{
+ display:flex;flex:0 0 auto;flex-direction:row;flex-wrap:wrap;
+ justify-content:flex-start;align-items:center;align-content:flex-start;
+ width:100%;max-width:100%;min-width:0;
+ column-gap:3px;row-gap:3px;
+}
+.toolbar-controls .map-layer-control>.overlays-switches>.contour-switch{
+ flex:0 0 auto;width:auto;margin:0;white-space:nowrap;
+}
+/* The desktop left-toolbar uses a two-column grid. Without spanning both
+   columns, Map layers receives only half the sidebar width and still stacks. */
+@media(min-width:801px){
+ html[data-controls-position="left"] .toolbar-controls .map-layer-control{
+  grid-column:1/-1;width:100%;max-width:none;
+ }
+}
+.helper-credit[data-state="fallback"]{color:#d9a85c;font-weight:700}
+
+/* In-toolbar DEM status: visible without scrolling to the footer. Not shown
+   when the Terrain layer is off, preserving the compact checkbox rows. */
+.map-layer-control .terrain-notice:not([hidden]){
+ display:block;flex-basis:100%;width:100%;max-width:100%;
+ padding:2px 4px;font-size:10px;line-height:1.35;
+ white-space:normal;overflow-wrap:anywhere;color:var(--muted);
+}
+.map-layer-control .terrain-notice[data-state="error"]{color:#ed9b65;font-weight:650}
+.map-layer-control .terrain-notice[data-state="fallback"]{color:#efbc70;font-weight:650}
+.map-layer-control .terrain-notice[data-state="ready"]{color:var(--text)}
+
+/* Wind tracers use a stable speed palette; user-selected fixed colors remain available. */
+.overlay-style-auto{display:flex;align-items:center;gap:.55rem;font-weight:600;margin:.15rem 0 .25rem;}
+.overlay-style-auto[hidden]{display:none!important;}
+.overlay-style-auto input{accent-color:var(--accent,#318be1);}
+
+/* v1.1.50 — numerical color table import without expanding normal controls. */
+.legend-pal-section{border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:12px 0;margin:10px 0 2px;}
+.legend-pal-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:5px;margin-bottom:9px;font-size:12px;}
+.legend-pal-heading span{color:var(--muted);font-weight:400;overflow-wrap:anywhere;}
+.legend-pal-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.legend-pal-upload,.legend-pal-actions button{border:1px solid var(--border);border-radius:7px;padding:8px 12px;background:var(--card-head);color:var(--text);font-size:12px;cursor:pointer;}
+.legend-pal-upload:hover,.legend-pal-actions button:hover{background:var(--control);}
+.legend-pal-upload:focus-within{outline:2px solid var(--highlight);outline-offset:2px;}
+.legend-pal-upload input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;}
+.legend-pal-actions button:disabled{opacity:.4;cursor:default;}
+.legend-pal-section .legend-pal-status{font-size:12px;min-height:0;margin:8px 0 3px!important;color:var(--highlight)!important;overflow-wrap:anywhere;}
+.legend-pal-section small{font-size:11px;color:var(--muted);line-height:1.5;display:block;}
+
+/* v1.1.51 — compact, interpretable wind-speed key in tracer appearance editor. */
+.tracer-speed-key{width:100%;max-width:300px;margin:0 0 8px;padding:2px 1px;font-size:11px;}
+.tracer-speed-key[hidden]{display:none!important;}
+.tracer-speed-ramp{height:12px;border-radius:5px;border:1px solid rgba(110,122,140,.8);background:linear-gradient(to right,#f3f7ff 0%,#adeffa 6%,#4fd7ea 13%,#59e39a 22%,#fee85d 33%,#ff9e41 50%,#ff466a 67%,#ce81ff 100%);}
+.tracer-speed-labels{display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;margin-top:2px;}
+.tracer-speed-key small{display:block;margin-top:4px;color:var(--muted);line-height:1.35;}
+
+/* GFS 10:1 snowfall method: compact, accessible radio pair. */
+.snow-method-control{min-width:190px;max-width:360px}
+.snow-method-options{display:flex;flex-wrap:wrap;gap:4px 11px;align-items:center;padding:5px 7px;border:1px solid var(--border,#3c536c);border-radius:7px}
+.snow-method-options label{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:12px;cursor:pointer}
+.snow-method-options input{accent-color:#67b8fa;margin:0}
+.snow-method-control[hidden]{display:none!important}
+@media (max-width:560px){.snow-method-control{width:100%;max-width:none}.snow-method-options{gap:7px 9px}}
+
+/* v1.1.61: reserve real space for the SLR source selector, on desktop and mobile. */
+.toolbar-controls .snow-method-control{box-sizing:border-box;flex:0 0 260px;width:260px;min-width:260px;max-width:260px;min-height:0;position:relative;z-index:0}
+.toolbar-controls .snow-method-control .snow-method-options{box-sizing:border-box;width:100%;display:flex;flex-wrap:wrap;gap:5px 10px;align-items:center;overflow:visible}
+.toolbar-controls .snow-method-control .snow-method-options label{display:inline-flex;flex:0 0 auto;gap:4px;align-items:center;min-width:0;font-size:11px}
+@media (max-width:800px){.toolbar-controls .snow-method-control{flex:1 1 260px;width:auto;min-width:0;max-width:100%}}
+
+/* v1.1.62: the WEASD/TSNOWP radio pair is a dedicated toolbar row.
+   Do not let it share horizontal real estate with either cycle or forecast
+   selectors. Applies to regional/GFS, wide/narrow and left controls modes. */
+.toolbar-controls > .snow-method-control{
+  box-sizing:border-box;
+  flex:0 0 100%;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  align-self:stretch;
+  position:static;
+}
+.toolbar-controls > .snow-method-control .snow-method-options{
+  box-sizing:border-box;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:flex-start;
+  width:100%;
+  min-width:0;
+  gap:6px 14px;
+  overflow-wrap:normal;
+}
+.toolbar-controls > .snow-method-control .snow-method-options label{
+  flex:0 1 auto;
+  max-width:100%;
+  white-space:normal;
+}
+@media(min-width:801px){
+  html[data-controls-position="left"] .toolbar-controls > .snow-method-control{
+    grid-column:1/-1;
+    width:100%;max-width:100%;min-width:0;
+  }
+}
+
+/* Visible, shared SLR control occupies an independent toolbar row. */
+.toolbar-controls > .snow-ratio-control{box-sizing:border-box;flex:1 0 100%;width:100%;min-width:0;max-width:100%;order:initial}
+.snow-ratio-control[hidden]{display:none!important}
+.snow-ratio-control label{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.snow-ratio-control output{font-variant-numeric:tabular-nums;white-space:nowrap}
+.snow-ratio-control input[type="range"]{display:block;width:100%;margin:4px 0 0;accent-color:var(--highlight);cursor:pointer}
+html[data-controls-position="left"] .toolbar-controls > .snow-ratio-control{flex:0 0 auto;width:100%}
+
+/* v1.1.72: zoom-disclosed city names and point-sampled values. */
+.city-overlay{position:absolute;inset:0;z-index:5;width:100%;height:100%;pointer-events:none;display:block}
+
+/* v1.1.73: place the full-width SLR slider inside the radio-button group. */
+.toolbar-controls > .snow-method-control .snow-ratio-control{box-sizing:border-box;width:100%;max-width:100%;min-width:0;margin-top:8px;padding:0 2px 2px;display:block}
+.toolbar-controls > .snow-method-control .snow-ratio-control[hidden]{display:none!important}
+.toolbar-controls > .snow-method-control .snow-ratio-control input[type="range"]{display:block;box-sizing:border-box;width:100%;min-width:0;margin:6px 0 0}
+.toolbar-controls > .snow-method-control .snow-ratio-control label{display:flex;justify-content:space-between;align-items:center;width:100%;white-space:normal}
+
+.toolbar-controls > .snow-method-control .snow-method-options > .snow-ratio-control{flex:0 0 100%;width:100%;max-width:100%;margin-top:3px;border-top:1px solid var(--border);padding:7px 1px 2px}
+.toolbar-controls > .snow-method-control .snow-method-options > .snow-ratio-control label{flex:initial;display:flex;justify-content:space-between;width:100%;max-width:100%;font-size:11px}
+
+/* Touch-device canvas field fallback: above MapLibre terrain, below vector overlays.
+   The alpha channel preserves true no-data, clear-zero, and precipitation cutoffs. */
+.mobile-scalar-overlay{position:absolute;inset:0;z-index:1;width:100%;height:100%;pointer-events:none;display:none;image-rendering:auto}
+
+/* Interactive values are sampled from the actual plotted series/profile data.
+   Readout works for mouse, pen, and touch and remains outside PNG exports. */
+.evu-inspect-body{position:relative}
+.evu-inspect-readout{flex:none;min-height:19px;margin:0 5px 2px;padding:3px 7px;border:1px solid var(--border,#4b637e);border-radius:6px;background:var(--surface,#172c42);color:var(--text,#e8f4ff);font-size:12px;font-variant-numeric:tabular-nums;line-height:1.45}
+.evu-inspect-crosshair{position:absolute;z-index:2;pointer-events:none;border-top:1px dashed #f8d06b;border-left:0;filter:drop-shadow(0 0 1px #101d2e)}
+.evu-inspect-crosshair.vertical{border-top:0;border-left:1px dashed #f8d06b}
+.evu-inspect-crosshair[hidden]{display:none}
+
+.mobile-geography-overlay{position:absolute;inset:0;z-index:2;width:100%;height:100%;pointer-events:none;display:none}
+
+/* v1.1.81: small manual app-refresh control and non-disruptive update prompt. */
+.release-update-notice[hidden]{display:none!important}
+.release-update-notice{position:fixed;right:14px;bottom:14px;z-index:12000;
+ display:flex;align-items:center;gap:10px;max-width:min(440px,calc(100vw - 28px));
+ color:var(--text);background:var(--panel);border:1px solid var(--highlight);
+ border-radius:11px;box-shadow:0 12px 30px rgba(0,0,0,.3);padding:10px 12px;
+ font:600 12px/1.35 Arial,Helvetica,sans-serif}
+.release-update-notice span{flex:1;min-width:0}
+.release-update-notice button{height:30px;flex:0 0 auto;border-radius:7px;padding:0 10px;font-size:11px}
+.release-update-notice #releaseUpdateDismiss{padding:0;width:30px;font-size:18px}
+@media(max-width:520px){.release-update-notice{left:10px;right:10px;bottom:10px}}
+
+/* v1.1.81: compact expandable Map overlays, independent of toolbar clipping. */
+.toolbar-controls .map-layer-control{display:flex;flex-direction:column;flex-wrap:nowrap;
+ width:max-content;max-width:100%;min-width:240px;flex:0 0 240px;gap:3px;align-items:stretch}
+.toolbar-controls .map-layer-control>label{display:block;margin:0;font-size:11px}
+.toolbar-controls .map-layer-control>.map-layer-heading{width:100%;display:grid;grid-template-columns:minmax(0,1fr) 30px;gap:6px;padding-right:2px;box-sizing:border-box}
+.toolbar-controls .map-layer-control .map-layers-menu-trigger{display:flex;align-items:center;
+ justify-content:space-between;gap:7px;min-width:0;width:100%;min-height:30px;height:auto;white-space:nowrap;
+ background:var(--control);color:var(--text);border:1px solid var(--border);
+ border-radius:7px;padding:4px 9px;cursor:pointer;font-size:12px;font-weight:600}
+.toolbar-controls .map-layer-control .map-layers-menu-trigger svg{flex:0 0 16px;width:16px;height:16px;margin-left:auto}
+.toolbar-controls .map-layer-control .map-layers-menu-trigger span{flex:1 1 auto;min-width:0;text-align:left;white-space:normal;overflow-wrap:normal;line-height:1.2}
+.toolbar-controls .map-layer-control .map-reset-icon{height:30px;width:30px;min-width:30px;padding:0}
+html[data-controls-position="left"] .toolbar-controls .map-layer-control{
+ grid-column:1/-1;width:100%;max-width:100%;min-width:0;flex:0 0 auto;
+}
+@media(max-width:800px){.toolbar-controls .map-layer-control{width:240px;max-width:100%;min-width:min(240px,100%);flex:1 1 240px}}
+/* v1.1.91: Map Overlays is one grid item across BOTH sidebar columns.
+   Avoid intrinsic button clipping on Chromebook zoom/text scaling. The
+   popup remains detached at body level and right-click customization stays. */
+@media(min-width:801px){
+ html[data-controls-position="left"] .toolbar-controls>.map-layer-control{
+  grid-column:1/-1;min-width:0;width:100%;flex-basis:auto;
+ }
+}
+.toolbar-controls .map-layer-control>.map-layer-heading{
+ display:grid;grid-template-columns:minmax(0,1fr) 30px;align-items:center;min-width:0;
+}
+.toolbar-controls .map-layer-control .map-layers-menu-trigger{
+ min-width:0;min-height:30px;height:auto;overflow:visible;
+}
+.toolbar-controls .map-layer-control .map-layers-menu-trigger>span{
+ min-width:0;white-space:normal;overflow-wrap:normal;
+}
+.toolbar-controls .map-layer-control .map-layers-menu-trigger>svg{
+ display:block;flex:0 0 16px;min-width:16px;
+}
+.map-layers-menu-popup[hidden]{display:none!important}
+.map-layers-menu-popup{display:block;position:fixed;z-index:11000;max-height:calc(100dvh - 16px);
+ overflow:auto;border:1px solid var(--border);background:var(--panel);color:var(--text);
+ padding:11px;border-radius:10px;box-shadow:0 18px 40px rgba(0,0,0,.38);box-sizing:border-box}
+.map-layers-menu-popup .map-layers-menu-hint{font-size:11px;line-height:1.35;color:var(--muted);margin:0 0 8px}
+.map-layers-menu-popup .overlays-switches{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.map-layers-menu-popup .contour-switch{display:flex;align-items:center;gap:6px;min-height:35px;
+ white-space:normal;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:7px}
+.map-layers-menu-popup .contour-switch:hover{border-color:var(--highlight)}
+.map-layers-menu-popup .contour-switch input{width:16px;height:16px;flex:0 0 16px}
+.map-layers-menu-popup .terrain-notice:not([hidden]){display:block;margin-top:7px;
+ font-size:11px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+.map-layers-menu-popup .terrain-notice[data-state="error"]{color:#ed9b65}
+.map-layers-menu-popup .terrain-notice[data-state="fallback"]{color:#efbc70}
+
+/* v1.1.82: anchored chart readout, only visible while inspecting a datapoint. */
+.evu-inspect-readout{position:absolute;z-index:5;pointer-events:none;display:flex;flex-direction:column;gap:3px;min-width:150px;max-width:min(290px,85%);width:max-content;padding:9px 12px;margin:0;border:1px solid rgba(158,190,230,.36);border-radius:10px;background:rgba(15,30,49,.96);color:#edf6ff;box-shadow:0 8px 24px rgba(0,0,0,.36);font-size:12px;line-height:1.38;backdrop-filter:blur(8px)}
+.evu-inspect-readout strong{font-size:13px;font-weight:700;color:#ffffff}
+.evu-inspect-readout span{color:#c5d7e9;white-space:normal}
+.evu-inspect-readout[hidden]{display:none!important}
+
+/* v1.1.87 — Data Overlays uses a detached body-level menu when >4
+   options apply; supports desktop sidebars, toolbar overflow and mobile. */
+#contourControl.data-overlays-compact{position:relative;min-width:186px;max-width:100%}
+#contourControl.data-overlays-compact #overlaysLabel{display:none}
+#contourControl .map-layers-menu-trigger:not([hidden]){
+ display:flex;align-items:center;justify-content:space-between;min-height:30px;
+ background:var(--control);color:var(--text);border:1px solid var(--border);
+ padding:5px 10px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;min-width:175px
+}
+#dataOverlaysPopup.menu-collapsible:not(.menu-open){display:none!important}
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));
+ position:fixed!important;z-index:11001;box-sizing:border-box;
+ max-height:calc(100dvh - 16px);overflow:auto;gap:7px;
+ background:var(--panel);color:var(--text);border:1px solid var(--border);
+ border-radius:10px;padding:12px;box-shadow:0 18px 40px rgba(0,0,0,.4)
+}
+body > #dataOverlaysPopup.data-overlays-menu-popup .contour-switch{
+ min-height:36px;height:auto!important;display:flex;align-items:center;gap:7px;
+ border:1px solid var(--border);border-radius:7px;padding:7px 9px;
+ font-size:12px!important;white-space:normal;cursor:pointer
+}
+body > #dataOverlaysPopup.data-overlays-menu-popup .contour-switch:hover{border-color:var(--highlight)}
+body > #dataOverlaysPopup.data-overlays-menu-popup .contour-switch input{flex:0 0 15px;width:15px;height:15px}
+body > #dataOverlaysPopup.data-overlays-menu-popup .obs-switches,
+body > #dataOverlaysPopup.data-overlays-menu-popup .spc-switches{display:contents}
+body > #dataOverlaysPopup.data-overlays-menu-popup [hidden]{display:none!important}
+@media(max-width:460px){body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open{grid-template-columns:1fr 1fr;gap:5px;padding:9px}}
+
+
+/* v1.1.92 — stable one-piece Map overlays trigger.
+   The former adjacent reset icon consumed the remaining 30px of a
+   half-width grid item in the Chromebook left sidebar. Reset now belongs
+   to the popup. The trigger fills its own grid item regardless of side/top
+   placement, browser zoom, or stale earlier display declarations. */
+.toolbar-controls > #mapLayerControl {
+  box-sizing:border-box; min-width:0; max-width:100%;
+  align-self:stretch; justify-self:stretch;
+}
+.toolbar-controls > #mapLayerControl > .map-layer-heading {
+  display:block; box-sizing:border-box;
+  min-width:0; width:100%; padding:0;
+}
+.toolbar-controls > #mapLayerControl #mapLayersMenuBtn {
+  display:flex; box-sizing:border-box; align-items:center;
+  justify-content:space-between; width:100%; min-width:0;
+  padding:5px 10px; gap:8px; height:34px; max-width:100%;
+  overflow:hidden; white-space:nowrap;
+}
+.toolbar-controls > #mapLayerControl #mapLayersMenuBtn > span {
+  flex:1 1 auto; white-space:nowrap; overflow:hidden;
+  text-overflow:ellipsis; min-width:0;
+}
+.toolbar-controls > #mapLayerControl #mapLayersMenuBtn > svg {
+  display:block; flex:0 0 16px; width:16px; min-width:16px;
+  height:16px; margin-left:auto;
+}
+@media(min-width:801px) {
+  html[data-controls-position="left"] .toolbar-controls > #mapLayerControl {
+    grid-column:1 / -1; width:100%; max-width:none;
+    flex:0 0 100%;
+  }
+}
+body > #mapLayersMenuPopup .map-layers-popup-heading {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-bottom:9px;
+}
+body > #mapLayersMenuPopup .map-layers-popup-heading .map-layers-menu-hint {
+  flex:1 1 auto; min-width:0; margin:0;
+}
+body > #mapLayersMenuPopup #resetViewBtn {
+  display:inline-flex; box-sizing:border-box; flex:0 0 auto;
+  align-items:center; justify-content:center; gap:6px;
+  min-width:0; height:32px; padding:0 10px;
+  border:1px solid var(--border); border-radius:7px;
+  background:var(--control); color:var(--text);
+  font:600 11px/1.2 Arial,Helvetica,sans-serif; cursor:pointer;
+}
+body > #mapLayersMenuPopup #resetViewBtn svg {
+  width:15px; height:15px; flex:0 0 15px;
+}
+body > #mapLayersMenuPopup #resetViewBtn:hover {
+  background:var(--controlHover); border-color:var(--highlight);
+}
+@media(max-width:380px) {
+  body > #mapLayersMenuPopup .map-layers-popup-heading {align-items:flex-start;flex-wrap:wrap;}
+  body > #mapLayersMenuPopup #resetViewBtn {margin-left:auto;}
+}
+
+/* One unified upper-air image selector; also chooses the difference scalar. */
+.shaded-field-control{flex:1 1 100%;min-width:0;margin:0 0 4px;padding:6px 8px 8px;border:1px solid var(--border,rgba(145,175,205,.36));border-radius:9px}
+.shaded-field-control[hidden]{display:none!important}
+.shaded-field-control legend{padding:0 5px;font-weight:700;font-size:11px}
+.shaded-field-options{display:flex;flex-wrap:wrap;align-items:center;gap:5px 9px}
+.shaded-field-choice{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-size:11px;cursor:pointer}
+.shaded-field-choice input{accent-color:#40b6ec;margin:0;width:14px;height:14px}
+
+/* v1.2.18: compact manual refresh with accessible focus target. */
+#viewerRefreshBtn{font-size:20px;line-height:1;min-width:32px;min-height:32px}
+#viewerRefreshBtn:focus-visible{outline:2px solid var(--highlight);outline-offset:2px}
+
+/* v1.2.20 — Full-width shaded image / difference selector.
+   The body-level Data Overlays popup uses two columns for independent overlay
+   checkboxes, but the scalar selector spans BOTH so every toggle is below it. */
+#imageFieldControl.shaded-field-control {
+ box-sizing:border-box;display:block;flex:0 0 100%;width:100%;max-width:100%;
+ min-width:0;grid-column:1 / -1;grid-row:auto;align-self:stretch;
+ margin:0 0 4px;padding:8px 10px 10px;
+}
+#imageFieldControl.shaded-field-control[hidden]{display:none!important}
+#imageFieldControl .shaded-field-options {
+ box-sizing:border-box;width:100%;display:grid;
+ grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px;
+}
+#imageFieldControl .shaded-field-choice {
+ min-width:0;width:100%;display:flex;align-items:center;
+ white-space:normal;padding:3px 2px;font-size:12px;
+}
+#imageFieldControl .shaded-field-choice span {min-width:0;overflow-wrap:normal}
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > #imageFieldControl {
+ grid-column:1 / -1;width:100%;max-width:100%;min-width:0;
+}
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > .contour-switch,
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > .obs-switches,
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > .spc-switches {
+ grid-row:auto;
+}
+
+/* Terrain panel picker: a compact, non-modal selector keeps the numbered plots
+   visible while choices are made. The numbers never appear in exports. */
+.terrain-panel-popup[hidden],.terrain-panel-number[hidden],.terrain-panels-edit[hidden]{display:none!important}
+/* Dock the picker in the viewer toolbar, never over map numbers. The left
+   sidebar scrolls to show the picker; top/mobile controls gain one temporary
+   full-width row while it is open. No draggable floating dialog is required. */
+.terrain-panel-popup{position:relative;inset:auto;transform:none;flex:1 0 100%;
+ width:100%;max-width:none;max-height:min(50vh,500px);overflow:auto;box-sizing:border-box;
+ background:var(--panel);color:var(--text);border:1px solid var(--highlight);border-radius:13px;
+ box-shadow:0 6px 22px rgba(0,0,0,.22);padding:12px 14px;margin:2px 0 6px}
+@media(min-width:801px){html[data-controls-position="left"] .toolbar-controls .terrain-panel-popup{
+ grid-column:1/-1;justify-self:stretch;align-self:stretch;width:100%;min-width:0;flex:0 0 auto;max-height:none;overflow:visible;padding:11px 9px;margin:0;
+ }
+ html[data-controls-position="left"] .terrain-panel-choices{grid-template-columns:minmax(0,1fr)}
+ html[data-controls-position="top"] .terrain-panel-choices{grid-template-columns:repeat(3,minmax(0,1fr))}
+ html[data-controls-position="left"] .terrain-panel-actions{gap:5px}
+ html[data-controls-position="left"] .terrain-panel-actions button{padding:7px 8px}
+}
+.terrain-panel-popup-head{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:baseline}
+.terrain-panel-popup-head strong{font-size:16px}
+.terrain-panel-popup-head span,.terrain-panel-popup p{color:var(--muted);font-size:12px;line-height:1.45}
+.terrain-panel-popup p{margin:9px 0 12px}
+.terrain-panel-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.terrain-panel-choice{display:flex;align-items:center;gap:9px;min-height:40px;padding:7px;
+ border:1px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer}
+.terrain-panel-choice:has(input:checked){border-color:var(--highlight);background:rgba(75,158,225,.14)}
+.terrain-panel-choice input{width:17px;height:17px;flex:none;accent-color:var(--highlight)}
+.terrain-panel-choice .terrain-choice-number{display:grid;place-items:center;flex:none;width:25px;height:25px;
+ border-radius:7px;background:#254d7a;color:#fff;font-weight:800}
+.terrain-panel-choice span:last-child{overflow-wrap:anywhere}
+.terrain-panel-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+.terrain-panel-actions button,.terrain-panels-edit{border:1px solid var(--border);background:var(--surface);color:var(--text);
+ font:inherit;font-size:12px;border-radius:7px;padding:8px 10px;cursor:pointer}
+.terrain-panel-actions .terrain-panels-apply{background:var(--highlight);color:#071b2f;font-weight:750}
+.terrain-panel-actions-spacer{flex:1}
+.terrain-panels-edit{width:100%;margin-top:8px}
+.terrain-panel-number{position:absolute;inset:0;display:grid;place-items:center;z-index:35;pointer-events:none;
+ font-size:clamp(52px,9cqw,110px);font-weight:900;line-height:1;letter-spacing:-.04em;
+ color:#fff;text-shadow:0 3px 9px #000,0 0 18px #03101c,0 0 2px #000;
+ background:rgba(1,10,24,.12)}
+.terrain-panel-number[data-selected="false"]{color:#b8c6d5;background:rgba(1,10,24,.28)}
+@media(max-width:540px){.terrain-panel-choices{grid-template-columns:1fr}.terrain-panel-popup{max-height:none;overflow:visible}}
+
+/* v1.2.23: menus are always dropdowns and occupy one clean full-width row.
+   Their trigger text already identifies the control, so no duplicate heading. */
+.toolbar-controls > #contourControl,
+.toolbar-controls > #mapLayerControl {
+ box-sizing:border-box;display:flex;flex-direction:column;min-width:0;
+ width:100%;max-width:none;flex:1 0 100%;align-self:stretch;
+}
+.toolbar-controls > #contourControl > #dataOverlaysMenuBtn,
+.toolbar-controls > #mapLayerControl #mapLayersMenuBtn {
+ box-sizing:border-box;width:100%;min-width:0;min-height:34px;
+ flex:0 0 auto;justify-content:space-between;
+}
+.toolbar-controls > #contourControl > #dataOverlaysMenuBtn {display:flex;overflow:hidden}
+#contourControl #overlaysLabel {display:none!important}
+html[data-controls-position="left"] .toolbar-controls > #contourControl,
+html[data-controls-position="left"] .toolbar-controls > #mapLayerControl {
+ grid-column:1/-1;width:100%;max-width:none;flex-basis:auto;
+}
+
+/* v1.2.25: Match the Data Overlays trigger label and chevron precisely to
+   Map overlays, including at narrow sidebar widths / browser zoom. */
+.toolbar-controls > #contourControl > #dataOverlaysMenuBtn {
+ display:flex;box-sizing:border-box;align-items:center;
+ justify-content:space-between;gap:8px;
+ width:100%;min-width:0;max-width:100%;height:34px;
+ padding:5px 10px;overflow:hidden;white-space:nowrap;
+}
+.toolbar-controls > #contourControl > #dataOverlaysMenuBtn > span {
+ flex:1 1 auto;min-width:0;text-align:left;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.toolbar-controls > #contourControl > #dataOverlaysMenuBtn > svg {
+ display:block;flex:0 0 16px;min-width:16px;
+ width:16px;height:16px;margin-left:auto;
+}
+
+/* v1.2.26: observation/GLM counts belong to the detached Data Overlays
+   dropdown, not below its trigger. Keep status rows full-width and compact;
+   persistent source attribution remains visible with the other credits. */
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > .obs-count,
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > .glm-age-legend {
+  grid-column:1 / -1;
+  margin:0;
+  min-width:0;
+}
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > .obs-count:empty {display:none!important}
+.helper-status > #obsAttribution:not([hidden]) {
+  display:block;
+  width:100%;
+  margin:0;
+  line-height:1.4;
+}
+
+
+/* Experimental Weather Events browser: isolated, opt-in, responsive. */
+.weather-events-launch{font-weight:800;border-color:var(--border)}
+.weather-events-dialog{position:fixed;inset:0;margin:auto;width:min(1080px,calc(100vw - 24px));height:min(760px,calc(100dvh - 24px));max-width:none;max-height:none;padding:0;border:1px solid var(--border);border-radius:16px;background:var(--panel);color:var(--text);box-shadow:0 28px 100px rgba(0,0,0,.55);overflow:hidden;z-index:99990}
+.weather-events-dialog::backdrop{background:rgba(4,10,20,.78)}
+.weather-events-frame{height:100%;min-height:0;display:flex;flex-direction:column;gap:10px;padding:15px}
+.weather-events-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.weather-events-heading h2{font-size:18px;margin:1px 0 5px;color:var(--text)}
+.weather-events-heading p{font-size:12px;margin:0;color:var(--muted);line-height:1.4}
+.weather-events-close{flex:none;width:34px;height:34px;font-size:25px;line-height:1;padding:0}
+.weather-events-import,.weather-events-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.weather-events-import>button{height:32px;padding:0 10px}
+.weather-events-file-label{display:flex;align-items:center;gap:5px;max-width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:11px;font-weight:700}
+.weather-events-file-label input{max-width:190px;font-size:11px;color:var(--muted)}
+.weather-events-status{margin:0;font-size:11px;color:var(--muted);line-height:1.4;min-height:15px}
+.weather-events-filters input{flex:2 1 200px;height:36px;min-width:0;background:var(--control);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:0 11px}
+.weather-events-filters select{flex:1 1 160px;height:36px;min-width:0}
+.weather-events-layout{display:grid;grid-template-columns:minmax(220px,0.38fr) minmax(0,0.62fr);min-height:0;flex:1;gap:10px}
+.weather-events-list,.weather-events-detail{min-height:0;overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--border);border-radius:12px;padding:8px;background:var(--surface)}
+.weather-events-list{display:flex;flex-direction:column;gap:7px}
+.weather-event-choice{text-align:left;width:100%;height:auto;min-height:63px;white-space:normal;display:flex;flex-direction:column;gap:5px;padding:9px 11px;background:var(--control);border:1px solid var(--border);border-radius:10px;line-height:1.35}
+.weather-event-choice strong{font-size:12px;color:var(--text)}
+.weather-event-choice small{font-size:10px;color:var(--muted);font-weight:400;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+.weather-event-choice strong,.weather-event-choice small,.weather-event-choice a{max-width:100%;min-width:0;overflow-wrap:anywhere}
+.weather-event-choice .weather-event-alert-badge{display:block;margin-top:1px}
+.weather-event-choice.is-active{outline:2px solid var(--highlight);outline-offset:-2px}
+.weather-events-detail>h3{font-size:17px;margin:5px 0 7px}
+.weather-events-detail-meta,.weather-events-models,.weather-events-caveat{font-size:11px;line-height:1.4;margin:0 0 7px;color:var(--muted)}
+.weather-events-caveat{border-left:3px solid var(--highlight);padding:5px 8px;margin:10px 0;background:var(--panel)}
+.weather-events-scenes{display:flex;flex-direction:column;gap:7px}
+.weather-scene{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.weather-scene-label{display:flex;flex-direction:column;min-width:0;gap:4px;line-height:1.35}
+.weather-scene-label strong{font-size:12px}.weather-scene-label small{font-size:11px;color:var(--muted)}
+.weather-scene-open{flex:none;min-width:91px;height:32px;padding:0 8px}
+.weather-scene-error{color:#dd966e!important;overflow-wrap:anywhere}
+.weather-events-empty{font-size:12px;color:var(--muted);line-height:1.5;padding:8px}
+.weather-events-footnote{margin:0;font-size:10px;line-height:1.45;color:var(--muted)}
+@media(max-width:680px){.weather-events-dialog{width:calc(100vw - 12px);height:calc(100dvh - 12px)}.weather-events-frame{padding:9px;gap:7px}.weather-events-layout{grid-template-columns:1fr;grid-template-rows:minmax(90px,.36fr) minmax(180px,.64fr)}.weather-events-heading h2{font-size:15px}.weather-events-file-label input{max-width:140px}}
+
+/* v1.2.34: full-width panel export and Weather Events positioned after
+   all interactive controls, immediately above the User Guide / Shortcuts box.
+   Place Events OUTSIDE #viewerControls to separate it from Export and use
+   margin-top:auto only in the desktop left sidebar, after all controls. */
+.toolbar-controls > .toolbar-utilities {
+  display:flex;box-sizing:border-box;flex:1 1 100%;width:100%;min-width:0;
+}
+.toolbar-controls > .toolbar-utilities > #saveAllPngBtn {
+  display:block;box-sizing:border-box;width:100%;min-width:0;grid-column:1 / -1;text-align:center;
+}
+.toolbar > .weather-events-control {
+  box-sizing:border-box;display:block;flex:1 1 100%;width:100%;min-width:0;align-self:stretch;
+}
+.toolbar > .weather-events-control > .weather-events-launch {
+  display:block;box-sizing:border-box;width:100%;height:32px;min-width:0;margin:0;text-align:center;
+}
+@media (min-width:801px) {
+  html[data-controls-position="left"] .toolbar > .weather-events-control {
+    flex:0 0 auto;margin-top:auto;margin-bottom:0;
+  }
+  html[data-controls-position="left"] .toolbar > .helper {
+    margin-top:0;
+  }
+}
+@media (max-width:800px) {
+  /* Match the mobile Controls expansion state, without moving the button. */
+  .toolbar > .toolbar-controls:not(.is-open) + .weather-events-control {display:none;}
+  .toolbar > .toolbar-controls.is-open + .weather-events-control {display:block;margin-top:8px;}
+}
+.user-guide-dialog .guide-contact {
+  margin:14px 0 10px;padding:10px 12px;border-top:1px solid var(--border);
+  color:var(--muted);font-size:12px;line-height:1.5;
+}
+.user-guide-dialog .guide-contact a {color:var(--highlight);text-decoration:underline;}
+
+/* v1.2.32: contextual, explicitly non-verifying historical WWA records. */
+.weather-event-alert-badge{color:var(--highlight)!important;font-weight:700!important}
+.weather-events-alert-context{border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:8px 0 13px;background:var(--panel);color:var(--text)}
+.weather-events-alert-context h4{margin:0 0 6px;font-size:12px}
+.weather-events-alert-context p,.weather-events-alert-context small{font-size:11px;line-height:1.45;color:var(--muted);margin:3px 0;display:block}
+.weather-event-alert-row{padding:7px 0;border-top:1px solid var(--border)}
+.weather-event-alert-row strong{font-size:12px}
+.weather-event-alert-row a{color:var(--highlight);text-decoration:underline}
+.weather-event-alert-disclaimer{margin-top:8px!important}
+
+/* Weather Events observed-evidence grouping: individual times stay available on demand. */
+.weather-observed-disclosure{margin-top:4px;font-size:11px;max-width:100%}
+.weather-observed-disclosure summary{cursor:pointer;color:var(--highlight);font-weight:700;overflow-wrap:anywhere}
+.weather-observed-items{padding-left:16px;margin:6px 0 3px;line-height:1.4;overflow-wrap:anywhere}
+.weather-observed-items li+li{margin-top:4px}
+.weather-observed-source{font-size:10px;color:var(--muted);white-space:normal;text-align:right;overflow-wrap:anywhere}
+.weather-event-alert-row a{overflow-wrap:anywhere}
+
+
+/* v1.2.38: event cards never shrink into their neighbors in the scroll list.
+   Keep WWA records visible and independently clickable even when case details are collapsed. */
+.weather-events-list{min-width:0;align-items:stretch}
+.weather-event-card{flex:0 0 auto;min-height:0;min-width:0;display:flex;flex-direction:column;gap:4px;padding:8px 10px;background:var(--control);border:1px solid var(--border);border-radius:10px;overflow-wrap:anywhere}
+.weather-event-card.is-active{outline:2px solid var(--highlight);outline-offset:-2px}
+.weather-event-card-top{display:flex;align-items:flex-start;gap:4px;min-width:0}
+.weather-event-card .weather-event-choice{flex:1 1 auto;min-width:0;width:auto;min-height:0;display:flex;flex-direction:column;gap:3px;padding:1px 2px;background:transparent;border:0;border-radius:4px;box-shadow:none;text-align:left;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+.weather-event-card .weather-event-choice strong{font-size:12px}
+.weather-event-card .weather-event-choice small{font-size:10px;line-height:1.35}
+.weather-event-expand{flex:0 0 28px;width:28px;min-width:28px;height:29px;padding:0;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);cursor:pointer}
+.weather-event-expand:hover,.weather-event-wwa-link:hover{color:var(--highlight)}
+.weather-event-card-wwa{display:flex;gap:5px 8px;flex-wrap:wrap;align-items:baseline;min-width:0;font-size:10px;line-height:1.5}
+.weather-event-card-wwa .weather-event-alert-badge{font-size:10px;white-space:normal}
+.weather-event-wwa-link{color:var(--highlight);font-size:10px;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.weather-event-wwa-name{font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.weather-event-card-details{display:flex;flex-direction:column;gap:4px;border-top:1px solid var(--border);margin-top:3px;padding-top:6px;min-width:0}
+.weather-event-card-details[hidden]{display:none!important}
+.weather-event-card-details small{font-size:10px;color:var(--muted);line-height:1.4;overflow-wrap:anywhere}
+.weather-event-wwa-more{display:flex;flex-wrap:wrap;gap:4px 9px}
+.weather-events-subheading{font-size:12px;margin:12px 0 8px}
+.weather-source-group,.weather-forecast-disclosure{flex:none;min-width:0;border:1px solid var(--border);border-radius:10px;background:var(--panel)}
+.weather-source-summary,.weather-forecast-disclosure>summary{padding:10px 12px;cursor:pointer;overflow-wrap:anywhere;color:var(--text)}
+.weather-source-summary{display:list-item;list-style-position:inside;}
+.weather-source-summary-text{display:inline-flex;flex-direction:column;gap:3px;max-width:calc(100% - 20px);vertical-align:top}
+.weather-source-summary-text strong{font-size:12px}
+.weather-source-summary-text small{font-size:10px;line-height:1.35;color:var(--muted)}
+.weather-source-details{padding:0 12px 10px 18px;max-height:300px;overflow-y:auto}
+.weather-source-entry{padding:7px 0;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}
+.weather-source-entry-main{display:flex;flex-wrap:wrap;gap:3px 10px;justify-content:space-between;font-size:11px;line-height:1.4}
+.weather-source-entry-main strong{font-size:11px}
+.weather-source-entry-main span,.weather-source-entry>small{font-size:10px;color:var(--muted);line-height:1.4}
+.weather-source-report-link{font-size:11px;color:var(--highlight);text-decoration:underline}
+.weather-forecast-disclosure{padding:0 10px 10px;margin-top:12px}
+.weather-forecast-disclosure>summary{margin:0 -10px;padding:10px 12px;font-size:12px;font-weight:700;color:var(--highlight)}
+.weather-forecast-disclosure h5{margin:10px 0 6px;font-size:12px}
+.weather-event-card a:focus-visible,.weather-event-card button:focus-visible,.weather-source-group summary:focus-visible,.weather-forecast-disclosure summary:focus-visible{outline:2px solid var(--highlight);outline-offset:2px}
+
+/* v1.2.43 — Browser-native cropped-tab recording of one focused panel.
+   The red recording controls live outside the cropped panel and therefore do
+   not appear in the saved video; the panel's normal overlays and legend do. */
+.export-kind[hidden],.export-video-notice[hidden],.export-label-options[hidden],
+.export-ratios[hidden],.export-framing[hidden]{display:none!important}
+.export-video-notice{
+ margin:0 0 14px;padding:11px 13px;border:1px solid var(--border);
+ border-radius:9px;background:var(--panel);color:var(--text);font-size:12px;
+ line-height:1.55;
+}
+.export-kind label[hidden]{display:none!important}
+.export-kind input:disabled{opacity:.5}
+.evu-video-recorder-bar{
+ position:fixed;top:9px;left:50%;transform:translateX(-50%);
+ z-index:20000;display:flex;align-items:center;gap:10px;
+ max-width:calc(100vw - 18px);padding:7px 9px 7px 12px;
+ border:1px solid #f49f9f;border-radius:999px;
+ color:#fff;background:rgba(88,19,31,.96);box-shadow:0 5px 24px rgba(0,0,0,.35);
+ font:600 13px system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+ pointer-events:auto;
+}
+.evu-video-recorder-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.evu-video-recorder-dot{width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#ff5965;box-shadow:0 0 0 3px rgba(255,117,131,.25)}
+.evu-video-recorder-bar[data-phase="recording"] .evu-video-recorder-dot{animation:evu-recording-pulse 1.4s ease-in-out infinite}
+@keyframes evu-recording-pulse{50%{opacity:.35}}
+.evu-video-recorder-stop{
+ flex:0 0 auto;min-height:30px;padding:5px 12px;border:1px solid #fff;
+ border-radius:999px;color:#6a1c2b;background:#fff;font:700 12px system-ui;
+ cursor:pointer;
+}
+.evu-video-recorder-stop:disabled{opacity:.7;cursor:progress}
+.evu-video-recorder-stop:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.evu-video-recorder-countdown{
+ position:absolute;inset:0;z-index:11;display:flex;flex-direction:column;
+ align-items:center;justify-content:center;gap:10px;
+ background:rgba(2,9,19,.36);color:#fff;pointer-events:none;
+ font:700 15px system-ui;text-shadow:0 2px 7px #000;
+}
+.evu-video-count-number{font-size:clamp(70px,13vmin,150px);font-variant-numeric:tabular-nums;line-height:1}
+.evu-video-recorder-countdown small{font-weight:650;font-size:clamp(13px,2.5vmin,19px)}
+.panel-card.evu-panel-recording .panel-save,
+.panel-card.evu-panel-recording .panel-expand{display:none!important}
+@media(max-width:600px){
+ .evu-video-recorder-bar{top:max(6px,env(safe-area-inset-top));font-size:11px;gap:7px;padding:6px 8px;}
+ .evu-video-recorder-stop{font-size:11px;padding:4px 8px}
+}
+@media(prefers-reduced-motion:reduce){.evu-video-recorder-dot{animation:none!important}}
+
+/* v1.2.45: terrain selection number is visible to the operator while being
+ * DOM-portaled outside the Element Capture subtree. The fixed geometry is
+ * supplied by the recorder, so it still follows panel resize and scrolling.
+ * Data/Map overlay menus and the Stop bar remain above it and clickable. */
+.terrain-panel-number.evu-terrain-number-outside-capture{
+ position:fixed!important;inset:auto;z-index:9000;
+ pointer-events:none!important;box-sizing:border-box;
+}
+
+/* Source-relative terrain rendering: never mistake an expensive low-detail preview for the final map. */
+.terrain-detail-render-status{position:absolute;z-index:6;top:48px;left:50%;transform:translateX(-50%);max-width:calc(100% - 22px);pointer-events:none;padding:6px 12px;border:1px solid rgba(150,200,240,.45);border-radius:7px;background:rgba(8,20,33,.88);color:#ecf5ff;font:600 12px/1.4 system-ui,sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.terrain-detail-render-status[hidden]{display:none!important}
+
+/* Terrain is intentionally unavailable in Globe projection. */
+#terrainOption.projection-unavailable {opacity:.48;cursor:not-allowed}
+#terrainOption.projection-unavailable input {cursor:not-allowed}

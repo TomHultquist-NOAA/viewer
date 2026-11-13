@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#09111f">
+<title>OMD EVU Model Viewer | GPU weather + 3D terrain v1.2.82</title>
+<link rel="stylesheet" href="css/styles.css?v=1.2.82">
+<!-- Main application: MapLibre 6 native terrain weather shaders. -->
+<link rel="stylesheet" href="vendor-v6/maplibre-gl.css?v=6.16.0">
+<script>
+/* Server-independent diagnostics: Apache may send .mjs as octet-stream.
+   The .js ES module has standard Javascript MIME; report any startup failure. */
+(function(){
+ window.EVU_ES_BOOT_STATUS='pending';
+ let shown=false;
+ function report(message){
+  if(shown||window.EVU_ES_BOOT_STATUS==='ready')return;
+  shown=true;
+  const attach=function(){
+   const box=document.createElement('aside');box.id='evuEsStartupError';
+   box.setAttribute('role','alert');
+   box.style.cssText='position:fixed;z-index:99999;top:12px;left:12px;right:12px;background:#823541;color:white;padding:13px 16px;border:1px solid #faa;border-radius:10px;font:14px system-ui;box-shadow:0 4px 28px #0007';
+   const text=document.createElement('div');text.textContent='Viewer startup error: '+message;
+   box.append(text);(document.body||document.documentElement).appendChild(box);
+  };
+  if(document.body)attach();else document.addEventListener('DOMContentLoaded',attach,{once:true});
+ }
+ window.addEventListener('error',event=>{
+  if(window.EVU_ES_BOOT_STATUS==='ready')return;
+  const source=event.filename||event.target?.src||'';
+  if(/evu-bootstrap|gpu-terrain-weather|vendor-v6|maplibre-gl/.test(source))report((event.message||'Cannot load ES module')+' ('+source+')');
+ },true);
+ window.addEventListener('unhandledrejection',event=>{
+  if(window.EVU_ES_BOOT_STATUS!=='ready')report(String(event.reason?.message||event.reason));
+ });
+ setTimeout(()=>{
+  if(window.EVU_ES_BOOT_STATUS==='pending')report('ES-module startup did not complete. Run python3 update_maplibre_vendor_v6.py --dest vendor-v6 --activate, and check vendor-v6/maplibre-gl.js.');
+ },12000);
+})();
+</script>
+<script>
+/* Release preflight before application initialization, even on cached HTML.
+   Do not modify localStorage, indexedDB or forecast data. */
+(function(){
+ const current=window.EVU_DOCUMENT_VERSION='1.2.82';
+ const parts=s=>/^\d+\.\d+\.\d+$/.test(String(s||''))?s.split('.').map(Number):null;
+ const newer=(v)=>{const a=parts(v),b=parts(current);return !!a&&!!b&&a.some((n,i)=>n!==b[i]&&a.slice(0,i).every((m,j)=>m===b[j])&&n>b[i]);};
+ window.EVU_EARLY_RELEASE_GATE=(async()=>{
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),2200);
+  try{
+   const response=await fetch('release.json?__nocache='+Date.now(),{cache:'no-store',credentials:'same-origin',signal:controller.signal});
+   if(!response.ok)return false;
+   const manifest=await response.json(),version=manifest&&manifest.version;
+   window.EVU_EARLY_RELEASE_RESULT={version,checkedAt:Date.now()};
+   if(!newer(version))return false;
+   const url=new URL(location.href);
+   if(url.searchParams.get('_app')===version)return false;
+   url.searchParams.set('_app',version);
+   url.searchParams.set('_fresh',String(Date.now()));
+   location.replace(url.href);
+   window.EVU_ES_BOOT_STATUS='refreshing';
+   return true;
+  }catch(_){return false;}finally{clearTimeout(timeout);}
+ })();
+})();
+</script>
+<script type="module" src="js/evu-bootstrap.js?v=1.2.82"></script>
+</head>
+<body>
+<header class="toolbar">
+  <div class="toolbar-brandline">
+    <div class="brand"><div class="brandmark">EVU</div><div><strong>OMD EVU Model Viewer</strong><small>Evaluation and Verification Unit</small></div></div>
+    <div class="toolbar-brand-actions">
+      <button id="mobileControlsBtn" class="utility mobile-controls-btn" aria-controls="viewerControls" aria-expanded="false" title="Show viewer controls">☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span></button>
+      <button id="viewerRefreshBtn" class="utility" type="button" aria-label="Refresh viewer" title="Reload the viewer and check for updates">⟳</button>
+      <button id="themeToggleBtn" class="utility theme-toggle" aria-label="Switch to light mode" title="Switch to light mode"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg></button>
+      <button id="controlsPositionBtn" class="utility controls-position-toggle" type="button" aria-label="Move controls to left side" aria-pressed="false" title="Move controls to left side"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></button>
+      <button id="copyLinkBtn" class="utility share-link-btn" type="button" aria-label="Copy share link" title="Copy share link"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.55 6.6-4.1M8.7 13.45l6.6 4.1"/></svg></button><span id="shareLinkStatus" class="sr-only" role="status" aria-live="polite"></span>
+    </div>
+  </div>
+  <div id="viewerControls" class="toolbar-controls">
+    <div class="control model-set-control"><label for="modelSetSelect">Model set</label><select id="modelSetSelect" aria-label="Model set"><option value="rrfs-refs">RRFS / REFS</option><option value="gfs-versions" disabled>GFSv16 / GFSv17 (coming soon)</option><option value="ai-models" disabled>AI / GFS / GEFS (coming soon)</option></select></div>
+    <div class="control field-control field-nested-control"><label for="fieldMenuBtn">Field</label><button id="fieldMenuBtn" class="field-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="fieldMenuPopup" aria-label="Choose meteorological field" disabled><span id="fieldMenuSelected">Loading…</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
+    <div class="control cycle-control"><label for="cycleSelect">Cycle (UTC)</label><select id="cycleSelect" disabled></select></div>
+    <div class="control forecast-control"><label for="fcstSelect">F-hour</label><select id="fcstSelect" disabled></select></div>
+    <div class="control snow-method-control" id="snowMethodControl" hidden>
+      <label id="snowMethodLabel">Snowfall method</label>
+      <div class="snow-method-options" role="radiogroup" aria-labelledby="snowMethodLabel">
+        <label><input type="radio" name="gfsSnowMethod" id="snowMethodWeasd" value="weasd" checked><span>WEASD Change</span></label>
+        <label><input type="radio" name="gfsSnowMethod" id="snowMethodPrecip" value="precip"><span>Snow Precipitation</span></label>
+        <div class="snow-ratio-control" id="snowRatioControl" hidden>
+        <label for="snowRatioSlider">Snow-to-liquid ratio <output id="snowRatioValue">10.0:1</output></label>
+        <input type="range" id="snowRatioSlider" min="5" max="40" step="0.5" value="10" aria-label="Snow-to-liquid ratio (5 to 40)" aria-valuetext="10 to 1">
+        </div>
+      </div>
+    </div>
+    <div class="transport" aria-label="Forecast navigation"><button id="stepBackBtn" class="round" disabled title="Previous hour">◀◀</button><button id="playBtn" class="round" disabled title="Play">▶</button><button id="pauseBtn" class="round active" disabled title="Pause">Ⅱ</button><button id="stepForwardBtn" class="round" disabled title="Next hour">▶▶</button></div>
+    <div class="control speed-control"><label>Speed</label><div class="speed-buttons" role="group" aria-label="Loop playback speed"><button id="speedDownBtn" type="button" title="Slower playback" aria-label="Slower playback">−</button><output id="speedValue" aria-live="polite" title="Playback speed relative to normal">1×</output><button id="speedUpBtn" type="button" title="Faster playback" aria-label="Faster playback">+</button></div></div>
+    <div id="contourControl" class="control contour-control overlays-control" hidden>
+      <button type="button" id="dataOverlaysMenuBtn" class="map-layers-menu-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="dataOverlaysPopup" hidden><span>Data overlays</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="overlays-switches" id="dataOverlaysPopup" role="group" aria-label="Data overlays">
+        <fieldset id="imageFieldControl" class="shaded-field-control" hidden><legend>Shaded image / difference</legend><div id="imageFieldOptions" class="shaded-field-options" role="radiogroup" aria-label="Shaded image field"></div></fieldset>
+        <label id="heightOption" class="contour-switch style-editable" data-style-layer="height" hidden title="Display geopotential height contours"><input type="checkbox" id="heightToggleBtn" checked><span>Height</span></label>
+        <label id="marineWindOption" class="contour-switch style-editable" data-style-layer="wind" hidden title="Display actual 10 m wind barbs on non-swell GFS wave fields"><input type="checkbox" id="marineWindToggleBtn" checked><span>10 m Wind barbs</span></label>
+        <label id="windOption" class="contour-switch style-editable" data-style-layer="wind" hidden title="Display meteorological wind barbs"><input type="checkbox" id="windToggleBtn" checked><span>Wind barbs</span></label>
+        <label id="windSpeedOption" class="contour-switch style-editable" data-style-layer="windSpeed" hidden title="Display 850-hPa wind-speed contours derived from native U/V (knots), independently of the shaded image and wind barbs"><input type="checkbox" id="windSpeedToggleBtn"><span>Wind speed</span></label>
+        <label id="tracersOption" class="contour-switch style-editable" data-style-layer="tracers" title="Show wind-speed-colored tracers from native U/V winds; right-click for color mode, thickness and density"><input id="tracersToggleBtn" type="checkbox"><span>Wind tracers</span></label>
+        <label id="contourOption" class="contour-switch style-editable" data-style-layer="contours" hidden title="Display optional shaded-field contours"><input type="checkbox" id="contourToggleBtn"><span>Contours</span></label>
+        <label id="dewpointOption" class="contour-switch style-editable" data-style-layer="dewpoint" hidden title="Display isobaric dewpoint contours where same-level moisture data are published"><input type="checkbox" id="dewpointToggleBtn" checked><span>Dewpoint</span></label>
+        <label id="spfhOption" class="contour-switch style-editable" data-style-layer="specificHumidity" hidden title="Display specific-humidity contours where native pressure-level moisture is available"><input type="checkbox" id="spfhToggleBtn"><span>Specific humidity</span></label>
+        <label id="lowTracksOption" class="contour-switch" hidden title="Show or hide surface-low trajectories, low-center markers and pressure labels for this product"><input type="checkbox" id="lowTracksToggleBtn" checked><span>Low tracks</span></label>
+        <label id="surfaceMSLPOption" class="contour-switch style-editable" data-style-layer="contours" hidden title="Overlay labeled MSLP isobars on this Surface plot; enabled by default"><input type="checkbox" id="surfaceMSLPToggleBtn" checked><span>MSLP isobars</span></label>
+        <label id="mslp850Option" class="contour-switch style-editable" data-style-layer="temperature" hidden title="Display dashed 850-hPa temperature isolines on MSLP"><input type="checkbox" id="mslp850ToggleBtn" checked><span>850-hPa Temp</span></label>
+        <div id="obsControl" class="obs-switches" hidden>
+          <label class="contour-switch" title="Synoptic Data METAR / ASOS / AWOS station observations"><input type="checkbox" id="obsSynoptic" checked><span>METARs</span></label>
+          <label class="contour-switch" title="mPING crowd-sourced precipitation reports"><input type="checkbox" id="obsMping" checked><span>mPING</span></label>
+        </div>
+        <div id="lightningControl" class="spc-switches" hidden>
+          <label class="contour-switch" title="GLM satellite lightning flashes from the preceding hour, colored by age"><input type="checkbox" id="lightningToggleBtn"><span>GLM lightning</span></label>
+        </div>
+        <div id="spcControl" class="spc-switches" hidden>
+          <label class="contour-switch" title="SPC preliminary tornado, wind, and hail reports"><input type="checkbox" id="spcToggleBtn"><span>SPC reports</span></label>
+        </div>
+      <small id="lightningLegend" class="glm-age-legend" hidden aria-label="GLM lightning flash age in minutes before valid time"><span>GLM age:</span><span><i style="--glm-color:#ed468b"></i>0–15m</span><span><i style="--glm-color:#f59e0b"></i>15–30m</span><span><i style="--glm-color:#36b6cd"></i>30–45m</span><span><i style="--glm-color:#7d84dc"></i>45–60m</span></small>
+      <small id="lightningCount" class="obs-count" aria-live="polite" hidden></small>
+      <small id="spcCount" class="obs-count" aria-live="polite" hidden></small>
+      <small id="obsCount" class="obs-count" aria-live="polite" hidden></small>
+      </div>
+    </div>
+    <div class="control map-layer-control" id="mapLayerControl">
+      <div class="map-layer-heading">
+        <button id="mapLayersMenuBtn" class="map-layers-menu-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="mapLayersMenuPopup" title="Choose map overlays and right-click any item to customize it"><span>Map overlays</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+
+      </div>
+    </div>
+    <section id="terrainPanelPopup" class="terrain-panel-popup" role="dialog" aria-modal="false" aria-labelledby="terrainPanelPopupTitle" hidden>
+  <div class="terrain-panel-popup-head"><strong id="terrainPanelPopupTitle">Terrain panels</strong><span>Numbers on maps match the choices below</span></div>
+  <p>Select the panels that will use 3-D elevation. Unselected panels retain their normal full-resolution weather display and do not load terrain tiles.</p>
+  <div id="terrainPanelChoices" class="terrain-panel-choices" role="group" aria-label="Panels with terrain"></div>
+  <div class="terrain-panel-actions"><button type="button" id="terrainPanelsAllBtn">All</button><button type="button" id="terrainPanelsNoneBtn">None</button><span class="terrain-panel-actions-spacer"></span><button type="button" id="terrainPanelsCancelBtn">Cancel</button><button type="button" id="terrainPanelsDoneBtn" class="terrain-panels-apply">Apply terrain</button></div>
+</section>
+    <div class="control opacity-control" title="Meteorological image shading opacity; contours, barbs, and reports remain fully visible">
+      <label for="imageOpacity">Image opacity <output id="imageOpacityLabel">100%</output></label>
+      <input type="range" id="imageOpacity" min="0" max="100" step="5" value="100" aria-label="Image opacity percent">
+    </div>
+    <div class="control interpolation-control" title="Apply GPU bilinear interpolation to continuous weather fields. Off by default; categorical precipitation type remains nearest-neighbor.">
+      <label for="interpolateToggleBtn">Grid display</label>
+      <label class="contour-switch" for="interpolateToggleBtn"><input type="checkbox" id="interpolateToggleBtn"><span>Interpolate</span></label>
+    </div>
+    <div class="control map-view-control"><label for="mapViewSelect">Map view</label><select id="mapViewSelect"><option value="lambert">2D</option><option value="globe">Globe</option></select></div>
+    <div class="toolbar-utilities"><button id="saveAllPngBtn" class="utility" title="Export all panels as a PNG image or animated GIF" disabled>Export all panels</button></div>
+  </div>
+    <div class="weather-events-control"><button id="weatherEventsBtn" class="utility weather-events-launch" type="button" aria-haspopup="dialog" aria-controls="weatherEventsDialog" title="Browse experimental weather discoveries">✦ Weather Events</button></div>
+</header>
+<div id="shareLinkToast" class="share-link-toast" hidden aria-hidden="true"></div>
+<div id="releaseUpdateNotice" class="release-update-notice" role="status" aria-live="polite" hidden><span id="releaseUpdateText">A newer viewer version is available.</span><button id="releaseUpdateBtn" type="button">Load update</button><button id="releaseUpdateDismiss" type="button" aria-label="Dismiss update notice">×</button></div>
+<div id="mapLayersMenuPopup" class="map-layers-menu-popup" role="group" aria-label="Map overlay visibility and appearance" hidden>
+  <div class="map-layers-popup-heading">
+    <div class="map-layers-menu-hint">Select layers to display. Right-click a layer to customize it.</div>
+    <button id="resetViewBtn" type="button" class="map-reset-icon" title="Reset map extent, bearing and 3D tilt" aria-label="Reset map view and tilt"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11a9 9 0 1 1 3 6.7"/><path d="M3 4v7h7"/></svg><span>Reset view</span></button>
+  </div>
+  <div class="overlays-switches" role="group" aria-label="Map layers">
+      <label id="mapOutlinesOption" class="contour-switch style-editable" data-style-layer="mapOutlines" title="Toggle state, country and coastlines; right-click for their color and thickness"><input id="mapOutlinesToggleBtn" type="checkbox" checked><span>State/Country</span></label>
+      <label id="citiesOption" class="contour-switch style-editable" data-style-layer="cities" title="Show city names and optional sampled values; right-click for color, font size, label visibility and density"><input id="citiesToggleBtn" type="checkbox"><span>Cities</span></label>
+      <label id="roadsOption" class="contour-switch style-editable" data-style-layer="roads" title="Optional road network; right-click for line color, thickness and density"><input id="roadsToggleBtn" type="checkbox"><span>Roads</span></label>
+      <label id="countiesOption" class="contour-switch style-editable" data-style-layer="counties" title="Toggle county boundaries independently of zoom; right-click for color and thickness"><input id="countiesToggleBtn" type="checkbox"><span>Counties</span></label>
+      <label id="mapBackgroundOption" class="contour-switch style-editable" data-style-layer="mapBackground" title="Left-click to toggle; right-click anywhere here to style map background"><input id="mapBackgroundToggleBtn" type="checkbox" checked><span>Map background</span></label>
+      <label id="terrainOption" class="contour-switch style-editable" data-style-layer="terrain" title="Toggle 3-D terrain; right-click for terrain opacity, vertical exaggeration and lighting"><input id="terrainToggleBtn" type="checkbox"><span>Terrain</span></label>
+
+  </div>
+  <button type="button" id="terrainPanelsEditBtn" class="terrain-panels-edit" hidden aria-haspopup="dialog" aria-controls="terrainPanelPopup">Choose terrain panels…</button>
+  <span id="terrainNotice" class="terrain-notice" role="status" aria-live="polite" hidden></span>
+  <span id="geographyNotice" class="terrain-notice" role="status" aria-live="polite" hidden></span>
+</div>
+
+<!-- Floating outside the clipped optional left toolbar; still anchored to its Field button. -->
+<div id="fieldMenuPopup" class="field-menu-popup" hidden>
+  <div id="fieldMenuCategories" class="field-menu-categories" role="menu" aria-label="Meteorological field categories"></div>
+  <div id="fieldMenuBranch" class="field-menu-branch" role="menu" aria-label="Fields in selected category" hidden>
+    <button id="fieldMenuBack" class="field-menu-back" type="button" aria-label="Back to field categories"><span aria-hidden="true">‹</span> Categories</button>
+    <div id="fieldMenuBranchTitle" class="field-menu-branch-title" aria-hidden="true"></div>
+    <div id="fieldMenuItems" class="field-menu-items"></div>
+  </div>
+</div>
+<div class="helper"><div class="helper-instructions"><button type="button" id="userGuideBtn" class="helper-guide" aria-haspopup="dialog" aria-controls="userGuideDialog">User guide</button> <button type="button" id="shortcutsBtn" class="helper-guide" aria-haspopup="dialog" aria-controls="shortcutsDialog">Shortcuts</button></div><span class="helper-status"><span id="dataStatus" role="status" aria-live="polite">Starting…</span><span id="citiesCredit" class="helper-credit" hidden>Cities: <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a> (CC BY 4.0)</span><span id="roadsCredit" class="helper-credit" hidden>Road data: <a href="https://www.census.gov/programs-surveys/geography.html" target="_blank" rel="noopener noreferrer">U.S. Census Bureau TIGER/Line</a></span><span id="terrainCredit" class="helper-credit" hidden>Terrain <span id="terrainState" role="status" aria-live="polite"></span> · <a id="terrainProviderLink" href="https://mapterhorn.com/attribution/" target="_blank" rel="noopener noreferrer">Mapterhorn</a></span><small id="obsAttribution" class="obs-attribution helper-credit" hidden>Data: <a href="https://synopticdata.com/" target="_blank" rel="noopener noreferrer">Synoptic Data</a> · <a href="https://mping.ou.edu/" target="_blank" rel="noopener noreferrer">mPING (OU/NSSL)</a> · <a href="https://www.ncei.noaa.gov/products/goes-terrestrial-weather-abi-glm" target="_blank" rel="noopener noreferrer">GOES GLM</a></small></span></div>
+<div class="viewer-workspace">
+  <main id="viewerGrid" class="viewer-grid" aria-label="Model comparison plots"><div class="startup">Initializing rendering engine…</div></main>
+  <section id="sharedLegend" class="shared-legend" aria-label="Shared field color legend">
+    <div class="shared-legend-heading">
+      <div id="sharedLegendTitle" class="shared-legend-title">Field color scale</div>
+      <button type="button" id="legendResetBtn" class="legend-reset" hidden title="Reset color scale to default" aria-label="Reset color scale to default">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v5h5"/></svg>
+      </button>
+    </div>
+    <div class="shared-legend-track">
+      <canvas id="sharedLegendCanvas" class="shared-legend-canvas" width="1024" height="20" title="Click for min/max; right-click for .pal palette"></canvas>
+      <div id="sharedLegendLabels" class="shared-legend-labels" aria-label="Color scale values, categorical fields show No and Yes"></div>
+    </div>
+  </section>
+  <section id="rotationSharedLegend" class="shared-legend rotation-shared-legend" aria-label="MRMS rotation track color legend" hidden>
+    <div id="rotationSharedLegendTitle" class="shared-legend-title">MRMS mid-level rotation track</div>
+    <div class="shared-legend-track">
+      <canvas id="rotationSharedLegendCanvas" class="shared-legend-canvas" width="1024" height="20" aria-label="Radar rotation track scale"></canvas>
+      <div id="rotationSharedLegendLabels" class="shared-legend-labels"></div>
+    </div>
+  </section>
+  <section id="differenceSharedLegend" class="shared-legend difference-shared-legend" aria-label="Shared GFS signed difference color legend" hidden>
+    <div id="differenceSharedLegendTitle" class="shared-legend-title">GFS difference</div>
+    <div class="shared-legend-track">
+      <canvas id="differenceSharedLegendCanvas" class="shared-legend-canvas" width="1024" height="20" aria-label="Signed difference color scale"></canvas>
+      <div id="differenceSharedLegendLabels" class="shared-legend-labels"></div>
+    </div>
+  </section>
+  <dialog id="legendRangePopup" class="legend-range-popup" aria-labelledby="legendRangeTitle" aria-describedby="legendRangeMessage" hidden>
+    <form id="legendRangeForm" method="dialog" novalidate>
+      <h2 id="legendRangeTitle">Customize color scale</h2>
+      <p id="legendRangeMessage">Adjust the displayed minimum and maximum. Model data are unchanged.</p>
+      <div class="legend-range-pair">
+        <label for="legendMinSlider">Minimum</label>
+        <div class="legend-range-controls"><input id="legendMinSlider" type="range" aria-label="Color scale minimum slider"><input id="legendMinNumber" type="number" aria-label="Color scale minimum value"></div>
+      </div>
+      <div class="legend-range-pair">
+        <label for="legendMaxSlider">Maximum</label>
+        <div class="legend-range-controls"><input id="legendMaxSlider" type="range" aria-label="Color scale maximum slider"><input id="legendMaxNumber" type="number" aria-label="Color scale maximum value"></div>
+      </div>
+      <section class="legend-pal-section" aria-label="Custom color palette">
+        <div class="legend-pal-heading"><strong>Custom color table (.pal)</strong><span id="legendPalName">Using built-in palette</span></div>
+        <div class="legend-pal-actions"><label class="legend-pal-upload">Upload .pal<input type="file" id="legendPalFile" accept=".pal,text/plain"></label><button type="button" id="legendPalRemoveBtn" disabled>Restore built-in colors</button></div>
+        <p id="legendPalStatus" class="legend-pal-status" role="status" aria-live="polite"></p>
+        <small>GRLevelX/RadarScope Color, SolidColor, Color4 or numeric RGB entries. Values use the displayed field units. Colors are saved per field in this browser.</small>
+      </section>
+      <p id="legendRangeError" class="legend-range-error" role="alert" hidden>The maximum must be greater than the minimum.</p>
+      <div class="legend-range-actions"><button id="legendRangeResetBtn" type="button">Reset default</button><span class="legend-range-spacer"></span><button id="legendCancelBtn" type="button">Cancel</button><button id="legendRangeApplyBtn" type="submit">Apply</button></div>
+    </form>
+  </dialog>
+</div>
+
+<dialog id="shortcutsDialog" class="user-guide-dialog shortcuts-dialog" aria-labelledby="shortcutsTitle">
+  <div class="user-guide-head"><div><small>Quick reference</small><h2 id="shortcutsTitle">Viewer shortcuts</h2><p>Keyboard, mouse, touch, and map interactions</p></div><div class="user-guide-head-actions"><a class="guide-pdf-link" href="SHORTCUTS.pdf" target="_blank" rel="noopener noreferrer" title="Open shortcuts PDF" aria-label="Open shortcuts PDF"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v6h6"/><path d="M8.5 15h7M8.5 18h5"/></svg></a><button id="shortcutsClose" type="button" aria-label="Close shortcuts">×</button></div></div>
+  <div class="user-guide-scroll shortcut-list">
+   <h3>Keyboard</h3>
+   <div class="shortcut-grid"><kbd>←</kbd><span>Previous forecast hour (GFS 3 h; AI 6 h)</span><kbd>→</kbd><span>Next forecast hour</span><kbd>↑ / ↓</kbd><span>Previous / next cycle</span><kbd>Space</kbd><span>Play / pause forecast animation</span><kbd>Esc</kbd><span>Close an open dialog or difference window</span></div>
+   <h3>Mouse and map</h3>
+   <div class="shortcut-grid"><kbd>Drag</kbd><span>Pan map</span><kbd>Shift + drag</kbd><span>Box zoom where supported</span><kbd>Hover</kbd><span>Inspect synchronized location and field values across panels</span><kbd>Wheel</kbd><span>Zoom in or out, including beyond model bounds</span><kbd>Ctrl + drag</kbd><span>Tilt / rotate the 2D map in 3D perspective</span><kbd>Right-drag</kbd><span>Rotate / tilt where supported</span><kbd>Reset icon</kbd><span>Inside Map layers: restore the standard map extent and remove camera tilt and rotation</span><kbd>Right-click map</kbd><span>Open point inspection / sounding actions</span><kbd>Right-click toggle label</kbd><span>Customize color, thickness, and density for this light/dark mode, including wind tracers</span><kbd>Click colorbar</kbd><span>Set custom numeric color range</span><kbd>Right-click colorbar</kbd><span>Import a custom .pal color table</span><kbd>Panel expand</kbd><span>Focus a single model, then restore the grid</span><kbd>Download icon</kbd><span>Export an individual panel or point chart</span></div>
+   <h3>Touch and display</h3>
+   <div class="shortcut-grid"><kbd>Pinch</kbd><span>Zoom; two fingers may rotate/pitch where supported</span><kbd>Long press</kbd><span>Point inspector on mobile</span><kbd>Terrain</kbd><span>Self-hosted 3-D DEM; a DEM installation is required. Right-click Terrain for opacity and vertical exaggeration (0–20×). Forecast Image opacity never changes automatically</span><kbd>Wind tracers</kbd><span>Animated wind streamlines for fields with suitable U/V vectors; right-click toggle to adjust color, thickness and particle density (default 4×; maximum 10×)</span></div>
+   <p class="shortcuts-footnote">Camera tilt is supported independently of Terrain. On mobile or slower devices, enable optional effects only as needed. 3-D terrain uses locally hosted DEM tiles; if unavailable, the viewer reports the missing DEM rather than drawing a flat fallback.</p>
+    <p class="guide-contact">Questions and comments can be directed to <a href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;tf=1&amp;to=thomas.hultquist@noaa.gov" target="_blank" rel="noopener noreferrer"><strong>Tom Hultquist</strong></a>, Office of Modeling and Development, Evaluation and Verification Unit.</p>
+  </div>
+  <div class="user-guide-footer"><span>Shortcuts also available as a printable PDF</span><button id="shortcutsDone" type="button">Close</button></div>
+</dialog>
+<dialog id="userGuideDialog" class="user-guide-dialog" aria-labelledby="userGuideTitle">
+  <div class="user-guide-head"><div><small>Model guidance visualization</small><h2 id="userGuideTitle">Model Viewer User Guide</h2><p>Interactive forecast and analysis comparisons</p></div><div class="user-guide-head-actions"><a class="guide-pdf-link" href="USER_GUIDE.pdf" target="_blank" rel="noopener noreferrer" aria-label="Open User Guide PDF in a new tab" title="Open PDF User Guide in a new tab"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/><path d="M14 3v6h6"/><path d="M8.5 15h7M8.5 18h5"/></svg><span class="sr-only">Open PDF</span></a><button id="userGuideClose" type="button" aria-label="Close user guide">×</button></div></div>
+  <!-- user-guide-source-sha256: 306d27db17f1b14a33bc1bedec768e3ce4035f53349bccde092817242159eeec -->
+  <div class="user-guide-scroll">
+<section class="guide-current" aria-label="Aviation weather and GFSv16/v17 v1.2.75"><h3>Aviation weather for regional and GFS model sets (v1.2.75)</h3><p><strong>Aviation weather</strong> is now a dedicated field menu containing <strong>Visibility, Ceiling height, and Flight category</strong>; these fields no longer appear in the Surface weather menu. Flight Category is now selectable for <strong>GFSv16 and GFSv17</strong> as well as RRFS/REFS/HRRR, using the same VLIFR/LIFR/IFR/MVFR/VFR palette and METAR colors. It remains excluded from the AI model set. New GFS model plots require the paired converter v1.4.63 to process native VIS and same-valid-time cloud ceiling (AGL) and derive flightcat. GFS categorical difference panels do not subtract category codes.</p><p><strong>Aviation analyses:</strong> for RRFS/REFS, and for GFS's analysis panel, published URMA fields are preferred, then RTMA, then RAP where available for the exact valid time. In GFS, the GFSv16 F000 model analysis is the final fallback when the observational analysis is unavailable. The analysis panel title identifies the actual selected source. Other GFS analysis plots retain their existing behavior. The converter offers <code>gfs_to_zarr.py --repair-aviation</code> to fill missing aviation fields in previously completed GFS hours without refetching unrelated fields.</p></section>
+<section class="guide-current" aria-label="Flight Category, MSLP image choices and terrain Globe behavior v1.2.71"><h3>Flight Category and enhanced Surface plots (v1.2.71)</h3><p><strong>Surface weather → Flight Category</strong> plots a discrete category derived from the most restrictive of same-hour visibility and ceiling: VLIFR (purple), LIFR (magenta), IFR (red), MVFR (blue), VFR (green). Values at exactly 0.5/1/3/5 statute miles or 200/500/1000/3000 ft AGL follow standard category boundaries; a missing value does not become zero. Available METAR markers use identical category colors and popups show Flight Category with available ceiling/visibility.</p><p>For <strong>2-m Temperature, 2-m Dewpoint, 2-m RH, 10-m Wind and 10-m Gust</strong>, a shaded-image radio selection switches between the original primary field and MSLP. Independently overlaid <strong>MSLP isobars are ON by default</strong> on all five fields; toggle them using the MSLP contours checkbox. Individual and multi-panel PNG/GIF exports follow the same selection and contour controls. <strong>Terrain</strong> is disabled in Globe projection and is switched off when entering Globe; return to 2D to enable it. The original Mixed precipitation colors remain unchanged. Flight Category requires the accompanying converter v1.4.62 to publish the derived model/analysis field.</p></section>
+<section class="guide-current" aria-label="Visibility, ceiling and Ptype analysis v1.2.70"><h3>Visibility, ceiling and RAP/MRMS verification (v1.2.70)</h3><p>The Surface menu now includes Visibility (mi) and Ceiling height (AGL, ft). On these fields, METAR circles use the same plot color scale; clicking a METAR shows available visibility and ceiling with its time and precipitation type. Recent observations are checked without the previous 30-minute wait and refresh roughly every minute. Analysis precipitation type now uses RAP F000, and Reflectivity with Ptype overlays MRMS reflectivity with same-valid-time RAP F000 categories. Mixed precipitation retains its original yellow/amber presentation. <strong>New native fields and observation JSON updates require converter/producer publication</strong>—see <a href="CONVERTER_DATA_REQUIREMENTS.md">data requirements</a>. The live-style multi-panel PNG/GIF contours from v1.2.68 are preserved; individual PNGs are unchanged.</p></section>
+<section class="guide-current" aria-label="AI point time-series forecast cadence v1.2.65"><h3>AI time-series lines corrected (v1.2.65)</h3><p>On the AI / GFS / GEFS workspace, point time series now sample F000, F006, F012, and subsequent selectable six-hour leads through F240, connecting adjacent available values and leaving gaps for genuinely unavailable leads. The GFSv16/v17 workspace remains three-hourly, and RRFS/REFS remains hourly. The lines use a visible three-pixel stroke; stored data, field values, and accumulation-bar behavior are unchanged.</p></section>
+<section class="guide-current" aria-label="Nine-panel AI and EAGLE developmental model support v1.2.64"><h3>AI viewer now has nine panels (v1.2.64)</h3><p>Existing rows remain <strong>AIGFS | AIGEFS Mean | HGEFS Mean</strong> and <strong>GFSv16 | GEFS Mean | Analysis (GFSv16 F000)</strong>. The new bottom row is <strong>EAGLE Solo (developmental AIGFS) | EAGLE Ensemble (developmental AIGEFS) | HEAGLE (developmental HGEFS)</strong>. EAGLE Solo has its own independent <code>catalog_eagle_solo.json</code>, published by the paired converter from the supplied NOAA developmental S3 feed. Its catalog may be pending until data are ready. The latter two panels remain labeled placeholders until their source locations are provided; no fields are synthesized. Terrain, tracing, differences and exports retain established behavior on available panels.</p></section>
+<section class="guide-current" aria-label="GFS and AI wind performance and 80 percent terrain opacity in v1.2.63"><h3>Fast GFS/AI wind tracers and 80% terrain default (v1.2.63)</h3><p>Eligible regular latitude/longitude GFS, AI and analysis wind fields now use a strictly validated direct native U/V lookup, avoiding repeated grid-axis scans for every animated wind tracer. Compatible Lambert grids keep their previously improved path. Density, speed, color, outline, and forecast/terrain display are unchanged; unsupported grids use the original sampler. The browser console command <code>EVUAdvancedMap.getTracerPerformance()</code> now separates <code>fastLatLonPanels</code> from <code>fastLambertPanels</code>. Terrain opacity defaults to <strong>80%</strong> when no custom value is saved, and the Terrain right-click <strong>Reset</strong> action returns it to 80%. User-saved terrain opacity and Image opacity (default 100%) remain independent and unchanged.</p></section>
+<section class="guide-current" aria-label="Native Lambert wind tracer acceleration v1.2.62"><h3>Faster RRFS/REFS wind tracers (v1.2.62)</h3><p>On supported native Lambert U/V grids, wind tracer animation now uses a validated direct-grid lookup instead of scanning thousands of grid-axis coordinates for every particle. The same native wind values, density, speed, colors, thin outline, and forecast/terrain appearance are retained. Mismatched and unsupported grids automatically use the original sampling path. For diagnostics open the browser console and run <code>EVUAdvancedMap.getTracerPerformance()</code> to see <code>fastGridPanels</code>, <code>referenceGridPanels</code>, and <code>averageFrameWorkMs</code>; <code>EVUFastWindSampler.getDiagnostics()</code> reports the last validation. The actual speedup depends on device and visible panels; no change to rendering quality or user settings is intended.</p></section>
+<section class="guide-current" aria-label="Sounding profile completeness diagnostics v1.2.61"><h3>Sounding profile integrity (v1.2.61)</h3><p>When a full native sounding is unavailable, the existing six-level sparse fallback is labeled as such; it is not the model's actual native vertical resolution. To distinguish truly missing levels from levels intentionally hidden below ground, inspect the T/Td/Wind readout and its new below-ground-removal detail. With the sounding open, <code>EVUSoundingProfiles.getDiagnostics()</code> in the browser console reports the requested model/cycle/hour, native profile store, raw and rendered levels, and missing chunks or an unavailable catalog hour. The profile converter must publish complete native chunks and the profile catalog for every desired model run and forecast hour. See <code>RELEASE_1_2_61.md</code> and the paired Converter v1.4.57 audit instructions. GFS soundings, terrain, wind tracers and export workflows are not changed.</p></section>
+<section class="guide-current" aria-label="North America terrain coverage preset v1.2.60"><h3>North America-wide DEM coverage (v1.2.60)</h3><p>Weather-model grids and local DEM tile coverage are separate. Global elevation tiles are installed through z5, but previous z6–9 tiles cover only one CONUS-centered rectangle, so panning over Alaska, the Aleutians, Hawaii, northern Canada, and Greenland may produce terrain 404s. The updated Python installer offers <code>--region-preset north-america</code>, including mainland North America, Greenland, Hawaii (including the Northwestern Hawaiian Islands), Puerto Rico, and the Aleutians on both sides of the date line. A full z0–9 plan contains <strong>58,873</strong> unique tiles (45,413 additional relative to the existing 13,460); make sure sufficient disk space is available. On an Internet-connected installation host, preview with <code>python3 install_terrain_dem.py --dest data/dem --region-preset north-america --max-zoom 9 --global-base-maxzoom 5 --max-tiles 70000 --dry-run</code>. Remove <code>--dry-run</code> and optionally add <code>--workers 8</code> to install; reuse existing files and publish the new PNGs and manifest (manifest last). The smaller z0–8 option plans 15,762 tiles. The viewer code, weather interpolation, terrain renderer and DEM source warnings are unchanged.</p></section>
+<section class="guide-current" aria-label="Reset View and northward DEM coverage v1.2.59"><h3>Reset View and regional terrain coverage (v1.2.59)</h3><p>Reset View now frames native regular-latitude/longitude datasets (GFS, compatible AI and analyses) as well as Lambert datasets without repeating invalid projected-corner warnings. This changes only the camera overview, not model grid coordinates or weather values. If terrain panning yields missing <code>data/dem/6/9/19.png</code> or <code>6/11/19.png</code>, those tiles are north of 55°N, outside the previous local installation bbox. On the installation host, extend the DEM with <code>python3 install_terrain_dem.py --dest data/dem --bbox -150 15 -65 65 --max-zoom 9 --global-base-maxzoom 5 --workers 8</code>, then publish the added PNGs and updated manifest to the website. The extension reuses existing tiles. This release does not change the separate MapLibre shared-DEM-source warnings.</p></section>
+<section class="guide-current" aria-label="Terrain native-grid interpolation v1.2.55"><h3>Smooth terrain shading for continuous Lambert-grid fields (v1.2.55)</h3><p>With Terrain and Interpolate enabled, continuous Lambert-grid forecast values (including RRFS/REFS and compatible analyses) are now bilinearly interpolated <em>before</em> their values are converted to precipitation/temperature colors. This smooths visible grid-cell boundaries at close zoom and follows the existing interpolation control. The fast, validated native Lambert sampler remains active for matching grids. Precipitation-type categories, other categorical fields, and Interpolate OFF remain native nearest-grid-point displays. The underlying model values, grids, geometry, color scales, wind overlays, difference calculations, and exports are unchanged. Diagnostics: <code>EVUThreeSurface.getStatus()</code> includes <code>lastTextureInterpolationMode</code> (<code>native-bilinear</code> or <code>native-nearest</code>).</p></section>
+<section class="guide-current" aria-label="RRFS Lambert sampling v1.2.54"><h3>RRFS/REFS terrain sampler correction (v1.2.54)</h3><p>The validated fast Lambert sampler now matches the native autumnplot-gl grid spacing and nearest-grid-point coordinates, including the exact float32 grid cache behavior. The resulting final terrain mesh, color palette and forecast-texture resolution remain unchanged. After rendering, use <code>EVUThreeSurface.getStatus()</code> and <code>EVUFastLambertSampler.getDiagnostics()</code> to verify <code>validated-lambert-row</code> with the <code>autumnplot-grid-extent</code> convention. The 13,460-tile DEM expansion already completed does not need to be rerun for this update.</p></section>
+<section class="guide-current" aria-label="Terrain performance and diagnostics v1.2.54"><h3>RRFS/REFS terrain sampling and DEM coverage (v1.2.54)</h3><p>Terrain retains its full-quality final mesh and weather texture. The accelerated Lambert sampler is validated against each source grid and falls back safely if it cannot match the original field. Optional browser diagnostics: <code>EVUThreeSurface.getStatus()</code> includes <code>lastTextureSamplingMode</code> and <code>lastTextureSamplingReason</code>; <code>EVUFastLambertSampler.getDiagnostics()</code> provides the calibration detail. Resizing may reuse the existing full-quality texture when its geographic coverage still matches. For persistent z6 terrain tile 404s outside the installed region, broaden the local DEM installation as documented in the complete User Guide and release notes; the viewer ZIP does not contain elevation tiles.</p></section>
+<section class="guide-current" aria-label="Current viewer behavior"><h3>Current model sets and upper-air options (v1.2.60)</h3><p><strong>Full-quality terrain optimization (v1.2.54):</strong> Validated native Lambert row sampling avoids costly per-pixel grid projections without changing texture resolution, relief, or color palettes; unsupported grids keep the reference sampler. For measured browser timing run <code>EVUThreeSurface.getStatus()</code> to inspect <code>lastTextureSamplingMode</code>, <code>lastTextureSampleMs</code>, and <code>lastTextureColorMs</code>. Local DEM 404s outside the original regional tile coverage require installing additional elevation PNGs with the updated <code>install_terrain_dem.py</code> script, not just replacing viewer code.</p><p><strong>Terrain rendering (v1.2.51):</strong> The low-quality temporary terrain preview and extra DEM-readiness wait introduced in recent releases have been removed. The established direct high-detail Three.js terrain renderer is restored, with the original mesh and forecast-color sampling settings; DEM tiles may still refine the terrain as they arrive. This change restores predictable image quality rather than promising a new speed improvement. The expanded-panel geographic footprint, wind tracers, video/PNG/GIF exports, and other controls remain unchanged. To diagnose a slow high-detail draw, use <code>EVUThreeSurface.getStatus()</code> in the browser console and compare its mesh, texture, projection and draw timings.</p><p><strong>AI / GFS / GEFS</strong> offers 250/300-hPa Height/Wind, 500-hPa Height/Vorticity, and 700/850/925-hPa Height/Temperature/Moisture and 1000-hPa Height/Temperature, subject to published source fields. AI 2-m dewpoint and specific humidity are intentionally omitted. Use the shaded image radio choices within Data overlays to switch Wind/Height (250/300), Vorticity/Height (500), Temperature/Height/Dewpoint/Specific humidity (700/850/925), or Temperature/Height (1000). At 850 hPa, Wind speed can be shaded and contoured independently of Temperature, Height, Dewpoint, Specific humidity, and Wind barbs. The MSLP plot also offers MSLP or 850-hPa temperature as a shaded image and difference scalar. This also selects the GFS or on-demand difference scalar; dewpoint and specific-humidity contours remain independent.</p><p>Wind tracers use a complete native U/V pair at the same forecast hour and initialization, including a compatible companion data store if available. Wind tracers retain their speed-based palette with a thin translucent contrasting outer keyline. <strong>Precipitation verification is shared across all model sets:</strong> CCPA first, Stage IV backup, MRMS second backup, requiring a complete unmixed accumulation. Inventory refresh runs approximately every three minutes while the tab is active.</p><p>Runtime libraries and licensing (MapLibre GL JS, autumnplot.gl and Three.js) are documented in the complete <a href="USER_GUIDE.pdf" target="_blank" rel="noopener noreferrer">PDF guide</a> and <a href="THIRD_PARTY.md">third-party acknowledgments</a>. Required terrain, map and observation data-source attribution remains visible when applicable.</p></section>
+   <nav class="guide-index" aria-label="Guide contents">
+    <a href="#guide-start">Getting started</a>
+    <a href="#guide-map">Map controls</a>
+    <a href="#guide-inspect">Point charts</a>
+    <a href="#guide-fields">Fields and snowfall</a>
+    <a href="#guide-colors">Color scales</a>
+    <a href="#guide-overlays">Overlays</a>
+    <a href="#guide-obs">Observations</a>
+    <a href="#guide-diff">Differences</a>
+    <a href="#guide-export">Exports</a>
+    <a href="#guide-data">Data and limitations</a>
+   </nav>
+   <div class="guide-intro">
+<p><strong>Viewer version 1.1.84</strong></p>
+<p><strong>Missing-data display:</strong> All scalar plots now leave missing cells transparent so the map background or terrain remains visible. GFS 10:1 snowfall also leaves zero and trace amounts unshaded; valid zeros in other fields remain data. This applies to standard map images and exports.</p>
+<p>The OMD EVU Model Viewer displays weather model forecasts and available verifying analyses side by side. The panels share a geographic view, making it easier to compare different models and forecast hours. The default layout includes RRFS, HRRR, REFS members, REFS Mean, and an Analysis panel.</p>
+   </div>
+  <section id="guide-start">
+    <h3>Getting started</h3>
+<ol>
+<li>Choose a <strong>Model set</strong>, <strong>Field</strong>, and model <strong>Cycle</strong> (initialization time, in UTC).</li>
+<li>Choose an <strong>F-hour</strong> to display the forecast. For example, F024 is 24 hours after initialization. Each panel displays its valid time.</li>
+<li>Zoom or pan any map to focus on an area. The other panels follow the same view.</li>
+<li>Use <strong>Previous</strong>, <strong>Next</strong>, <strong>Play/Pause</strong>, and <strong>Speed</strong> to move through the forecast. A panel indicates when the requested data are unavailable.</li>
+</ol>
+<p>The Field menu groups related weather variables, including radar, precipitation type, surface weather, snowfall, upper air, severe-weather parameters, and GFS marine weather.</p>
+<p><strong>Expand a panel:</strong> The expand button now preserves the original small panel's geographic area as closely as the larger window's aspect ratio allows. The center, bearing and pitch remain unchanged. If the enlarged window is proportionally wider or taller, the extra screen space may display modest additional geography along that dimension. Zooming or panning while expanded is retained when you return to the comparison grid. This applies to every model set, analysis panel and 2D/Globe view.</p>
+<p><strong>Model sets:</strong> RRFS/REFS contains nine panels and supports hourly forecast lead navigation and an optional floating two-panel difference. GFSv16/GFSv17 contains six panels (two forecasts, matching GFSv16 F000 analysis, and three signed differences), with three-hourly forecast lead navigation. GFS does not offer 1-hour precipitation or snowfall accumulations. F000 verifying analysis exists only at matching synoptic valid times. The viewer uses published native-grid difference stores when available and otherwise computes compatible differences on demand from the underlying GFS source grids or aligned verification fields, preserving the existing availability rules. Controls for maps, shading, overlays, point inspection, and exporting follow the same interface, subject to each field’s actual availability.</p>
+  </section>
+  <section id="guide-map">
+    <h3>Map controls and shortcuts</h3>
+<p><strong>3D perspective:</strong> Ctrl + drag (or right-drag) tilts and rotates synchronized 2D maps. <strong>Terrain</strong> starts OFF and uses a locally hosted 3-D DEM when installed. The former bundled 2-D raster fallback has been removed. Run install_terrain_dem.py to fetch the same-origin elevation tiles if not yet installed. Turning Terrain on leaves Image opacity unchanged (100% by default). Surface and near-surface weather fields retain their forecast palette with neutral relief shadows at full opacity; upper-air fields at full opacity obscure terrain. You can adjust Image opacity at any time without losing the setting. Right-click Terrain for independent terrain shading, vertical exaggeration and sunlight (0× flat, 1× natural scale, up to 20×). State/Country and independently enabled County outlines remain drawn above the relief. <strong>Wind tracers</strong> (off by default) draw speed-directed atmospheric streamlines for eligible fields, including non-swell GFS wave plots with 10 m winds. Right-click the wind-tracer label (which names its active level) for light/dark-specific color, thickness and density. For dense RRFS/REFS comparisons the viewer reuses projected tracer endpoints, restores full selected density when possible, and temporarily reduces particle work if the device is overloaded; barbs and tracers pause during an active camera gesture and restart when the view settles. The 3-D terrain compositor reuses unchanged full-resolution weather textures after DEM/lighting updates, with no change to sampled forecast values or field palettes. The interim terrain preview now chooses its sample density from the source grid spacing and the current map scale rather than a fixed low-resolution preview across all datasets. Fine native grids receive more detail within an interactive workload limit; the final terrain quality remains unchanged. Use <strong>Shortcuts</strong> for the keyboard, mouse, hover, touch and PDF reference.</p>
+<table>
+<thead>
+<tr>
+<th>Action</th>
+<th>How to do it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Change forecast hour</td>
+<td>Left/Right arrows or Previous/Next controls</td>
+</tr>
+<tr>
+<td>Play or pause</td>
+<td>Spacebar or Play/Pause</td>
+</tr>
+<tr>
+<td>Change model cycle</td>
+<td>Up/Down arrows (when not typing in a control)</td>
+</tr>
+<tr>
+<td>Zoom and pan</td>
+<td>Scroll/trackpad and drag; touch gestures where supported</td>
+</tr>
+<tr>
+<td>Scroll through models on a phone</td>
+<td>Swipe vertically using the <strong>↕ Scroll</strong> rail on the right edge of any panel; tapping it advances to the next model</td>
+</tr>
+<tr>
+<td>Open a point chart on a phone</td>
+<td>Touch and hold a fixed map location for about 0.6 seconds, then select <strong>Time series</strong> or <strong>Sounding</strong></td>
+</tr>
+<tr>
+<td>Change projection</td>
+<td>Choose <strong>2D</strong> or <strong>Globe</strong></td>
+</tr>
+<tr>
+<td>Return to the original map</td>
+<td>Select the <strong>Reset icon in Map layers</strong></td>
+</tr>
+<tr>
+<td>Focus on one model</td>
+<td>Use its panel-expand control</td>
+</tr>
+<tr>
+<td>Close an open menu</td>
+<td>Press <strong>Escape</strong>, where supported</td>
+</tr>
+</tbody>
+</table>
+<p>On phones, use the slim <strong>↕ Scroll</strong> rail at the right edge of any model panel to scroll the page without accidentally panning the map. A tap on the rail advances to the next panel. Swiping directly on a weather map continues to pan/zoom that map. When the device has sufficient WebGL resources, all nine configured maps are initialized without having to scroll each one into view. On resource-limited devices, off-screen maps may pause and reactivate as needed.</p>
+<p>You can switch between dark and light appearance. On desktop, the controls can be placed at the top or left side. <strong>Share</strong> copies a link to the current field, forecast hour, and map view.</p>
+<p><strong>Map appearance:</strong> State/Country and Map background are enabled by default; Counties and Terrain start off. Turning off State/Country removes coastlines and state/country boundaries, while Counties has its own independent checkbox and appearance settings. Turning off Map background uses solid black in light mode or solid white in dark mode behind the weather shading. On desktop, <strong>right-click anywhere inside the checkbox label box</strong> (including its text or padding) for State/Country, Counties, Terrain, Map background, Contours, Wind, Wave direction, Wind-wave direction, or Swell direction (for the corresponding marine field), Height, or 850-hPa Temp to open the appearance editor. Choose a solid color and line thickness, and adjust Density (0.5–2.0×) to control how many symbols or contour lines appear. State/Country outline density controls geographic detail; Counties and Terrain offer opacity instead of density. Map background has no density setting. Use Reset for defaults. Normal left-clicking still turns each overlay on and off. Appearance preferences are saved separately for <strong>dark mode and light mode</strong>. Color, thickness, and density changes apply only to the active theme, and custom map outlines remain scoped by model set and field. Observation markers are not restyled. Map background controls the fill color; its thickness slider does not change map-outline width. State/Country have their own independent thickness setting, saved for the selected field and model set.</p>
+  </section>
+  <section id="guide-inspect">
+    <h3>Right-click: time series and sounding</h3>
+<p><strong>On a desktop, right-click a location on a model or analysis map; on a touch device, press and hold that location for about 0.6 seconds without moving your finger.</strong> Then select one of these tools. Both open a floating chart window that you can move or resize. Use the <strong>download icon</strong> in the chart header to save a PNG. Open soundings and point time series change their chart colors immediately when the viewer switches between light and dark modes; saved PNGs reflect the active theme without reloading the chart data.</p>
+<p><strong>Time series</strong> plots the current field at the clicked location across the full forecast cycle. The AI / GFS / GEFS model set now samples at its selectable six-hour cadence through <strong>F240</strong>; GFSv16/v17 uses three-hourly samples through <strong>F240</strong>, and RRFS/REFS keeps its hourly time series. Consecutive available values are connected by clear lines, while genuinely missing nominal forecast leads remain gaps. It stays tied to the chosen model, field, location, and cycle, even if you subsequently change what is displayed in the viewer. Instantaneous quantities and run-to-date totals are shown as <strong>lines</strong>; time-period precipitation and snowfall accumulations (such as 3-, 6-, and 24-hour totals in GFS, with 1-hour totals also available in RRFS/REFS) are shown as <strong>bars</strong>. Rolling accumulation intervals can overlap, so adjacent bars should not be added together. Unavailable hours are not zero. The Y-axis uses rounded, whole-number ticks for most fields, retaining decimals for precipitation and other quantities where sub-unit differences matter. The data-availability note is separated from the forecast lead-time axis label, and the vertical/horizontal grid lines are visible in either display theme. It may take a moment to load the full series; progress is shown in the chart window. For Reflectivity with Ptype, the series plots reflectivity (dBZ), not the precipitation-type category.</p>
+<p><strong>Sounding</strong> displays a Skew-T / Log-P sounding at the clicked location, with <strong>red temperature</strong>, <strong>green dewpoint</strong>, correctly oriented <strong>meteorological wind barbs</strong>, a roomier <strong>wind hodograph</strong>, and a <strong>model diagnostics</strong> panel that includes both 0–1 km and 0–6 km bulk shear (when published). When available, it uses the newer pressure-level profiles collected by the converter, extending up to 100 hPa. The diagnostics box samples model-grid CAPE, helicity, and <strong>0–1 km / 0–6 km bulk shear</strong> values when published. These values are sampled independently from the published model grids, not calculated from the profile winds. Basic surface and level-summary information is also displayed. The Skew-T uses a practical −50°C to +50°C near-surface temperature axis and a header spaced above the plot. Hodograph wind-speed ring labels are kept clear of the cardinal directions. The dry-adiabat and mixing-ratio guides remain visible in both light and dark mode, while the valid date/time and latitude/longitude stay anchored within the chart during refreshes. The sounding <strong>updates automatically when the forecast hour or cycle changes</strong>, including during playback. Its chosen location and model remain the same.</p>
+<p>An <strong>approximate most-unstable (MU) parcel trace</strong> appears as a dashed gold line when the native profile has enough temperature and dewpoint levels. It selects the highest equivalent potential temperature in the lowest 300 hPa of usable moisture data, lifting dry adiabatically to the LCL and approximately moist adiabatically above. Its starting pressure and LCL are noted below the diagnostics, and it is omitted for sparse or incomplete moisture profiles. It is a qualitative approximation: no parcel-derived CAPE/CIN or authoritative convective diagnostics are implied.</p>
+<p>The sounding window reports how many temperature, dewpoint, and wind levels are available. <strong>REFS Mean uses its own operational ensemble-mean profile</strong>, including time-lagged members, but has relatively few available pressure levels. REFS member profiles may also have gaps. RAP analysis soundings are available at their corresponding hourly valid times when published.</p>
+<p><strong>Sounding limitations:</strong> Full profiles may not yet be available for older cases or every forecast hour. In that situation the viewer uses the earlier, limited-level sounding when possible, and labels it as a sparse fallback. Profile data are sampled from a coarser geographic grid than the maps, so they may not represent local terrain or sharp weather boundaries. Some diagnostics may be unavailable, and any shown values are only as good as the published fields for that source and hour. With a compatible converter, native surface pressure allows below-ground isobaric levels to be excluded, and native 2-m temperature and dewpoint anchor the profile at the ground. Older profiles without surface pressure are clearly identified as not terrain-screened; missing levels are not invented. These soundings are best used for visual case-study exploration, <strong>not operational parcel diagnostics or safety-critical decisions</strong>. Desktop right-click and mobile touch-and-hold use the same data sources and open the same charts. On small mobile screens, the chart occupies most of the available screen width; the header has Close and Save controls.</p>
+  </section>
+  <section id="guide-fields">
+    <h3>Fields, precipitation type, and snowfall</h3>
+<p><strong>Updraft helicity analysis comparison:</strong> For the 1-hour model UH maximum, the Analysis panel displays the radar-derived <strong>MRMS mid-level (3–6 km AGL) 60-minute rotation track</strong>, ending at the selected valid time. For accumulated model UH, the Analysis panel displays the <strong>gridpoint maximum</strong> of successive 60-minute MRMS tracks from the beginning of the forecast through the selected valid time. The accumulated MRMS analysis is unavailable unless every required hourly track has been published. Model UH (m² s⁻²) and radar rotation track (×10⁻³ s⁻¹) are different physical quantities; the viewer provides <strong>two independently labeled colorbars</strong>, including on all-panel PNG/GIF exports. This is a qualitative comparison of rotating-storm signatures, <strong>not observed UH</strong>.</p>
+<p><strong>Precipitation analysis selection:</strong> Every model set uses shared verification data in the priority <strong>CCPA → Stage IV → MRMS</strong>, with availability and latency handled automatically. A complete native accumulation is preferred when appropriate; otherwise a total is assembled from complete, non-overlapping intervals from one source, quality pass, and grid. Never mix providers or fill gaps with zero. MRMS remains the source for radar reflectivity and precipitation rate; source labels identify the actual verification shown.</p>
+<p><strong>Precipitation-type labels are model-specific:</strong> HRRR is <strong>Derived precipitation type</strong>, RRFS and REFS members are <strong>Dominant precipitation type</strong>, and REFS Mean is <strong>Ensemble dominant precipitation type</strong>. These exact terms appear in panel titles and per-panel PNG/GIF labels. The comparison-wide legend uses the neutral description <strong>Precipitation type (model-specific)</strong> because all models share one categorical color scale.</p>
+<p><strong>REFS Mean PMM products:</strong> composite reflectivity is displayed as <strong>PMM composite reflectivity</strong>. Accumulated precipitation is labeled <strong>PMM accumulated precipitation</strong> when the published field comes from the PMM precipitation source. The viewer does not infer PMM from a generic ensemble-mean field; older data stores may need the converter's targeted PMM precipitation repair before they contain the correct source data.</p>
+<p><strong>Reflectivity with Ptype</strong> appears below Precipitation type in the Radar menu. It colors model reflectivity by forecast precipitation type: green progressing into yellow/orange for stronger rain echoes, blue for snow, pink for freezing rain, purple for sleet, and amber for mixed precipitation. Both reflectivity and precipitation type must be available for the chosen hour.</p>
+<p><strong>Precipitation rate</strong> is displayed in inches per hour (in/hr), including map values, the colorbar, point time series, and PNG/GIF exports. Stored values are unchanged.</p>
+<p><strong>Optional grid interpolation:</strong> use the <strong>Interpolate</strong> checkbox beside Image opacity to apply GPU bilinear filtering to continuous scalar-field shading. It is <strong>on by default for eligible GFS atmospheric fields</strong>, but <strong>off by default for GFS Marine weather and RRFS/REFS</strong>. Marine, GFS atmospheric, and RRFS/REFS interpolation choices are saved independently in the current browser. This blends the four surrounding grid values for display only; it does not change stored Zarr values, point sampling, time series, sounding data, contours, or calculations. Categorical precipitation type and the hybrid <strong>Reflectivity with Ptype</strong> field retain nearest-neighbor rendering so category boundaries and codes are not blended. PNG/GIF exports use the same setting as the live panels.</p>
+<p>Snowfall and precipitation fields include hourly, multi-hour, and accumulated options where available. Some totals need a complete sequence of earlier data, so a missing input can make a later accumulation unavailable. Missing data are <strong>not</strong> treated as zero.</p>
+<p><strong>GFS 10:1 snowfall method:</strong> Select <strong>WEASD Change</strong> (default, same positive SWE-gain calculation for v16 and v17) or <strong>Snow Precipitation</strong> (native v17 TSNOWP only). Panel titles abbreviate the default as <strong>SWE increase</strong>. The v17−v16 WEASD difference uses each model’s separate positive gain; the Snow Precipitation option does not offer an incompatible v16 difference. For GFS snowfall, the Analysis panel uses NOHRSC observations at valid time. The two forecast-minus-NOHRSC difference panels remain unavailable pending spatial regridding.</p>
+<p>For <strong>NOHRSC snowfall</strong> in the Analysis panel, 6-hour analyses are generally valid at 00/06/12/18 UTC and 24-hour analyses at 00/12 UTC. A 48-hour total uses two available 24-hour periods; the accumulated total adds consecutive 6-hour periods beginning after model initialization. There are no native 1-hour or 3-hour NOHRSC plots. Small, isolated snowfall artifacts are filtered from the map shading, without changing reported values.</p>
+<p><strong>GFS marine weather:</strong> The Marine weather menu in GFS comparison mode contains six wave-height and wave-period scalar products from GFSv16 and GFSv17. Non-swell wave plots default to <strong>10 m Wind</strong> barbs ON (real GFS 10-m U/V) and independent <strong>Wave direction</strong> propagation arrows OFF. Swell-only plots have no 10-m wind barbs and their <strong>Swell direction</strong> arrows are initially OFF. Native wave-direction records describe propagation and are not meteorological wind barbs. <strong>Right-click anywhere in the direction toggle label (Wave direction, Wind-wave direction, or Swell direction)</strong> to customize direction color, thickness, and density separately from meteorological wind barbs; settings also apply to exported overlays. The v16 wave source is public AWS GRIB2 and the v17 wave source is local GRIB2. Wave source coverage is not identical to the atmospheric domain, so map regions outside wave coverage remain transparent/missing. Matching scalar wave products can be compared in the GFS difference panels. Circular wave directions themselves are not subtracted, and maximum individual wave height is not included because availability for both versions has not been established.</p>
+  </section>
+  <section id="guide-colors">
+    <h3>Adjust the numerical colorbar</h3>
+<p>You can change the displayed range on most <strong>numerical</strong> colorbars without changing the underlying values.</p>
+<ol>
+<li><strong>Click the numerical colorbar</strong> to open the color-scale editor.</li>
+<li>Move the <strong>Minimum</strong> and <strong>Maximum</strong> sliders, or type precise values into their adjacent entry boxes.</li>
+<li>Select <strong>Apply</strong> to update the shading, <strong>Cancel</strong> (or Escape) to leave it unchanged, or <strong>Reset default</strong> to restore the original range. After applying a custom range, use the <strong>circular-arrow reset icon</strong> beside the colorbar title to restore defaults without opening the editor.</li>
+</ol>
+<p>The full color palette stretches across the selected interval. For fields with a transparent near-zero interval, that single interval remains centered on physical zero as the minimum and maximum change; it does not drift with the original palette or create a second blank band. The new scale applies to panels showing that field and is included in exports. The numerical min/max override remains while stepping through forecast hours but resets when the page is reloaded. <strong>Right-click any numerical colorbar (or click the shared colorbar) to upload a custom .pal table. Imported palettes are saved per field in browser storage, included in normal panel PNG/GIF exports, and restored after refresh; use Restore built-in colors to remove them. .pal values must use the displayed field units.</strong> <strong>CAPE colorbars use familiar round labels (such as 500, 1000, and 1500 J/kg)</strong>. <strong>Categorical precipitation-type legends cannot be adjusted</strong> this way.</p>
+  </section>
+  <section id="guide-overlays">
+    <h3>Overlays and transparency</h3>
+<p>The <strong>Shear &amp; helicity</strong> field group displays 0–1/0–6 km bulk shear and
+0–1/0–3 km storm-relative helicity (SRH). Default color scales are <strong>0–60 kt for 0–1 km</strong> and <strong>0–90 kt for 0–6 km</strong>; use the numerical colorbar to change them. On <strong>bulk shear</strong>, the <strong>Shear barbs</strong>
+checkbox displays the upper-minus-lower wind vector difference as conventional
+wind barbs, with 5/10/50-knot markings. Their shafts point opposite the
+downshear direction, following wind-barb orientation conventions; the barbs
+describe shear, <strong>not</strong> wind at a single level. On <strong>SRH</strong>, the <strong>Storm motion barbs</strong>
+checkbox controls native Bunkers right-moving storm-motion barbs, also in knots.
+All overlays follow synchronized panels, pan/zoom operations, and panel PNG
+exports, and the severe-weather checkbox state is remembered independently
+of other wind overlays.</p>
+<p>The overlays require native U/V components in the published Zarr catalog for
+that model and hour. If a source omits them, the corresponding overlay is
+absent rather than simulated. The RAP analysis requires the latest converter
+and missing-field recovery for older analysis hours to publish native 0–1 km and 0–6 km shear components. Native RAP 0–1 km components are available in Converter v1.4.1 when provided in the source GRIB inventory. A missing
+barb overlay does not imply missing scalar shading.</p>
+<p>Depending on the field, you can enable height or pressure contours, wind barbs, and contours of the shaded field. <strong>Numerical CAPE, shear, storm-relative helicity, updraft helicity, also support shaded-field contours</strong>, with conventional rounded value intervals that become finer at close zoom. Categorical precipitation-type fields do not support these numerical contours. <strong>For 500-hPa absolute-vorticity shading, RRFS and individual REFS members use a modest display-only smooth, while HRRR and REFS Mean use an even lighter smooth</strong> to make plots easier to compare. The stored fields and point-sampled values are unchanged. <strong>Small, field-specific values near zero are transparent</strong> where a clear background is meteorologically useful: below 10 J/kg for CAPE, below 2 kt for wind speed/components and bulk shear, within ±10 m² s⁻² for SRH, within ±5 m² s⁻² for updraft helicity, within ±5 × 10⁻⁵ s⁻¹ for 500-hPa absolute vorticity, and below 1% for snow cover/frozen-precipitation percentage. The exact neutral interval is tied to physical zero and remains a single interval when the numerical colorbar range changes. Relative humidity remains shaded down to 0% because very dry air is a meaningful meteorological signal. Difference maps also become transparent close to zero. This lets the underlying map background show through in dark and light modes, without changing the meteorological data. Temperature and MSLP shading remain continuous because zero is not a no-weather threshold for those fields. Live height and MSLP contours use slightly thicker, clean single strokes without a contrasting halo; the existing export contour appearance is unchanged. Dark-mode 500-hPa vorticity maps use brighter aqua geographic outlines by default to improve contrast with their vorticity colors, while custom outline styles remain in control. The available overlay checkboxes share compact rows when space permits and wrap when necessary. Report counts appear below the switches. The available options appear with the field controls. Use <strong>Image opacity</strong> to fade the weather shading without fading geographic outlines, contours, wind barbs, or observation markers. Applicable overlays are also included when exporting plots.</p>
+  </section>
+  <section id="guide-obs">
+    <h3>Weather observations and storm reports</h3>
+<p>On all <strong>Radar &amp; precip. type</strong> fields, enable <strong>METAR</strong> to display colored circles or <strong>mPING</strong> to display triangles. Their colors indicate reported rain, snow, freezing rain, sleet, or mixed precipitation. Reports are usually selected from within about 30 minutes of the forecast valid time.</p>
+<p>On supported composite-reflectivity, shear/helicity, or severe-weather maps, enable <strong>SPC reports</strong> to display preliminary tornado (red), wind (blue), and hail (green) circles. The selected reports are shared by <strong>all active panels</strong>, including RRFS, HRRR, REFS members, REFS Mean, and Analysis, for the common forecast valid time. Select a report to see any available details. Reports are hidden by default.</p>
+<p>On all <strong>Radar &amp; precip. type</strong>, <strong>Shear &amp; helicity</strong>, and <strong>Instability &amp; severe storms</strong> fields, enable <strong>GLM lightning</strong> to display satellite-observed lightning flash centroids from the <strong>preceding 60 minutes</strong>, ending at the forecast valid hour. The age colors indicate <strong>0–15 min (pink)</strong>, <strong>15–30 min (orange)</strong>, <strong>30–45 min (cyan)</strong>, and <strong>45–60 min (violet)</strong> before that valid hour. The selected overlay remains enabled across fields and page reloads. The flash locations are satellite-detected optical lightning, <strong>not individual cloud-to-ground strikes</strong>; age is measured relative to the model valid hour, not the current wall-clock time. Choose a lightning-bolt marker to see its timestamp and originating satellite. Published GLM observation hours must be generated by the companion collector; if data are missing, the control reports <strong>GLM data unavailable</strong>, without implying there was no lightning. Converter 1.4.13 applies the configured retention period to unprotected local and published hours while preserving valid hours covered by protected historical cases. Age colors apply to live maps and panel PNG/GIF exports.</p>
+<p><strong>Limitations:</strong> Reports may be delayed, incomplete, revised, or absent. Future forecast hours cannot yet have verifying observations. A blank area does not mean no weather occurred. Some accumulated severe-weather fields display reports over a longer period than the most recent hour.</p>
+  </section>
+  <section id="guide-diff">
+    <h3>Compare two panels</h3>
+<p>In <strong>RRFS/REFS mode</strong>, select the comparison checkboxes beside <strong>two compatible panel titles</strong> to open a <strong>Difference</strong> map. In <strong>GFS mode</strong>, the three difference panels are already included. When a published native-grid difference store is unavailable, the viewer calculates the compatible comparison on demand from the underlying GFSv16/v17 native fields. All difference panels show shaded signed differences and geography <strong>without meteorological contours, wind barbs, height isolines, or temperature overlays</strong>, irrespective of the normal panel toggles. For a floating RRFS/REFS comparison, the result is <strong>first selected panel minus second selected panel</strong>. On opening, that floating difference window adjusts its map area to match the selected panel's aspect ratio and geographic footprint, so both horizontal and vertical extents agree as closely as the screen permits. The floating window can be resized freely afterward. Counties are controlled by the independent Counties checkbox at every zoom level, including the floating difference window. Difference PNG exports preserve the checkbox state at capture time. Standard unrotated 2D difference-map PNGs also use a faster projection path without changing image resolution, field sampling, color scales or geographic accuracy; Globe and rotated views retain exact per-pixel projection. Saved difference maps use the same plot-area geometry as individual panel PNGs at the selected output size, reducing differences in geographic crop. Fit and Fill still determine whether edges are shown or cropped, and independently resized or zoomed maps retain their chosen view. Difference-map colorbars use whole-number labels for most fields; fractional labels are retained for small precipitation and other quantities requiring sub-unit precision. The same ticks appear in exported difference PNGs. The difference uses fixed field-specific near-zero transparent ranges and consistent signed colorbar limits through the forecast period. The difference follows changes to the forecast hour and synchronized panel view; you can zoom the floating map independently for close inspection. Use the window's download icon to save a PNG. Incompatible or missing fields cannot be compared.</p>
+  </section>
+  <section id="guide-export">
+    <h3>Save PNGs and animated GIFs</h3>
+<p>Use a panel's <strong>download icon</strong> to export one plot, or <strong>Export all panels</strong> for a comparison image or animation. All exported PNGs and GIFs receive a unique UTC timestamp and short suffix in their filenames, so repeated downloads keep distinct names instead of browser-added <code>(1)</code> and <code>(2)</code> suffixes. Choose the image proportions (<strong>16:9</strong> or <strong>4:3</strong>) and whether to <strong>Fit</strong> the entire map area or <strong>Fill</strong> the frame (which can crop edges). Titles, times, legends, and applicable overlays are included. Exported METAR, mPING, and SPC Local Storm Report markers are slightly enlarged for presentation readability; on-screen marker sizes do not change. Geographic outlines in PNG and GIF exports retain their separate two-tone outline treatment: a contrasting casing with a themed inner stroke. <strong>Live maps use one clean stroke without the export halo.</strong> This keeps coastlines and political boundaries visible over <strong>both dark and bright weather shading</strong> in either viewer theme while preserving a cleaner appearance than the older export-specific treatment. This applies to individual, all-panel, and difference-map exports. County visibility is controlled by its checkbox (not zoom) in live maps and PNG/GIF captures; exports honor that checkbox.</p>
+<p><strong>Panel video recording:</strong> Expand a model panel using its lower-right expand button, then select the panel’s upper-right save button and choose <strong>Record expanded panel (video)</strong>. The browser asks permission to share a tab; choose <strong>this tab</strong>, not a window or the entire screen. A three-second countdown begins after panel-only capture is established. The floating <strong>Stop &amp; save</strong> control ends recording and downloads the video in a browser-supported format. The video records the expanded panel, including zooming/panning, live terrain, tracers, overlays, and colorbar. The recording Stop &amp; save control, Data overlays / Map overlays menus, and large numbered terrain panel-selection markers remain visible to users but are <strong>not captured in the video</strong>. Their effects on the map, including terrain and wind tracers, <strong>are captured</strong>. This requires HTTPS and current Chrome/Edge <strong>Element Capture</strong> support; there is no full-screen or less-private Region Capture fallback, and no microphone audio. Keep the tab visible, and do not navigate away while recording.
+</p><p><strong>Android Chrome panel recording (v1.2.57):</strong> On Android, Chrome does not provide desktop tab/Element Capture. When an expanded panel is active, the video export option now uses <strong>mobile canvas recording</strong> where supported. A three-second countdown precedes a Stop &amp; save control; the recording includes the MapLibre map, rendered terrain, forecast data, wind tracers, contour/wind/city overlays, a simplified panel label, and the shared field legend. The menu and stop controls are excluded; in-map HTML popups may appear as simplified text. Keep Chrome in the foreground while recording. Video is generated locally with no audio or server upload. The desktop Element Capture route remains unchanged. <strong>Mobile frame retention (v1.2.58):</strong> During terrain pan/zoom and pending weather redraws, the recorder retains the last complete frame instead of recording an empty intermediate canvas, then resumes with the fresh map image. Some camera gestures may appear as a brief held frame rather than a continuous transition. Mobile capture diagnostics are available while recording via <code>EVUPanelRecorder.getStatus()</code>.</p>
+<p>Select <strong>Large labels</strong> when preparing images for presentations. It enlarges the model or analysis title, time information, and exported colorbar title and tick numbers in exported PNGs and GIFs, without changing the live viewer. Select <strong>No labels</strong> to remove the export header and inset panel labels while retaining the colorbar for custom post-processing. The difference-map title and time line use the same normal and large font sizes as individual-panel exports when labels are shown.</p>
+<p>For animated GIFs, the defaults are:</p>
+<table>
+<thead>
+<tr>
+<th>Resolution</th>
+<th>Default range</th>
+<th style="text-align:right">Maximum frames</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Standard (1200 px)</td>
+<td>F000–F024</td>
+<td style="text-align:right"><strong>25</strong></td>
+</tr>
+<tr>
+<td>High (1600 px)</td>
+<td>F000–F024</td>
+<td style="text-align:right"><strong>25</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Both resolutions use a shared <strong>25-frame maximum</strong> for single-panel and all-panel GIFs. The default delay is <strong>700 milliseconds per frame</strong>. You can change the forecast-hour range, step, and delay. The final frame stays visible slightly longer. Larger or longer GIFs may take more time to export.</p>
+<p>Analysis panels use titles such as <strong>Analysis · NOHRSC · 24-hour snowfall</strong>, with the <strong>valid time</strong> alone on the subtitle.</p>
+  </section>
+  <section id="guide-data">
+    <h3>Data availability and troubleshooting</h3>
+<ul>
+<li><strong>A panel says missing:</strong> The selected model, variable, hour, or verifying analysis may not be available. Try another hour or source. Some accumulated totals require every contributing period.</li>
+<li><strong>An analysis is missing:</strong> Its valid time may not be supported, the analysis may not be published yet, or an earlier required period may be missing. RAP is an hourly model analysis and is only shown for supported fields at valid hours that have been collected and published. The site administrator can check a specific case with the RAP diagnostic page.</li>
+<li><strong>Changes do not appear after deployment:</strong> Refresh the page to load the latest viewer.</li>
+<li><strong>A plot or map fails to load:</strong> The viewer includes a <strong>Diagnostics</strong> page for technical troubleshooting; contact the site maintainer if the issue persists.</li>
+</ul>
+<p>The viewer is intended for forecast evaluation and comparison, not for issuing official warnings. <strong>All displayed times are UTC.</strong></p>
+<h3>Sounding surface wind vectors</h3>
+<p>Native soundings use <strong>2-m temperature and dewpoint</strong> and <strong>10-m U/V wind</strong> at the model's native surface-pressure anchor, in addition to the available native isobaric levels. The levels readout counts a surface wind level only when <strong>both</strong> 10-m vector components are present. This is a display anchor at surface pressure, not a claim that 10-m wind was measured at 2-m height. Older profile stores need the converter's surface-only upgrade before the new level is available. Below-ground pressure levels remain excluded.</p>
+<p>Sounding-chart footnotes explain that the MU parcel uses an <strong>approximate pseudo-adiabatic path</strong> and does <strong>not</strong> compute CAPE/CIN; the terrain-screening note reports whether native surface pressure was available. These footnotes appear on separate fitted lines beneath the right-hand diagnostics card. The Skew-T axis tilt has also been moderated slightly.</p>
+  </section>
+  </div>
+  <p class="guide-contact">Questions and comments can be directed to <a href="https://mail.google.com/mail/?view=cm&amp;fs=1&amp;tf=1&amp;to=thomas.hultquist@noaa.gov" target="_blank" rel="noopener noreferrer"><strong>Tom Hultquist</strong></a>, Office of Modeling and Development, Evaluation and Verification Unit.</p>
+  <div class="user-guide-footer"><span>Press Esc or Close to return to the viewer</span><button id="userGuideDone" type="button">Close guide</button></div>
+</dialog>
+<dialog id="differenceDialog" class="difference-confirm" aria-labelledby="differenceDialogTitle">
+ <form method="dialog"><h2 id="differenceDialogTitle">Compare two panels</h2>
+ <p id="differenceDialogPair"></p>
+ <p class="difference-confirm-hint">The live difference map is <strong>first selected − second selected</strong>, using geographically matched values. It updates with the selected field, forecast hour, cycle, and map view.</p>
+ <div class="difference-dialog-actions"><button value="cancel" id="differenceCancelBtn">Cancel</button><button value="open" id="differenceOpenBtn">Open difference map</button></div></form>
+</dialog>
+<dialog id="overlayStyleDialog" class="overlay-style-dialog" aria-labelledby="overlayStyleHeading">
+  <form method="dialog" id="overlayStyleForm">
+    <div class="overlay-style-heading"><strong id="overlayStyleHeading">Overlay appearance</strong><button type="button" id="overlayStyleClose" aria-label="Close">×</button></div>
+    <div class="overlay-style-content"><p class="overlay-style-theme-note">Appearance settings are saved for the current light or dark mode only.</p><label for="overlayStyleColor">Color</label><input type="color" id="overlayStyleColor" value="#ffffff" aria-label="Overlay color (no transparency)">
+    <label id="overlayStyleAutoContrastRow" class="overlay-style-auto" for="overlayStyleAutoContrast" hidden><input id="overlayStyleAutoContrast" type="checkbox" checked> Color by wind speed (knots)</label>
+    <div id="tracerSpeedKey" class="tracer-speed-key" hidden aria-label="Wind speed tracer colors: 0, 20, 45, and 90 knots or more"><div class="tracer-speed-ramp"></div><div class="tracer-speed-labels"><span>0</span><span>20</span><span>45</span><span>90+ kt</span></div><small>Slower winds move more slowly; faster winds move faster.</small></div>
+    <label id="overlayStyleCityNamesRow" class="overlay-style-auto" for="overlayStyleCityNames" hidden><input id="overlayStyleCityNames" type="checkbox" checked> Show city label</label>
+    <div id="overlayStyleCityFontRow" class="overlay-style-density-row" hidden><label for="overlayStyleCityFont">City label font size <output id="overlayStyleCityFontValue">12 px</output></label><input type="range" id="overlayStyleCityFont" min="9" max="28" step="1" value="12"></div>
+    <label id="overlayStyleCitiesValuesRow" class="overlay-style-auto" for="overlayStyleCitiesValues" hidden><input id="overlayStyleCitiesValues" type="checkbox" checked> Display value at city</label>
+    <label for="overlayStyleWidth">Thickness <output id="overlayStyleWidthValue">1.0×</output></label><input type="range" id="overlayStyleWidth" min="0.5" max="4" step="0.1" value="1" aria-label="Line thickness multiplier">
+    <div id="overlayStyleTracerSpeedRow" class="overlay-style-density-row" hidden><label for="overlayStyleTracerSpeed">Animation speed <output id="overlayStyleTracerSpeedValue">2.5×</output></label><input type="range" id="overlayStyleTracerSpeed" min="0.25" max="5" step="0.25" value="2.5" aria-label="Wind tracer animation speed multiplier"><small>Changes visual animation speed only; wind-driven directions and relative speeds are preserved. Independent of playback speed and particle density.</small></div>
+    <div id="overlayStyleOpacityRow" class="overlay-style-density-row" hidden><label for="overlayStyleOpacity">Terrain opacity <output id="overlayStyleOpacityValue">80%</output></label><input type="range" id="overlayStyleOpacity" min="0" max="100" step="5" value="80" aria-label="Terrain opacity percentage"><small>Controls terrain shading only; forecast Image opacity is independent.</small></div>
+    <div id="overlayStyleExaggerationRow" class="overlay-style-density-row" hidden><label for="overlayStyleExaggeration">Vertical exaggeration <output id="overlayStyleExaggerationValue">12×</output></label><input type="range" id="overlayStyleExaggeration" min="0" max="20" step="1" value="12" aria-label="Terrain vertical exaggeration multiplier"><small>0× = flat terrain, 1× = actual vertical scale, 20× = highly exaggerated. Does not modify DEM data.</small></div>
+    <div id="overlayStyleSunAngleRow" class="overlay-style-density-row" hidden><label for="overlayStyleSunAngle">Sunlight direction <output id="overlayStyleSunAngleValue">315°</output></label><input type="range" id="overlayStyleSunAngle" min="0" max="360" step="5" value="315" aria-label="Terrain sunlight azimuth"><small>Azimuth clockwise from north. 315° lights the landscape from the northwest.</small></div>
+    <div id="overlayStyleReliefStrengthRow" class="overlay-style-density-row" hidden><label for="overlayStyleReliefStrength">Hillshade strength <output id="overlayStyleReliefStrengthValue">75%</output></label><input type="range" id="overlayStyleReliefStrength" min="0" max="100" step="5" value="75" aria-label="Terrain hillshade strength"><small>Adjusts directional shading independently of terrain opacity and vertical exaggeration.</small></div>
+    <div id="overlayStyleDensityRow" class="overlay-style-density-row"><label for="overlayStyleDensity">Density <output id="overlayStyleDensityValue">1.0×</output></label><input type="range" id="overlayStyleDensity" min="0.5" max="10" step="0.1" value="1" aria-label="Overlay density multiplier"><small>Changes the number of arrows, barbs, or contour lines. For map outlines, adjusts geographic detail.</small></div>
+    <div class="overlay-style-actions"><button type="button" id="overlayStyleReset">Reset</button><button type="button" id="overlayStyleDone">Done</button></div></div>
+  </form>
+</dialog>
+<section id="differenceWindow" class="difference-window" hidden aria-label="Live panel difference map">
+ <div class="difference-window-header" id="differenceDragHandle"><div class="difference-window-heading"><strong id="differenceWindowTitle">Difference map</strong><small id="differenceWindowSubtitle">First − second</small></div><div class="difference-window-actions"><button id="differenceSaveBtn" class="difference-window-save" type="button" title="Download difference map PNG" aria-label="Download difference map PNG" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg></button><button id="differenceCloseBtn" class="difference-window-close" type="button" title="Close difference window" aria-label="Close difference window">×</button></div></div>
+ <div id="differenceMap" class="difference-map" aria-label="Geographic difference visualization"><div id="differenceSample" class="difference-sample" hidden aria-live="off"></div></div>
+ <div id="differenceMessage" class="difference-message" role="status" aria-live="polite">Preparing difference map…</div>
+ <div class="difference-window-legend"><div class="difference-legend-ramp" aria-hidden="true"></div><div class="difference-legend-ticks" aria-label="Fixed field-specific difference color scale"></div><div id="differenceLegendUnit" class="difference-legend-unit">Difference</div></div>
+</section>
+<dialog id="exportDialog" class="export-dialog" aria-labelledby="exportDialogTitle" aria-describedby="exportDialogHelp">
+  <form id="exportForm">
+    <div class="export-heading"><h2 id="exportDialogTitle">Save PNG</h2><button type="button" id="exportCloseBtn" class="export-close" aria-label="Close export options">×</button></div>
+    <div class="export-scroll" id="exportScroll">
+    <p id="exportDialogHelp">Choose PNG or GIF, an aspect ratio, and whether the map should fill the frame or fit entirely.</p>
+    <fieldset class="export-kind" id="exportKindFieldset"><legend>Format</legend>
+      <label><input type="radio" name="exportKind" value="png" checked> Still image (PNG)</label>
+      <label id="exportGifChoice"><input type="radio" name="exportKind" value="gif"> Animated GIF</label>
+      <label id="exportVideoChoice" hidden><input type="radio" name="exportKind" value="video"> Record expanded panel (video) <small>(Chrome/Edge desktop or Android)</small></label>
+    </fieldset>
+    <fieldset class="export-gif-options" id="exportGifOptions" hidden><legend>Animation</legend>
+      <div class="export-gif-row"><label for="exportGifStart">First forecast hour <output id="exportGifStartLabel">F000</output></label><input type="range" id="exportGifStart" min="0" max="84" step="1" value="0"></div>
+      <div class="export-gif-row"><label for="exportGifEnd">Last forecast hour <output id="exportGifEndLabel">F024</output></label><input type="range" id="exportGifEnd" min="0" max="84" step="1" value="24"></div>
+      <div class="export-gif-row"><label for="exportGifStep">Forecast-hour step</label><select id="exportGifStep"><option value="1">Every 1 hour</option><option value="2">Every 2 hours</option><option value="3">Every 3 hours</option><option value="6">Every 6 hours</option></select></div>
+      <div class="export-gif-row"><label for="exportGifDelay">Delay between frames <output id="exportGifDelayLabel">700 ms</output></label><input type="range" id="exportGifDelay" min="100" max="2000" step="100" value="700"></div>
+      <div class="export-gif-row"><label for="exportGifQuality">GIF resolution</label><select id="exportGifQuality"><option value="high" selected>High · 1600 px wide</option><option value="standard">Standard · 1200 px wide</option></select></div>
+      <small id="exportGifSummary" role="status" aria-live="polite"></small>
+      <small>Final frame holds for an additional 0.5 second. GIF colors use a frame-adaptive 256-color palette; larger frames take longer to encode.</small>
+    </fieldset>
+    <p id="exportVideoNotice" class="export-video-notice" hidden>Record the expanded panel, including map movements, terrain, wind tracers, weather overlays, geographic labels and colorbar. <strong>Not recorded:</strong> the floating Stop &amp; save button, Data overlays / Map overlays menus, and the large numbered terrain panel-selection markers. These controls remain visible and usable while recording; changes they make to the map <strong>are recorded</strong>. Select <strong>this browser tab</strong> when prompted. Recording begins after a 3-second countdown, and Stop &amp; save downloads a local video (WebM or MP4 depending on browser), with no audio or upload.</p>
+    <fieldset id="exportLabelFieldset" class="export-label-options"><legend>Labels</legend><label><input type="checkbox" id="exportLargeLabels"> <strong>Large labels</strong> <small>(larger headings, colorbar titles and tick numbers for presentations)</small></label><label><input type="checkbox" id="exportNoLabels"> <strong>No labels</strong> <small>(hide the top banner and inset panel labels, but keep the colorbar)</small></label></fieldset>
+    <fieldset id="exportRatioFieldset" class="export-ratios"><legend>Aspect ratio</legend>
+      <label class="export-choice"><input type="radio" name="exportRatio" value="16:9" checked><span><strong>16:9 widescreen</strong><small id="exportSize169">1920 × 1080</small></span></label>
+      <label class="export-choice"><input type="radio" name="exportRatio" value="4:3"><span><strong>4:3 standard</strong><small id="exportSize43">1600 × 1200</small></span></label>
+    </fieldset>
+    <fieldset id="exportFramingFieldset" class="export-framing"><legend>Map framing</legend>
+      <label><input type="radio" name="exportFraming" value="fill" checked> Fill the plot area <small>(may crop map edges)</small></label>
+      <label><input type="radio" name="exportFraming" value="fit"> Fit entire map <small>(show surrounding geography)</small></label>
+    </fieldset>
+    </div>
+    <div class="export-actions"><p id="exportBusyStatus" role="status" aria-live="polite" class="export-busy"></p><button type="button" id="exportCancelBtn">Cancel</button><button type="submit" id="exportConfirmBtn" class="export-primary">Download PNG</button></div>
+  </form>
+</dialog>
+
+<!-- Read-only browser for the current published Weather Events feed. -->
+<dialog id="weatherEventsDialog" class="weather-events-dialog" aria-labelledby="weatherEventsTitle">
+  <div class="weather-events-frame">
+    <div class="weather-events-heading">
+      <div><h2 id="weatherEventsTitle">Experimental Weather Events</h2><p>Explore significant weather identified from recent analyses and observed reports, with historical alerts and retained forecasts for context.</p></div>
+      <button id="weatherEventsClose" class="weather-events-close" type="button" aria-label="Close Weather Events">×</button>
+    </div>
+    <div class="weather-events-import">
+      <button type="button" id="weatherEventsRefresh">Reload published feed</button>
+    </div>
+    <p class="weather-events-status" id="weatherEventsStatus" role="status" aria-live="polite">The current published events will load when opened.</p>
+    <div class="weather-events-filters">
+      <input type="search" id="weatherEventsSearch" placeholder="Search situations or models" aria-label="Search weather events">
+      <select id="weatherEventsCategory" aria-label="Filter event category"><option value="all">All categories</option></select>
+      <select id="weatherEventsAlertFilter" aria-label="Filter historical alert records"><option value="all">All WWA statuses</option><option value="matched">WWA matches</option><option value="none">No nearby US records</option><option value="unchecked">Not checked</option></select>
+    </div>
+    <div class="weather-events-layout">
+      <div id="weatherEventsList" class="weather-events-list" aria-label="Discovered situations"></div>
+      <section id="weatherEventsDetail" class="weather-events-detail" aria-label="Selected situation scenes"></section>
+    </div>
+    <p class="weather-events-footnote">These are experimental forecasts, not verified events or alerts. The browser only reads catalogs and opens existing views; it never preserves cases or alters processing.</p>
+  </div>
+</dialog>
+</body></html>

@@ -1,0 +1,5 @@
+# OMD EVU Viewer — Linux web-root deployment
+
+Unpack the viewer ZIP directly alongside the existing `index.html`; **do not nest in a new directory**. Preserve the deployed `config.json`, existing model/analysis Zarr data, JSON catalogs, roads, DEM tiles and all runtime/vendor directories (`vendor/`, `vendor-v6/`, `vendor-three/`). The ZIP contains the viewer application, geographic baselines and operational installation helpers, **not** converted forecast data or third-party vendor binaries.
+
+For first-time setup, configure catalog paths using the supplied `config.json`, install vendor dependencies using the supplied installers, then copy or mount published `data/` products. On upgrade, merge rather than overwrite the site-specific config. Run `sh repair_viewer_permissions.sh` and `python3 validate_viewer_install.py`, inspect a representative regional/GFS/AI field and full-profile sounding, then deploy **`release.json` last** after other changes to notify open browser sessions. The current surface-low field includes **Data overlays → Low tracks** (on by default) and **Background → MSLP / No data**. See README and the in-app guide.
