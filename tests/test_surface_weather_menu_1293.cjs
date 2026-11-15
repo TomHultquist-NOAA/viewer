@@ -1,0 +1,13 @@
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const css=fs.readFileSync(path.join(root,'css/styles.css'),'utf8');
+const regular=['surfaceMSLPOption','mslp850Option','obsControl','amountReportsControl','lightningControl','spcControl'];
+const block=html.indexOf('id="surfaceWeatherOption"');
+assert(block>=0,'Surface-weather section must exist');
+for(const id of regular)assert(html.indexOf(`id="${id}"`)<block,`${id} must precede surface-weather section`);
+assert(/body\s*>\s*#dataOverlaysPopup\.data-overlays-menu-popup\.menu-open\s*>\s*#surfaceWeatherOption\s*\{[\s\S]*?grid-column\s*:\s*1\s*\/\s*-1/.test(css),'detached Data overlays fieldset must span all grid columns');
+assert(css.includes('grid-template-columns:repeat(2,minmax(0,1fr))'),'two-column selector layout');
+assert(/window\.EVU_DOCUMENT_VERSION='1\.2\.\d+'/.test(html),'document version updated');
+assert(!/id="surfaceWeatherToggleBtn" checked/.test(html),'surface weather must remain OFF by default');
+console.log('PASS: surface weather menu appears after normal switches and spans full-width detached popup');

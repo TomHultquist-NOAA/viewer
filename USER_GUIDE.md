@@ -1,147 +1,33 @@
-**Surface low tracks:** Under **Data overlays**, the **Low tracks** checkbox is on by default and independently controls trajectory lines, center markers and pressure labels. Under **Background**, choose **MSLP** (default) or **No data** to show tracks over the geographic basemap without pressure shading. Forecast tracks accumulate within the selected model initialization through its selected lead; analysis tracks use successive F000 analyses to the selected valid time.
-
-**November 13, 2026 viewer v1.2.80:** Flight Category and precipitation type are discrete categories; neither has a meaningful numerical difference. The GFS version/analysis difference panels show *Not applicable* for Flight Category instead of trying to render a signed difference; regional and AI model-set pair-comparison selection is hidden for categorical fields. Ordinary Flight Category maps and METAR reports remain supported.
-
-**November 13, 2026 viewer v1.2.79:** Visibility above **9 miles** and ceiling above **30,000 feet AGL** are treated as unavailable for shading and difference calculations. Areas outside these ranges are transparent, and each compared source must be within range. The visibility palette ends at 9 miles; the ceiling palette still reaches 30,000 feet and the ceiling *difference* scale remains ±10,000 ft.
-
-**November 13, 2026 viewer v1.2.79:** Surface Low Tracks show only the selected model's own initialized cycle, accumulated from F000 through the selected forecast hour. The regional Analysis panel displays successive F000 analyzed centers between that cycle initialization and valid time; GFS/AI Analysis panels use successive GFSv16 F000 cycles over the same interval. The readout distinguishes incomplete low-track extraction from a fully examined interval with no qualifying *closed* lows. GLM lightning symbols are small colored diamonds with mobile-friendly tap targets. The **ceiling-height difference** color scale spans ±10,000 ft AGL; the ordinary ceiling palette is unchanged. Converter v1.4.69 protects all existing GFSv16/v17 native sounding catalog records during subsequent regional profile publications.
-
-**November 13, 2026 viewer update (v1.2.75):** When a panel has Terrain enabled, the normal geographic point-sampling readout also shows the unexaggerated terrain elevation in both metres and feet MSL, using the terrain DEM under the cursor. Panels without Terrain continue to display only the weather value. Low Tracks forecast-hour availability now follows the MSLP source field.
-
-**November 13, 2026 viewer update (v1.2.74):** On the GFS v16/v17 six-panel comparison, VIS and CEIL difference panels now subtract the same valid-time URMA/RTMA analysis used in the Analysis panel. If the two grids have different projections, the analysis is sampled on the forecast grid. Flight Category remains categorical and cannot be differenced. The Low Tracks screen distinguishes an unpublished cycle from a published cycle containing no qualifying lows; the same existing converter crons publish these records automatically, without any additional cron setup.
-
-**Surface Low tracks (v1.2.73):** Open Surface weather → Low tracks to view MSLP-based candidate closed-low trajectories through the **selected valid hour**, with a marker at every recorded hour, colored tracks, and central-pressure labels prioritized at endpoints, minimum pressure, and sufficiently separated six-hour positions when zoomed in. Click or tap a marker for exact time, pressure, and coordinates. Analyses are drawn from the available MSLP analysis reference. This viewer plot requires converter v1.4.65 and only displays derived compact JSON; long-term research storage is described in `LOW_TRACK_RESEARCH.md` in the converter package. This is experimental feature tracking, not official cyclone verification.
-
-## Viewer v1.2.73 — Low tracks
-
-Select **Surface weather → Low tracks** to view forecast and analyzed mean sea level pressure low trajectories. Each position is a marker and adjacent positions are connected. Pressure labels emphasize track endpoints, the deepest low, and regularly spaced positions at higher zoom. Tap/click any marker for its UTC valid time, central pressure and coordinates. Tracks are derived from native MSLP Zarr during converter processing; the research archive stores compact track and verification records only. This is a provisional experimental low-center tracker, not official storm-track verification.
-
-## Viewer v1.2.72 - Aviation weather and GFSv16/v17
-
-The **Aviation weather** field menu contains **Visibility, Ceiling height (AGL)** and **Flight Category**. They have been moved out of **Surface weather**. The field IDs, map rendering, METAR overlays, legends and exports are unchanged. The menu is available for RRFS/REFS/HRRR and **GFSv16/v17**; Flight Category remains excluded in the AI model set.
-
-**GFS Flight Category** is derived from native same-forecast-hour GFS `VIS` (surface, metres) and cloud ceiling above ground (metres). Where GFS publishes HGT at cloud ceiling rather than a native CEIL field, the converter subtracts same-grid HGT at the surface to obtain AGL. Values use the more restrictive visibility or ceiling category and are assigned to discrete VLIFR (purple), LIFR (magenta), IFR (red), MVFR (blue) or VFR (green) bands. Both unavailable inputs mean an unknown value, not VFR. The GFS Analysis panel chooses URMA aviation analyses if published at that valid time, then RTMA, then RAP, then falls back to GFSv16 F000. The displayed analysis label identifies the actual observational source. On GFS comparison panels Flight Category is withheld from subtraction; a difference between category codes has no meteorological meaning.
-
-**Installation:** Pair with converter **v1.4.63**. Existing published GFS stores that lack visibility and ceiling will not suddenly populate just from installing the viewer; run the converter's targeted `--repair-aviation` option on selected processed cycles and hours, or wait for new GFS cycles. Missing variables are never fabricated. See `RELEASE_1_4_63.md` in the converter package for command examples and operational limitations.
-
-
-## Viewer v1.2.71 — Flight Category and multi-image Surface plots
-
-Select **Surface weather → Flight Category** to display a discrete color-filled map from the most restrictive of same-valid-time visibility and ceiling: **VLIFR purple, LIFR magenta, IFR red, MVFR blue, VFR green**. Flight-category codes: 0 VLIFR, 1 LIFR, 2 IFR, 3 MVFR, 4 VFR. Standard thresholds are visibility <0.5/<1/<3/3–5/>5 statute miles, or ceiling <200/<500/<1000/1000–3000/>3000 ft AGL. If one value is missing, the other is used; both missing remain unavailable. METAR circles use matching categories and METAR popups include the derived category. This is available for RRFS/REFS/HRRR and RAP F000 analyses wherever the converter has published the values. Categorical differences are intentionally disabled, rather than subtracting numeric category codes.
-
-The **2-m Temperature, 2-m Dewpoint, 2-m Relative humidity, 10-m Wind speed, and 10-m Wind gust** plot menus now expose **MSLP as the secondary shaded image** using the established radio buttons. The primary field remains the default. On each of these plots, **labeled MSLP isobars default ON**, separately from the primary field’s contours. Use the `MSLP contours` control to turn them off; the selection persists and applies to exported images.
-
-**Globe projection:** Terrain is not supported there. Selecting Globe clears any enabled terrain and disables its checkbox. Terrain becomes selectable when you return to 2D; you may then reenable it. No change to existing 2D terrain rendering.
-
-**Converter requirement:** Deploy converter **v1.4.62** to generate regional forecast and RAP F000 `flightcat` Zarr arrays; existing hours can be backfilled locally if both native inputs are already stored. No live WCOSS2 files were read during local regression testing. The original Mixed precipitation colors are preserved.
-
-
-## Viewer v1.2.70 — Mixed precipitation color reverted
-
-The Mixed category is restored to the original **yellow/amber** coloring in both Precipitation Type and Reflectivity with Ptype, across model sets and METAR/mPING markers. No other precipitation category is changed. All functionality from v1.2.69 remains available.
-
-## New in Viewer v1.2.69 — visibility, ceilings, METARs and analysis precipitation type
-
-Select **Surface weather → Visibility** to plot model visibility in **statute miles**, or **Surface weather → Ceiling height (AGL)** to plot ceiling in **feet above ground level**. These fields use fixed aviation-relevant ranges, with METAR circles adopting the exact same color table (including a user-edited color range). Click a METAR circle to see available visibility, ceiling, precipitation type, station, and actual observation time; missing values are not displayed as zero. mPING remains a separate precipitation-type overlay. A published model or analysis field is required to draw the underlying plot.
-
-Current-hour METAR/mPING files are checked as soon as that hour becomes valid; the viewer no longer blocks them for 30 minutes. Recent published hourly JSON can refresh approximately once a minute while the tab is active, without the stations blinking away during an update. This improves viewer-side freshness, but the WCOSS2 observation collection and website publishing schedule still determine the actual delivery lag.
-
-The Analysis panel shows **RAP F000** for precipitation type. Reflectivity with Precipitation Type combines **MRMS composite reflectivity** with **RAP F000 categorical type** at the same valid time, with geographic alignment on the RAP grid. It is a composite of two analyses, not a pure MRMS Ptype observation. The prior Mixed colors (yellow/amber) are restored in v1.2.70 across both Ptype renderings and all model sets.
-
-If **HRRR F000 Ptype** is blank and reports all None/Unknown, the viewer attempts to derive native categories only if all four F000 categorical flags have already been published; otherwise an informative message identifies the missing converter input. It does not borrow F001. New visibility, ceiling and RAP categorical data **must still be ingested and published by the operational converter**. See `RELEASE_1_2_69.md` and `CONVERTER_DATA_REQUIREMENTS_1_2_69.md` for details.
-
-## Refined multi-panel exports (v1.2.68)
-
-Six-/nine-panel PNG/GIF exports use **single, crisp meteorological contour strokes**, matching the dark, high-contrast on-screen plots more closely. Geographic boundaries retain a subtle low-opacity contrast edge rather than heavy white casings. Individual-panel PNGs intentionally retain their established stronger casing. Fits, fills, wind barbs, contour labels, custom line widths/colors and model grid values are unchanged. No converter rerun is needed for this **export-only** visual improvement.
-
-## Comparison PNG/GIF clarity (v1.2.67)
-
-When exporting all six GFS or nine RRFS/REFS/AI panels, the MSLP isobars and other contour fields retain the **dark center line plus contrasting light outline** used in the individual-panel export. Version 1.2.66 made those strokes too thin; version 1.2.67 restores a strong, readable pair of strokes with only a moderate reduction relative to the original heavy comparison export. Contour labels are also sized to remain legible when the final image is displayed smaller than its full pixel resolution. Geographic boundaries and wind barbs receive corresponding moderate, comparison-only adjustments. This applies to **PNG and animated GIF**, **Fit and Fill**, and **both 6- and 9-panel layouts**.
-
-The established larger individual-panel exports, data values, model grids, terrain, wind-tracer appearance, and user-set line colors/width multipliers are unchanged. You do not need to rerun the converter or regenerate data. For comparison, export the same MSLP forecast as one individual panel and as all panels; the latter should have proportionately lighter, but equally crisp, two-tone isolines.
-
-## v1.2.65 — Connected AI point time series
-
-The AI / GFS / GEFS point-time-series charts use the same **six-hour forecast cadence** as the model-set forecast controls, through **F240**, rather than inserting 1-hour placeholders between every real sample. Consecutive valid points are joined by a three-pixel line. Missing six-hour forecast values remain gaps, not zeros or invented data. GFS-version charts remain three-hourly and RRFS/REFS hourly. The interval-accumulation bar style, saved chart PNGs, and selected forecast values are unchanged.
-
-## Nine-panel AI / GFS / GEFS viewer — EAGLE developmental datasets (v1.2.64)
-
-The AI model set now uses a three-by-three layout. The first six positions are unchanged: **AIGFS | AIGEFS Mean | HGEFS Mean**, then **GFSv16 | GEFS Mean | Analysis (GFSv16 F000)**. The bottom row is **EAGLE Solo (developmental AIGFS) | EAGLE Ensemble (developmental AIGEFS) | HEAGLE (developmental HGEFS)**.
-
-EAGLE Solo is a **separate** model, with its own catalog at `data/catalog_eagle_solo.json`. Its GRIB source is the developmental NOAA S3 bucket supplied for `aigfs.YYYYMMDD/CC/model/atmos/grib2` (not the operational AIGFS location). It populates after Converter v1.4.59 publishes valid data. Until then, a missing initial EAGLE Solo catalog is treated as pending. Forecast fields appear only when present in the GRIB index and converted into the native Zarr store; absent fields remain missing rather than being filled with fabricated zeros.
-
-EAGLE Ensemble and HEAGLE are reserved placeholders labeled developmental; no source files or processing schedule exist until the source information is supplied. These panels do not waste map contexts, and no speculative datasets are shown. Terrain, wind tracers, synchronized maps, shared color scale, differences and recording work as before on available model panels. Up to nine active maps are supported when the remaining sources become available.
-
-The read-only source readiness/latency probe runs on the converter machine: `python3 probe_eagle_solo_latency.py --cycles 4 --hours 0,6,12`. It requires outbound S3 HTTPS; its reported upload times must be verified in your environment. No DEM or vendor-library change is required.
-
-## Wind-tracer performance and terrain default (v1.2.63)
-
-The fast native wind sampler supports validated **regular latitude/longitude grids**, in addition to the existing RRFS/REFS/HRRR Lambert acceleration. GFS v16/v17 and compatible AI-model tracers can use the constant-time U/V lookup, as can RAP or other analyses when their source U/V grid is Lambert or regular lat/lon. Every candidate must match the unchanged native sampler for both wind components; unsupported, reversed, rotated or mismatched grids continue with the reference method. The update does **not** regrid winds, reduce tracers, change relative speed, colors, outlines, or rendering.
-
-Turn on wind tracers and run `EVUAdvancedMap.getTracerPerformance()` in the browser console. `fastLatLonPanels` and `fastLambertPanels` report accelerated regular and Lambert panels separately. `EVUFastWindSampler.getDiagnostics()` describes the latest native grid validation. Actual performance depends on visible panels and your browser.
-
-**Terrain opacity now defaults to 80%** when no setting has been saved; choosing **Reset** in the right-click Terrain appearance dialog also selects 80%. Explicit terrain opacity preferences remain preserved separately for light and dark modes, including a previously saved 100%. If you want to adopt the new default after saving an older value, use Reset. **Image opacity** is a separate control and still defaults to 100%. Terrain remains OFF by default; the underlying DEM, forecast palette, terrain mesh and scalar interpolation are unchanged.
-
-## Wind-tracer performance (v1.2.62)
-
-For RRFS/REFS, HRRR, and compatible native Lambert wind fields, animated wind tracers now sample native U and V through a fast, strictly validated grid lookup rather than scanning every native grid-axis coordinate for each tracer. The wind values are not interpolated, regridded, or approximated, and each new U/V pair is cross-checked against the original sampling method before acceleration. Unsupported grids retain the previous sampler. Wind tracer density, animation speed, 5-knot color groupings, faint tracer outlines, exports, and terrain quality are unchanged. For field diagnostics open the browser console and run `EVUAdvancedMap.getTracerPerformance()` to see the number of fast/reference panels and average animation work per frame. `EVUFastWindSampler.getDiagnostics()` reports the last validation outcome. Performance improvements should be verified in the deployed browser, especially with 6–9 panels.
-
-**North America-wide DEM coverage option (v1.2.60):** The weather-model domain and locally installed terrain coverage are separate: previous installations include global tiles only at z0–5, with a smaller regional footprint at z6–9. To cover the cropped GFS and AI domain through Alaska, the Aleutians crossing the date line, Hawaii including the Northwestern Hawaiian Islands, Puerto Rico, Canada, and Greenland, use the multi-region preset in `install_terrain_dem.py`. First preview: `python3 install_terrain_dem.py --dest data/dem --region-preset north-america --max-zoom 9 --global-base-maxzoom 5 --max-tiles 70000 --dry-run`. Then run the same command **without** `--dry-run` to download the additional tiles; `--workers 8` is optional. At z0–9 this plans 58,873 unique tiles (45,413 additional if your previous 13,460-tile installation is intact); ensure you have sufficient storage. For a smaller z0–8 plan (15,762 tiles) preview: `python3 install_terrain_dem.py --dest data/dem --region-preset north-america --max-zoom 8 --global-base-maxzoom 5 --dry-run`. Existing valid tiles are reused, and publication of `data/dem/manifest.json` should occur last. The larger preset is intentionally opt-in via `--max-tiles 70000`; no DEM download happens automatically on a viewer update. The MapLibre shared-source advisories and all weather-rendering code are unchanged.
-
-**Terrain smooth interpolation on Lambert grids (v1.2.55):** With Terrain enabled, the Interpolate checkbox stays ON for continuous fields. On RRFS/REFS and other successfully validated Lambert grids, the terrain color texture now bilinearly interpolates the **native scalar values before color mapping** instead of interpolating only already-colored pixels. This removes pronounced blocky native grid-cell boundaries at close zoom, matching the intent of the normal interpolated weather display. The validated Lambert fast path is retained. When Interpolate is OFF, or for precipitation type and other categorical fields, nearest native values remain discrete. No native data or grid coordinates change. The renderer's status now includes `lastTextureInterpolationMode` (`native-bilinear` for smooth continuous Lambert values, `native-nearest` otherwise); `lastTextureSamplingMode` still reports the validated Lambert sampling path. Users can verify both with `EVUThreeSurface.getStatus()`. All other model rendering, terrain detail, wind tracers and video/PNG/GIF exports are unchanged.
-
-## Terrain
-
-**RRFS/REFS Lambert performance correction (v1.2.54):** The previous fast weather-texture sampler could reject actual 3-km Lambert grids because it assumed the GRIB Dx/Dy metadata were the exact spacing between the coordinate centers used by autumnplot-gl. In the viewer's Lambert library, the actual step is `Dx × nx/(nx-1)` and `Dy × ny/(ny-1)`; its raw field sampling also uses nearest native grid points and float32 coordinate caches. The corrected accelerated sampler reproduces both conventions and still validates against the original field before activation. This correction changes performance only: terrain geometry, resolution, precipitation shading, output and export formats are preserved. To check that fast sampling has activated, inspect `EVUThreeSurface.getStatus()` for `lastTextureSamplingMode: "validated-lambert-row"`, and `EVUFastLambertSampler.getDiagnostics()` for `convention: "autumnplot-grid-extent"`. Compare the texture sampling time with the prior ~27,600 ms; live performance remains to be measured. No further DEM tile installation is needed if the expanded 13,460-tile plan completed successfully and was deployed.
-
-
-**RRFS/REFS terrain diagnostics and expanded DEM coverage (v1.2.53):** A native Lambert texture accelerator now uses the same optional projection defaults and configured earth radius as the viewer's operational map grid. It remains strictly validated against the real field before activation, and falls back to reference sampling if there is any mismatch. After rendering an expanded panel, inspect `EVUThreeSurface.getStatus()` for `lastTextureSamplingMode`, `lastTextureSampleMs`, `lastTextureMs`, and `lastTextureSamplingReason`. If reference mode remains active, `EVUFastLambertSampler.getDiagnostics()` reports the calibration reason. Resizing the browser (including opening or closing Developer Tools) can now reuse the existing full-resolution weather texture if the sampled geographic envelope still covers the viewport. For local DEM 404s at z6 beyond the previous CONUS-centered region, expand the installed DEM with `python3 install_terrain_dem.py --dest data/dem --bbox -150 15 -65 55 --max-zoom 9 --global-base-maxzoom 5 --workers 8` on a machine with Internet access; copy the updated tiles and manifest into the published `data/dem/` directory. Use the wider of your existing region and this suggested region. The MapLibre warning about sharing DEM sources is advisory and is unrelated to the measured texture CPU bottleneck.
-
- panel selection and automatic updates (v1.2.21)
-
-**Terrain on individual panels.** Open **Map Layers** and check **Terrain**. An inline **Terrain panels** selector opens within the viewer controls (not over the forecast maps), and a large temporary number is shown over every eligible viewer panel. Check the panels where you want real 3-D terrain, then select **Apply terrain**. The numbers disappear and only those panels start rendering terrain. Choose **Choose terrain panels…** in the Map Layers menu to adjust the selection later. You can select all or none; the selection is remembered separately by model set, while Terrain itself starts OFF when the page is opened. The temporary number overlays are not included in PNG/GIF exports.
-
-**Performance.** Unselected panels use the normal flat weather renderer and do not maintain DEM tile sources. The selected terrain panels retain the same mesh resolution, source DEM detail, forecast transparency and color palette. Camera/DEM/lighting changes invalidate a cached relief-lighting calculation. Terrain exaggeration defaults to **12×** for new users; right-click Terrain for a **0–20×** integer-step slider (saved custom settings continue to be respected).
-
-**Updates.** When the viewer is already active, a published release appears as a notice with **Load update**. The notice disappears when the current HTML matches the published version. If the viewer is in a background tab, a return to focus triggers an automatic update check and reload. If the server still supplies stale HTML after a reload, the notice explains that deployment or caching should be checked, and the separate manual refresh button remains available.
-
-## Updates in v1.2.20 (2026-11-09)
-
-**Data overlays layout:** The Shaded image / difference radio group spans the full menu width. All independently selectable contours and Wind barbs are listed below the image choices. **850-hPa Wind speed** contours use their own dashed amber appearance and can be enabled while any scalar is shaded. Upper-air height, moisture and wind-speed palettes and their signed differences use refined field-appropriate physical ranges; height stays in decameters (dm). Any saved custom palette or range remains in effect.
-
-## Updates in v1.2.19 (2026-11-09)
-
-**850-hPa wind speed is now an independent shaded image and difference choice.** The viewer calculates scalar speed from same-hour, same-grid U850/V850 vector components in already-published model/analysis data; no separate wind-speed files or converter backfill are required. Wind speed is shaded in knots (0–120-kt default scale) and its signed differences use a fixed ±25-kt scale. A distinct dashed gold/amber **Wind speed** contour checkbox stays visible even if another 850-hPa scalar is shaded, along with Temperature, Height, Dewpoint and Specific humidity. **Wind barbs** is a separate checkbox for direction and speed-vector symbols; it does not control wind-speed shading or contours.
-
-**Upper-air colorbars and differences now use proper field-specific physical limits.** Geopotential heights at 250, 300, 500, 700, 850, 925 and 1000 hPa are displayed in decameters (**dm**, ten geopotential meters). The native model files still store height in geopotential meters. Fixed shading and signed difference limits, hover values, height contour labels and PNG/GIF export legends all use the matching converted units. Temperature, wind speed, vorticity, dewpoint and specific humidity retain their own appropriate physical palettes and difference scales. If a source field or same-grid wind pair is unavailable, the viewer reports it as missing rather than presenting substituted data.
-
-## Updates in v1.2.18 (2026-11-09)
-
-The upper-air primary scalar's contour checkbox remains visible and independently controlled even when the **shaded image/difference** radio selection is changed to another scalar. Height, dewpoint, and specific-humidity contours remain independently controlled as well. At 250/300 hPa Wind speed and Height can both be contoured; at 500 hPa Vorticity and Height; at 700/850/925 hPa Temperature, Height, Dewpoint and Specific humidity; at 1000 hPa Temperature and Height. Contours are not drawn on difference panels. This arrangement is common to all model sets, live plots, and exports. The image palette now validates finite levels and hex colors to avoid a blank plot when selecting height or any other alternate scalar; unavailable source fields remain unavailable, rather than fabricated.
-
-The darker 700-hPa political outlines now also apply at 850, 925 and 1000 hPa unless overridden by saved user choices. Wind tracers retain their wind-speed color ramp, including pale low-speed cores, but have a thin outer contrast keyline; new defaults are 5.0× particle density, 2.5× animation speed and 1.2× line thickness. Tracer motion remains level-relative and tracer display remains off by default. Existing saved settings are preserved.
-
-When a newer viewer is published, a tab reactivated after being hidden/focused elsewhere reloads with a cache-busted URL; an uninterrupted active tab displays a **Load update** notice instead. The small **Refresh viewer** control is available again. Install the new viewer assets before publishing `release.json`.
-
-### Mobile map shading (v1.2.14)
-
-On compact touch devices, the viewer draws weather colors in a separate canvas to work around unsupported or unreliable float-texture shaders, while keeping map interaction and data sampling unchanged. Terrain remains separately composited. If colors are missing, hard-refresh once after deployment using `index.html?build=12140`.
-
-### Automatic forecast inventory refresh (v1.2.13)
-
-The viewer checks published JSON catalogs for the currently selected model set every three minutes by default while its tab is visible. New forecast cycles and hours become available automatically, and currently displayed plots update if their required data arrive. An unpinned latest-run view follows new cycles; manually selected runs remain pinned. No browser refresh is necessary, and no new meteorological-data downloads are triggered solely by inventory polling. Background tabs pause polling, and inventory is checked again after returning. An administrator can customize `display.catalogRefreshSeconds` in `config.json` (180 by default, 0 to disable).
-
 # OMD EVU Model Viewer — User Guide
 
-**Viewer version 1.2.20**
+**Viewer v1.3.5 · Regional RRFS/REFS/HRRR, GFS, AI/GEFS and verifying analyses**
 
-**Missing-data display:** All numerical plots mask absent/invalid grid cells so the actual map background (or terrain, when enabled) shows through in light and dark modes; the map does not paint a fake data color or treat missing values as zero. For GFSv16/v17 **Snowfall (10:1 SLR)**, zero and trace amounts (0.01 in or less) are also left unshaded. Valid physical zeros in fields such as pressure anomalies, temperature, wind components, and other scalar fields remain available. This applies to map images and their normal PNG/GIF capture paths; point values and saved model data are not modified.
+The viewer displays synchronized meteorological model forecasts and verifying analyses, with native-grid maps, point inspection, forecast-time animation, comparisons, optional terrain, overlays, and scientific exports. Data appear only when their exact model cycle, valid time, field and published source are available. Experimental low-track and surface-weather objects are distinct from official NOAA analyzed weather maps.
 
-**MSLP spectrum:** red/orange for low pressure, green/cyan around the middle, and blue/purple/pink for higher pressure; 128 smooth gradients are shared by map shading and all colorbars. **Wind tracers:** Colors now follow actual model wind speed, independent of the image field. The right-click appearance editor shows a 0–90+ kt color key. Uncheck **Color by wind speed (knots)** to choose a fixed custom color; thickness and density remain adjustable. **Animation speed** now defaults to 2.5× and has an independent 0.25–5× right-click slider. In v1.1.91 the visible wind distribution and atmospheric level normalize the tracer motion, and trails have proportional length/width; their colors still represent the **actual** wind speed in knots.
+## Low-track availability and an early-cycle pressure minimum (v1.3.5)
 
-**GPU terrain and masking (v1.1.91):** The primary viewer uses MapLibre 6.16.0 native terrain-tile shaders for regular lat/lon and Lambert fields, rather than drawing a full CPU weather canvas when terrain is enabled. At 100% Image opacity, valid 850-hPa and other upper-air data completely cover terrain; truly below-ground or otherwise missing grid cells remain transparent and reveal the DEM. Surface and near-surface plots retain the exact colorbar hue while a reduced neutral hillshade provides subtle relief highlights and shadows. Natural DEM color never replaces fully opaque valid weather pixels; use the Terrain right-click strength control to make the relief stronger or weaker. Terrain does not automatically change opacity or tilt the camera. The right-click Terrain controls adjust exaggeration, opacity, lighting direction, and relief strength independently. **Map overlays** always appears as a selector; **Data overlays** becomes a selector when more than four overlays apply to the field. Saved user settings and forecast caches are preserved across application updates.
+With **Data overlays → Low tracks** enabled, affected model panels now display a small status message if the official track product has not been published for the selected cycle, if the displayed forecast hour has not yet been processed, if the official product is complete for that hour but yields no active track, or if metadata cannot be downloaded. The Data overlays menu aggregates these categories. These messages never obscure the entire shaded map, and the presence of an official fix is not inferred from the MSLP raster. Hover a status label for source/processed-hour details when available. A model's MSLP low may be visible before official tracking finishes: by default the GFS/AI official tracker does not run its first automatic pass until **F012** is available, so a newly initialized **F006** frame can lack the corresponding track JSON. F012 is a processing checkpoint, not a 24-hour cyclone existence criterion; provisional short tracks are retained. Sites may opt into an earlier **F006** official candidate pass by setting `OFFICIAL_TRACK_EARLY_CANDIDATE_HOURS=6` in the existing converter configuration, at the cost of an additional early tracking execution per cycle. Native GRIB availability, tracking completion and publication still apply, and a completed official tracker is not guaranteed to identify every MSLP minimum.
 
-The OMD EVU Model Viewer displays weather model forecasts and available verifying analyses side by side. The panels share a geographic view, making it easier to compare different models and forecast hours. The default layout includes RRFS, HRRR, REFS members, REFS Mean, and an Analysis panel.
+## Low tracks overlay on MSLP-capable surface fields (v1.3.5)
+
+**Low tracks is now an optional Data overlay, not a separate plot.** The Surface weather menu offers MSLP, 2-m Temperature / MSLP, 2-m Dewpoint / MSLP, 2-m Relative Humidity / MSLP, 10-m Wind / MSLP and 10-m Gust / MSLP. Choose one, then enable **Data overlays → Low tracks**. The checkbox is available regardless of which shaded-image radio choice is active. The original surface scalar and independent MSLP isobars and surface-weather analysis remain unchanged. Low tracks is initially **OFF** for new visitors; explicit choices persist in local preferences and are encoded in shared URLs. Legacy links using `field=lowtracks` automatically become an MSLP plot with the low-track overlay enabled.
+
+The overlay uses existing compact, official NCEP/GFDL VortexTracker files in `data/low_tracks/`, not newly extracted MSLP minima in the browser. Forecast lines extend from initialization through the current forecast lead; the F000 analysis panels instead use accumulated, conservatively associated F000 center diagnostics (not official GFDL tracks). Track colors follow the MSLP pressure palette even when temperature, dewpoint, humidity or wind is shaded. The trajectory canvas is included in PNG/GIF exports and can be switched off without reloading or altering any native weather field. Missing/incomplete published tracking metadata appears as a small status in **Data overlays**; it does not hide an otherwise valid map or imply no lows exist. Track archive producers, detection methods and retention are unchanged by this viewer-only upgrade.
+
+## Signed difference-field interpolation (v1.3.3)
+
+With **Interpolation** enabled, a signed difference field may have invalid cells at model/analysis coverage limits or below-ground masks. These cells must remain transparent. The GPU now substitutes conservative neighboring valid values **only in the display texture**, retaining the actual no-data mask, rather than letting an extreme missing-value sentinel contaminate the interpolated palette and form an artificial blue line. This does **not** modify the computed A–B differences, input Zarr, cursor values, plotted contour data, scientific archives, saved PNG values, or the interpolation checkbox. If an odd colored line persists, use the native data hover readout and compare a frame with interpolation off; genuine sharp signed differences may still appear as narrow bands.
+
+## Experimental surface-weather analysis (v1.3.2 / converter v1.4.93)
+
+The **Surface weather analysis** switches in Data overlays show **objective, experimental** synoptic H/L centers, frontal candidates, drylines, and troughs when the companion converter has published GeoJSON for the current model and forecast hour. They are **not official WPC/OPC analyses**. The converter now requires synoptic-scale pressure prominence around distinct H/L centers; it also screens coast-parallel thermal gradients for corroborating flow and MSLP evidence rather than treating the land/water temperature difference as a front. Genuine dynamically supported coastal fronts remain possible. The viewer uses more space between H/L labels when zoomed out, relaxing the separation as you zoom in. Native grids, isobars, and archived cyclone tracks are unchanged. Older surface-weather GeoJSON refreshes incrementally as the independent producer revisits stores.
+
+## Viewer v1.3.1 — pinned mobile playback, contour styles and 2-m wind overlays
+
+- **Mobile VCR:** previous frame, play/pause and next frame appear in a compact bar beneath the main header, independently of the collapsible controls; the bar stays pinned to the top of the viewport while scrolling through forecast panels. A compact readout gives the selected F-hour and valid UTC time.
+- **Contour line style:** right-click any contour switch in Data overlays, then choose Default (retains meteorological styling), Solid, Dashed, Dotted or Dash-dot. This controls contours in maps and captured images.
+- **Wind barbs on 2-m fields:** select 2-m Temperature, 2-m Dewpoint or 2-m Relative Humidity, open Data overlays and enable *10 m wind barbs* (initially off). Data are sampled from the appropriate same-cycle 10-m U/V pair, if provided.
+- **REFS Mean RH:** when native 2-m RH is absent in the mean GRIB2 products, the converter computes an estimate using the ensemble-mean 2-m temperature and dewpoint at each grid point. This is **not** the ensemble average of individual members' RH; the catalog labels the derivation. Older available forecast hours can be revisited using `repair_refs_mean_archive.py`.
 
 ## Getting started
 
@@ -166,7 +52,7 @@ The Field menu groups related weather variables, including radar, precipitation 
 
 | Action | How to do it |
 | --- | --- |
-| Change forecast hour | Left/Right arrows or Previous/Next controls |
+| Change forecast hour | Left/Right arrows or Previous/Next controls; on phones, the **always-visible top VCR controls** work with the main menu closed |
 | Play or pause | Spacebar or Play/Pause |
 | Change model cycle | Up/Down arrows **preserve the same valid UTC time** by changing forecast lead (F024 at 12Z → F030 at 06Z); unsupported exact leads are skipped |
 | Zoom and pan | Scroll/trackpad and drag; touch gestures where supported |
@@ -183,6 +69,8 @@ The Field menu groups related weather variables, including radar, precipitation 
 
 **Expanded panel geographic framing (v1.2.49):** When you enlarge any RRFS/REFS, HRRR, GFS, AI or analysis panel, its initial view is adjusted to show the same geographic region as the small panel rather than revealing a much larger area merely because the canvas grew. The viewer keeps the original center, bearing and pitch and compensates for the change in viewport dimensions. If the expanded window has a different aspect ratio, it may show some extra area along one edge to avoid cropping the original region. You can pan, zoom or tilt normally while expanded; returning to the comparison grid restores an equivalent geographic view at the smaller panel size, with consistent shared-map state. This also applies in Globe mode.
 
+**Mobile forecast playback (v1.3.1):** A compact playback strip initially appears beneath the viewer heading, then **stays pinned to the top of the screen while you scroll down through the forecast panels**—even when **Controls** is collapsed. The normal heading and other controls may scroll away. Tap ◀◀ / ▶▶ for the preceding/next available forecast frame (wrapping at the end), ▶ to animate, or Ⅱ to pause. The strip shows the active F-hour and valid UTC time and uses the same playback state as the main controls. To adjust playback speed or change model/cycle, expand **Controls**.
+
 On phones, use the slim **↕ Scroll** rail at the right edge of any model panel to scroll the page without accidentally panning the map. A tap on the rail advances to the next panel. Swiping directly on a weather map continues to pan/zoom that map. RRFS/REFS retains its existing multi-map behavior. On touch devices, global GFS uses up to three active maps at a time; off-screen GFS panels reactivate when scrolled into view or exported. This helps protect the phone's graphics memory while native-resolution data remain available for contours and point inspection.
 
 GFS atmospheric fields request interpolation by default, while GFS marine wave fields start without interpolation; each group remembers its own choice. Devices without float-texture linear-filter support use a safe nearest-neighbor fallback rather than displaying blank shading. Mobile GFS shading uses a lighter display grid; model values, differences, and time series remain unchanged. The **Rendering diagnostics** page can test GFSv16 or GFSv17 fields if shading is missing. As of v1.1.46, its separate **3. Test outlines & terrain** stage can identify inaccessible coastline/state data, MapLibre geometry-worker failures, and unavailable external DEM tiles. Successful GPU/Zarr plotting does not by itself mean coastlines or terrain are loaded.
@@ -192,9 +80,9 @@ You can switch between dark and light appearance. On desktop, the controls can b
 **Map appearance:** The compact **Map overlays** selector contains **State/Country** (coastlines and political boundaries), **Counties** (independent, off by default), **Cities**, **Roads**, **Map background**, and **Terrain** (off by default). **Wind tracers** (off by default) are in **Data overlays**, together with field-specific contour, vector, observation, and report toggles. Data overlays is always a full-width dropdown, regardless of the number of applicable options. County boundaries now appear whenever Counties is checked, **regardless of zoom**, and are absent when it is unchecked. Right-click State/Country or Counties to set color and thickness; Counties also supports opacity. Appearance preferences are saved independently for light and dark themes. Default State/Country outline colors adapt to the active color curve and map background; manual outline colors are saved per field and theme and shared across model sets. For wind tracers, the initial particle density is **5.0×**, and the slider ranges **0.5–10.0×**; regular overlay densities remain 0.5–2.0×. Wind-tracer **Animation speed** is a separate 0.25–5× multiplier, defaulting to 2.5×, and does not alter actual U/V winds or the forecast playback speed. Turning off Map background uses a solid contrast color behind the weather. None of these map appearance controls modifies the forecast values or exports.
 
 
-## Smoother MSLP shading and map outlines
+## MSLP shading and map outlines
 
-The **mean sea level pressure (MSLP)** field uses a fixed, smoothly graduated **960–1050 hPa** palette: red/orange for lower pressure, yellow/green through the middle of the scale, and cyan/blue/purple/pink for higher pressure. It uses **128 narrow color intervals** rather than the old 15 broad bands. The colorbar, live weather shading, and PNG/GIF exports use the same colors and physical limits. The **default State/Country lines are dark slate on MSLP** to match the bright pressure background; user-selected outline colors still take precedence, and differences retain their normal outline style. Custom palette overrides still take precedence.
+The **mean sea level pressure (MSLP)** field uses a fixed, smoothly graduated **950–1050 hPa** palette: red/orange for lower pressure, yellow/green through the middle of the scale, and cyan/blue/purple/pink for higher pressure. It uses **128 narrow color intervals** rather than the old 15 broad bands. The colorbar, live weather shading, and PNG/GIF exports use the same colors and physical limits. The **default State/Country lines are dark slate on MSLP** to match the bright pressure background; user-selected outline colors still take precedence, and differences retain their normal outline style. Custom palette overrides still take precedence.
 
 ## 3D perspective, elevation relief, and wind tracers
 
@@ -224,6 +112,8 @@ The operation is incremental: of 18,011 planned tiles, the earlier 13,460 are re
 
 Use the compact **Shortcuts** button next to the User guide for a quick keyboard, mouse, hover, and touch reference. The popup contains a printable **SHORTCUTS.pdf** link.
 
+**Contour line patterns (v1.3.1):** On desktop, right-click the applicable Data overlays checkbox for **Contours**, **MSLP isobars**, **Height**, **850-hPa temperature**, **Wind speed** (when provided as a contour), **Dewpoint**, or **Specific humidity**. Its appearance editor offers **Default (field-specific)**, **Solid**, **Dashed**, **Dotted**, or **Dash-dot**. Defaults preserve the existing meteorological presentation, while explicit choices override the contour pattern on maps and PNG exports; line width, colors, and dark/light theme preferences remain independent. Reset restores the field-specific pattern. Non-contour symbols (barbs, tracers, geography, storm tracks) are not affected.
+
 **Data overlays** always presents field-specific wind, contour, observation, lightning and report toggles in a full-width pop-up selector. The report count is hidden if both METAR and mPING are deselected. **Wind tracers** also appear here when an appropriate native wind field exists. **Map overlays** always opens its own compact pop-up containing State/Country, Counties, Cities, Roads, Map background and Terrain. Right-click applicable labels in either menu to edit color, thickness, density and other available style settings. County boundaries are controlled solely by their checkbox, regardless of zoom. Cities display more places at closer zoom; for significantly more names, use the optional Python 3.6 GeoNames installer in `CITY_LABELS_INSTALL.md`. The separate Reset icon sits beside the Map overlays selector. In dark mode, MSLP and geopotential-height contours use contrasting default strokes over continuous meteorological fields; customized per-theme stroke colors are retained.
 
 ### Sounding profile completeness checks (v1.2.61)
@@ -232,7 +122,7 @@ When a native upper-air profile is missing for the selected model, initializatio
 
 To diagnose a missing or incomplete sounding in the browser, open the sounding and run `EVUSoundingProfiles.getDiagnostics()` in Developer Tools. It shows the requested model/cycle/hour, matching Zarr path, raw and rendered level counts, missing native chunks, or why a profile hour was not advertised. GFS retains its native 37-level behavior when published; REFS Mean is natively much sparser and its unobserved levels must never be fabricated.
 
-For a converter-side check of RRFS, HRRR, all five REFS members, REFS Mean, RAP and GFS, run `python3 audit_sounding_profiles.py --root zarr --models all` from the updated Converter v1.4.57 directory, using the true output root. Repair missing native chunks under the existing converter locks, and publish the profile catalog last. An updated viewer alone cannot reconstruct uncollected upper-air fields.
+For a converter-side check of RRFS, HRRR, all five REFS members, REFS Mean, RAP and GFS, run `python3 audit_sounding_profiles.py --root zarr --models all` from the current converter directory, using the true output root. Repair missing native chunks under the existing converter locks, and publish the profile catalog last. An updated viewer alone cannot reconstruct uncollected upper-air fields. An earlier catalog validator incorrectly rejected many otherwise valid GFS profiles because legacy GFS completion stamps did not contain an explicit dewpoint-level inventory. Converter v1.4.91 recognizes those genuine native profiles and repopulates the published catalog without fabricating levels. Missing GFS profile chunks are scheduled for repair, while RAP analysis collection uses bounded 48-hour backfill (8 new hours per poll by default) rather than checking only the two most recent hours. Viewer v1.2.99 refetches the catalog if the requested hour was initially absent. Existing or historical soundings still require successful source acquisition and remote publication; a six-level fallback is not a valid native vertical profile.
 
 ## Right-click: time series and sounding
 
@@ -319,7 +209,7 @@ On all **Radar & precip. type** fields, enable **METAR** to display colored circ
 
 On supported composite-reflectivity, shear/helicity, or severe-weather maps, enable **SPC reports** to display preliminary tornado (red), wind (blue), and hail (green) circles. The selected reports are shared by **all active panels**, including RRFS, HRRR, REFS members, REFS Mean, and Analysis, for the common forecast valid time. Select a report to see any available details. Reports are hidden by default.
 
-On all **Radar & precip. type**, **Shear & helicity**, and **Instability & severe storms** fields, enable **GLM lightning** to display satellite-observed lightning flash centroids from the **preceding 60 minutes**, ending at the forecast valid hour. The age colors indicate **0–15 min (pink)**, **15–30 min (orange)**, **30–45 min (cyan)**, and **45–60 min (violet)** before that valid hour. The selected overlay remains enabled across fields and page reloads. The flash locations are satellite-detected optical lightning, **not individual cloud-to-ground strikes**; age is measured relative to the model valid hour, not the current wall-clock time. Choose an age-colored diamond marker to see its timestamp and originating satellite. Published GLM observation hours must be generated by the companion collector; if data are missing, the control reports **GLM data unavailable**, without implying there was no lightning. Converter 1.4.13 applies the configured retention period to unprotected local and published hours while preserving valid hours covered by protected historical cases. Age colors apply to live maps and panel PNG/GIF exports.
+On all **Radar & precip. type**, **Shear & helicity**, and **Instability & severe storms** fields, enable **GLM lightning** to display satellite-observed lightning flash centroids from the **preceding 60 minutes**, ending at the forecast valid hour. The age colors indicate **0–15 min (pink)**, **15–30 min (orange)**, **30–45 min (cyan)**, and **45–60 min (violet)** before that valid hour. The selected overlay remains enabled across fields and page reloads. The flash locations are satellite-detected optical lightning, **not individual cloud-to-ground strikes**; age is measured relative to the model valid hour, not the current wall-clock time. Choose an age-colored diamond marker to see its timestamp and originating satellite. Published GLM observation hours must be generated by the companion collector; if data are missing, the control reports **GLM data unavailable**, without implying there was no lightning. The converter applies the configured retention period to unprotected local and published hours while preserving valid hours covered by protected historical cases. Age colors apply to live maps and panel PNG/GIF exports.
 
 **Limitations:** Reports may be delayed, incomplete, revised, or absent. Future forecast hours cannot yet have verifying observations. A blank area does not mean no weather occurred. Some accumulated severe-weather fields display reports over a longer period than the most recent hour.
 
@@ -364,6 +254,19 @@ Both resolutions use a shared **25-frame maximum** for single-panel and all-pane
 
 Analysis panels use titles such as **Analysis · NOHRSC · 24-hour snowfall**, with the **valid time** alone on the subtitle.
 
+## Preserved historical case studies
+
+The viewer can revisit a previously published forecast cycle when the converter has protected its model Zarr and the corresponding catalog entries. Choose the appropriate **Regional RRFS/REFS/HRRR**, **GFS**, or **AI / GFS / GEFS** model set, then select the cycle date and initialization and navigate valid hours as usual. Case creation is an **administrator workflow** performed by the companion converter; browser users do not create or pin datasets.
+
+The current converter's `create_case.py` supports regional models, GFSv16/v17, AIGFS, AIGEFS, HGEFS, GEFS mean and its 0.25° companion, and mixed-family cases. Supported forecast hours depend on the model: regional data generally extend through F084; GFS through F240; and some AI/GEFS products through F384. Analyses, observations, soundings and track records can still be unavailable if their original upstream records were not retained or published; a protected forecast is not proof that every related data source exists.
+
+- **Official low tracks:** native-GRIB gettrk requires source GRIB available to the converter or preserved research records; a historical Zarr alone cannot generate missing official tracks.
+- **Surface-weather fronts/H/L/drylines/troughs:** these are experimental compact GeoJSON under a separate short rolling retention policy. They may be absent on preserved historical cases until the case administrator explicitly regenerates them; an absent overlay is not evidence of no fronts.
+- **CoCoRaHS / Synoptic / mPING:** reports appear only at their valid time when their source timestamps and permitted publication are available. Historical observation sources can be delayed or subject to provider limits.
+- **Weather-event discovery:** the recent-event explorer is independent of persistent case storage, so old cases need not appear in its current rolling suggestions.
+
+Case-study data protection and optional backfill are documented in the converter's `CASE_STUDIES.md`. The viewer does not change retention or archive contents.
+
 ## Data availability and troubleshooting
 
 - **A panel says missing:** The selected model, variable, hour, or verifying analysis may not be available. Try another hour or source. Some accumulated totals require every contributing period.
@@ -399,7 +302,7 @@ Sounding PNGs include the actual model source, model initialization in UTC, fore
 The preferred Roads overlay uses optional self-hosted U.S. Census TIGER/Line primary and secondary highways (Interstates, U.S. routes and state routes), with a simplified Natural Earth fallback. Build the tiles using `install_tiger_highways.py` and `HIGHWAYS_INSTALL.md`. Legacy OSM guidance is retained only for installations that already use it. Preserve the road-source attribution for whichever tiles are deployed.
 
 
-## AI / GFS / GEFS comparison (v1.2.16)
+## AI / GFS / GEFS comparison
 
 Six panels: AIGFS, AIGEFS Mean, HGEFS Mean, GFSv16, GEFS Mean and valid-time GFSv16 F000 Analysis. Native AI means are plotted at 0.25° where available; GEFS Mean uses its native 0.25° surface and 0.5° upper-air streams, without artificial upscaling. The shared timeline uses 6-hour steps through F240. A field is shown only if that forecast's native GRIB inventory and published Zarr catalog provide it.
 
@@ -411,27 +314,27 @@ Wind tracers use true matching U/V wind components from the current forecast val
 
 ## Runtime components, sources, and attribution
 
-The map viewer uses **MapLibre GL JS** for interactive geography, **autumnplot.gl** for weather-field plotting, and **Three.js** for optional GPU terrain/weather draping. Self-hosted installations must retain the appropriate runtime libraries and workers. Refer to `THIRD_PARTY.md`, `VENDOR_V6_INSTALL_LINUX.md`, and `GPU_RENDERER_ARCHITECTURE.md` for version pins, licensing and installation details. Terrain elevation may use ETOPO, Mapterhorn, or installed local tiles; preserve each source's required attribution. Roads may use U.S. Census TIGER/Line or legacy OpenStreetMap data; map and observation providers retain their own attribution requirements. Library credits are documented here rather than displayed in the viewer control bar.
-
-## Updates in v1.2.16 (2026-11-09)
-
-Upper-air Data overlays now provides a **Shaded image / difference** radio group. The selected scalar controls both the panel image and its difference (precomputed GFS or generated RRFS/REFS/AI). At 700, 850, and 925 hPa select Temperature, Height, Dewpoint, or Specific humidity; moisture contour checkboxes remain independent. At 250/300 hPa select Wind or Height, at 500 hPa select Vorticity or Height. Wind-tracer colors preserve the original speed palette, and terrain shading no longer responds to negative ocean elevations. New versions reload on startup or when the tab returns to focus; active tabs receive an update notice and a manual Refresh viewer button. For historical cycles, publish converter v1.4.41 moisture fields before selecting 925-hPa dewpoint or humidity.
-
-
-
-## Updates in v1.2.17 (2026-11-09)
-
-The **Data overlays** numeric-contour checkbox now names the actual shaded image field (for example, Temperature, Wind speed, Vorticity, Accumulated precipitation, or a specific wave product), rather than the ambiguous “Contours.” At 700/850/925 hPa, **Height**, **Dewpoint**, and **Specific humidity** have their own independent contour checkboxes; when one of these becomes the shaded image, that same checkbox controls its contours, so no second set of overlapping isolines is drawn. The previous height, moisture and temperature contour styles remain distinct.
-
-For GFS precomputed difference panels, if the published difference Zarr does not contain an optional upper-air shaded field yet, the viewer tries to compute the signed difference from exactly aligned native GFS fields. The two inputs must be from the correct model cycles and forecast/valid hours, and must have identical grids; otherwise the viewer leaves the difference unavailable rather than guessing. The same image selection continues to control the scalar for RRFS/REFS and AI on-demand comparisons. Below-ground transparency now covers isobaric dewpoint and specific humidity too when terrain is enabled. Converter v1.4.41 remains the current converter for the moisture fields.
-
-
-**v1.2.23 note:** MSLP permits MSLP or 850-hPa Temperature as the shaded image, automatically selecting the corresponding difference scalar, with independent MSLP and 850-hPa temperature contour checkboxes. Data overlays is always a full-width menu with no duplicate heading; Map overlays also omits its redundant heading. The GFS 850-hPa wind-speed difference is the signed difference of the native speeds, not a component-vector difference magnitude.
-
-
-**v1.2.24 menu note:** The full-width Data overlays menu has a fixed label; its previous changing item count was removed. All field selectors and independently selectable contour overlays remain unchanged.
-
+The map viewer uses **MapLibre GL JS** for interactive geography, **autumnplot.gl** for weather-field plotting, and **Three.js** for optional GPU terrain/weather draping. Self-hosted installations must retain the appropriate runtime libraries and workers. Refer to `THIRD_PARTY.md`, `VENDOR_V6_INSTALL_LINUX.md`,  for version pins, licensing and installation details. Terrain elevation may use ETOPO, Mapterhorn, or installed local tiles; preserve each source's required attribution. Roads may use U.S. Census TIGER/Line or legacy OpenStreetMap data; map and observation providers retain their own attribution requirements. Library credits are documented here rather than displayed in the viewer control bar.
 
 ## Questions and comments
 
 Questions and comments can be directed to [**Tom Hultquist**](https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=thomas.hultquist@noaa.gov), Office of Modeling and Development, Evaluation and Verification Unit.
+
+
+### Low tracks on F000 analysis panels (v1.3.5)
+
+The **Analysis (RAP F000)** and **GFSv16 F000 analysis** panels accumulate
+low-center positions from independently generated F000 surface-weather
+diagnostics beginning with the selected forecast cycle, ending at the displayed
+valid time. Conservative, one-to-one time-adjacent matching connects positions
+into paths; gaps in the source F000 snapshots are **not** bridged. Previous
+positions remain visible even after a center disappears; the panel reports
+when the current F000 snapshot is missing or only historical tracks are shown.
+These analysis paths are **diagnostic associations, not official GFDL gettrk**.
+Forecast-model panels continue to use only the separate official gettrk products.
+Missing/empty status messages appear in each affected panel and Data overlays.
+
+If no F000 diagnostics are published, check the converter's independent
+`run_surface_weather_cron.sh` task; the surface-weather job now publishes
+`data/low_tracks/analysis_f000_{rap_surface,gfs_v16}.json` from its F000
+center output. These files are viewer-only caches, not research archives.

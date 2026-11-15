@@ -29,14 +29,13 @@ const REFC_COLORS=[
  '#772c9b','#59198d','#828282','#b4b4b4'
 ];
 const FIELDS = {
- lowtracks:{label:"Surface low tracks",unit:"",trackProduct:true},
  // User-reference MSLP spectrum: deep reds at LOW pressure, through
  // orange/yellow/green/cyan, to blue/violet/pink at HIGH pressure.
  // Display-only, 128 smoothly interpolated intervals across the fixed
- // 960–1050 hPa range. The GPU and all browser/export legends share pal().
+ // 950–1050 hPa range. The GPU and all browser/export legends share pal().
  mslp:{label:'Mean sea level pressure (MSLP)',unit:'hPa',convert:'PaToHpa',
-  min:960,max:1050,paletteSamples:128,colors:[
-   [960,'#930d20'],[966,'#d10c21'],[972,'#f82d19'],[978,'#ff7b16'],
+  min:950,max:1050,paletteSamples:128,colors:[
+   [950,'#630718'],[960,'#930d20'],[966,'#d10c21'],[972,'#f82d19'],[978,'#ff7b16'],
    [984,'#ffc52c'],[990,'#f2ed1f'],[996,'#b7eb08'],[1002,'#58e822'],
    [1008,'#10de78'],[1014,'#08d7cf'],[1020,'#1ea4e8'],[1026,'#2372ed'],
    [1032,'#363bd9'],[1038,'#6e36dc'],[1044,'#bc42df'],[1050,'#f3acd1']]},
@@ -311,7 +310,7 @@ for(const name of ['mxuphl','mxuphl_run']){
 // Fixed forecaster field sequence. U/V are read for barbs, not separate menu fields.
 const FIELD_ORDER = [
  'ptype','refc_ptype','refc','csnow','cicep','cfrzr','crain',
- 'lowtracks','mslp','t2m','dpt2m','q2m','rh2m','vis','ceil','flightcat','prate','apcp1h','apcp3h','apcp6h','apcp24h','apcp48h','apcp','frozr','frzr','tsnowp',
+ 'mslp','t2m','dpt2m','q2m','rh2m','vis','ceil','flightcat','prate','apcp1h','apcp3h','apcp6h','apcp24h','apcp48h','apcp','frozr','frzr','tsnowp',
  'snow1h','snow3h','snow6h','snow24h','snow48h','asnow',
  'gfs_snow_slr103h','gfs_snow_slr106h','gfs_snow_slr1024h','gfs_snow_slr1048h','gfs_snow_slr10',
  'gfs_snow_depthChange3h','gfs_snow_depthChange6h','gfs_snow_depthChange24h','gfs_snow_depthChange48h','gfs_snow_depthChange',
@@ -345,7 +344,7 @@ function fieldMenuEntries(){
 // every supported selection is visible even before its data are backfilled.
 const FIELD_GROUP_DEFS = [
  {key:'radar',label:'Radar & precip. type',fields:['refc','ptype','refc_ptype','csnow','cicep','cfrzr','crain']},
- {key:'surface',label:'Surface weather',fields:['lowtracks','mslp','t2m','dpt2m','q2m','rh2m','wspd10','gust']},
+ {key:'surface',label:'Surface weather',fields:['mslp','t2m','dpt2m','q2m','rh2m','wspd10','gust']},
  {key:'aviation',label:'Aviation weather',fields:['vis','ceil','flightcat']},
  {key:'precip',label:'Precipitation',fields:['prate','apcp1h','apcp3h','apcp6h','apcp24h','apcp48h','apcp']},
  {key:'snow',label:'Winter weather',fields:['snow1h','snow3h','snow6h','snow24h','snow48h','asnow','gfs_snow_slr103h','gfs_snow_slr106h','gfs_snow_slr1024h','gfs_snow_slr1048h','gfs_snow_slr10','gfs_snow_depthChange3h','gfs_snow_depthChange6h','gfs_snow_depthChange24h','gfs_snow_depthChange48h','gfs_snow_depthChange',...RRFS_SNOW_MENU_ORDER,...RRFS_SNOW_KEYS,'frzr','frozr','tsnowp','cpofp','weasd','snod','snowc','sden']},
@@ -394,9 +393,13 @@ const UPPER_AIR_IMAGE_FIELDS=Object.freeze({
 });
 const UPPER_AIR_SCALAR_KEYS=new Set(Object.values(UPPER_AIR_IMAGE_FIELDS).flat().map(choice=>choice[0]));
 const SURFACE_MSLP_IMAGE_FIELDS=new Set(['t2m','dpt2m','rh2m','wspd10','gust']);
+// A field is track-overlay eligible if and only if its shaded-image menu
+// includes native MSLP; the toggle is independent of the selected shading.
+function lowTracksAvailableForField(field=st.field){
+ return field==='mslp'||SURFACE_MSLP_IMAGE_FIELDS.has(field);
+}
 function surfaceMSLPContoursEnabled(){return SURFACE_MSLP_IMAGE_FIELDS.has(st.field)&&st.overlayMSLP;}
 function selectedShadingField(){
- if(st.field==='lowtracks')return 'mslp';
  const choices=UPPER_AIR_IMAGE_FIELDS[st.field];
  const value=st.shadedFields?.get?.(st.field);
  return choices?.some(item=>item[0]===value)?value:st.field;
@@ -426,13 +429,12 @@ function contourFieldLabel(field=selectedShadingField()){
 function syncImageFieldChoices(){
  const fieldset=document.getElementById('imageFieldControl'),root=document.getElementById('imageFieldOptions');
  if(!fieldset||!root)return;
- const lowTracks=st.field==='lowtracks';
- const choices=lowTracks?[['mslp','MSLP'],['none','No data']]:UPPER_AIR_IMAGE_FIELDS[st.field];
+ const choices=UPPER_AIR_IMAGE_FIELDS[st.field];
  fieldset.hidden=!choices;
  if(!choices){root.replaceChildren();return;}
  const title=fieldset.querySelector('legend');
- if(title)title.textContent=lowTracks?'Background':'Shaded image / difference';
- const current=lowTracks?st.lowTrackBackground:selectedShadingField();
+ if(title)title.textContent='Shaded image / difference';
+ const current=selectedShadingField();
  if(root.dataset.menu!==st.field){
   root.replaceChildren(...choices.map(([key,label])=>{
    const node=document.createElement('label');node.className='shaded-field-choice';
@@ -444,9 +446,8 @@ function syncImageFieldChoices(){
  }
  for(const radio of root.querySelectorAll('input[type="radio"]'))radio.checked=radio.value===current;
 }
-const AI_REQUESTED_FIELDS=new Set(['lowtracks','wspd250','wspd300','wspd850','absv500','t700','t850','t925','t1000','mslp','t2m','wspd10','apcp','apcp6h','apcp24h','apcp48h']);
+const AI_REQUESTED_FIELDS=new Set(['wspd250','wspd300','wspd850','absv500','t700','t850','t925','t1000','mslp','t2m','wspd10','apcp','apcp6h','apcp24h','apcp48h']);
 function fieldAllowedForModelSet(fieldKey,modelSet){
- if(fieldKey==='lowtracks')return true;
  if(fieldKey==='flightcat')return modelSet!=='ai-models';
  if(modelSet==='ai-models')return AI_REQUESTED_FIELDS.has(fieldKey);
  if(modelSet==='gfs-versions')return !['wspd250','t1000','q2m'].includes(fieldKey)&&!RRFS_SNOW_KEYS.has(fieldKey)&&!['apcp1h','snow1h','snow3h','snow6h','snow24h','snow48h','asnow','snowc','mxuphl','mxuphl_run'].includes(fieldKey);
@@ -501,6 +502,209 @@ function observationPath(time){
  return root+observationHourKey(time)+'.json';
 }
 function aviationObservationField(){return st.field==='vis'?'visibility_mi':st.field==='ceil'?'ceiling_ft_agl':st.field==='flightcat'?'flightcat':null;}
+
+// Quantitative reports use a separate on-screen canvas, not MapLibre symbol
+// fonts. The source-free basemap has no glyph endpoint, so text layers would
+// silently fail on restricted/mobile browsers. Canvas stroke/fill also permits
+// precise two-tone casing and deterministic PNG capture.
+const AMOUNT_REPORT_EMPTY={type:'FeatureCollection',features:[]};
+const AMOUNT_REPORT_ROOT='data/precip_snow_reports/';
+function amountReportKind(field=st.field){
+ if(/^(?:apcp(?:1h|3h|6h|24h|48h)?|tsnowp|weasd|frozr|frzr)$/.test(field))return 'precip';
+ if(/^(?:snow(?:1h|3h|6h|24h|48h)|asnow|(?:gfs|rrfs)_snow_.*)$/.test(field))return 'snowfall';
+ if(field==='snod'||field==='snowc')return 'depth';
+ return null;
+}
+function amountReportTargetHours(field=st.field){
+ const m=String(field).match(/(?:apcp|snow|snow_.*?)(1|3|6|24|48)h$/);
+ if(m)return Number(m[1]);
+ if(field==='apcp'||field==='asnow'||/^(?:gfs|rrfs)_snow_/.test(field))return Math.max(0,st.hour);
+ return null;
+}
+function amountReportsEnabled(){return !!amountReportKind()&&(st.amountReportEnabled.cocorahs||st.amountReportEnabled.metar);}
+function amountReportPath(type,date){return AMOUNT_REPORT_ROOT+type+'/'+date+'.json';}
+function amountReportYMD(when){return when.toISOString().slice(0,10).replace(/-/g,'');}
+async function fetchAmountReportFile(type,key){
+ const id=type+':'+key,prior=st.amountReportCache.get(id);
+ const now=Date.now(),date=type==='hourly'?Date.parse(key.slice(0,4)+'-'+key.slice(4,6)+'-'+key.slice(6,8)+'T'+key.slice(8,10)+':00:00Z'):
+    Date.parse(key.slice(0,4)+'-'+key.slice(4,6)+'-'+key.slice(6,8)+'T12:00:00Z');
+ const ttl=(Number.isFinite(date)&&now-date<3*86400000)?(prior?.missing?60000:180000):3600000;
+ if(prior&&now-prior.at<ttl)return prior;
+ let result={features:[],missing:true,at:now};
+ try{
+  const response=await fetch(amountReportPath(type,key),{cache:'no-store'});
+  if(response.ok){const obj=await response.json();
+   if(obj?.type!=='FeatureCollection'||obj?.schema!=='omd-evu-precip-snow-reports-1'||!Array.isArray(obj.features))
+    throw Error('Unexpected observation report schema');
+   result={features:obj.features.filter(f=>f?.geometry?.type==='Point'&&Array.isArray(f.geometry.coordinates)&&
+     f.geometry.coordinates.length>=2&&Number.isFinite(f.geometry.coordinates[0])&&Number.isFinite(f.geometry.coordinates[1])&&
+     ['metar','cocorahs'].includes(f.properties?.source)),missing:false,at:now};
+  }else if(response.status!==404)throw Error('HTTP '+response.status);
+ }catch(e){console.warn('Quantitative reports:',type,key,String(e));}
+ st.amountReportCache.delete(id);st.amountReportCache.set(id,result);
+ while(st.amountReportCache.size>38)st.amountReportCache.delete(st.amountReportCache.keys().next().value);
+ return result;
+}
+// Only valid-hour AND matching-accumulation records belong on the selected
+// forecast frame. A CoCoRaHS local wall-clock observation is not a UTC time:
+// without provider-supplied UTC end-time metadata, leave it out instead of
+// assigning the same daily total to many different hours.
+function amountReportSelection(features,when,field=st.field){
+ const kind=amountReportKind(field);if(!kind||!when)return [];
+ const valueName=kind==='precip'?'precip_in':kind==='snowfall'?'snowfall_in':'snow_depth_in';
+ const target=amountReportTargetHours(field),best=new Map(),valid=when.getTime();
+ for(const f of features){
+  const props=f.properties||{},source=props.source;
+  if(!st.amountReportEnabled[source])continue;
+  const value=Number(props[valueName]);
+  if(props[valueName]==null||!Number.isFinite(value)||value<0||value>250)continue;
+  // SNINCR is snow-depth increase, not an independently measured new-snow
+  // accumulation. Do not place it on snowfall accumulation panels.
+  if(kind==='snowfall'&&props.snowfall_is_depth_increase)continue;
+  const observedUTC=props.end_utc||(source==='metar'?(props.sample_utc||props.last_sample_utc):null);
+  const stamp=Date.parse(observedUTC||'');
+  if(!Number.isFinite(stamp)||Math.abs(valid-stamp)>30*60000)continue;
+  const period=Number(props.period_hours);
+  if(kind!=='depth'){
+   if(!(Number.isFinite(target)&&target>0&&Number.isFinite(period)&&period===target))continue;
+  }
+  const point=f.geometry?.coordinates;
+  if(!Array.isArray(point)||point.length<2||!Number.isFinite(point[0])||!Number.isFinite(point[1]))continue;
+  const score=Math.abs(valid-stamp)/60000;
+  const key=source+':'+String(props.station||'')+':'+kind;
+  const current=best.get(key);
+  const report={point,source,value,period:Number.isFinite(period)&&period>0?period:null,props,kind,score};
+  if(!current||current.score>score)best.set(key,report);
+ }
+ return [...best.values()].sort((a,b)=>(a.value===0)-(b.value===0)||a.score-b.score);
+}
+function selectedAmountReports(){
+ const key=[st.field,st.ref?.id,st.hour,st.amountReportVersion||0,
+   st.amountReportEnabled.cocorahs?1:0,st.amountReportEnabled.metar?1:0].join('|');
+ if(st.amountReportSelectionKey!==key){st.amountReportSelectionKey=key;
+  st.amountReportSelected=amountReportSelection(st.amountReports||[],obsValidDate());}
+ return st.amountReportSelected||[];
+}
+function amountReportLabel(report){
+ const {value,kind,props}=report;
+ const digits=kind==='precip'?2:kind==='snowfall'?1:0;
+ const trace=props[(kind==='precip'?'precip_in':'snowfall_in')+'_trace'];
+ // The source and accumulation period are in the popup, not repeated on map.
+ return trace?'T':value.toFixed(digits);
+}
+function amountReportColor(report){
+ const meta=report.kind==='precip'?FIELDS.apcp24h:FIELDS.snod;
+ const p=report.kind==='depth'&&st.field==='snowc'?basePal(FIELDS.snod,{name:'snod'}):
+  pal(meta,{name:report.kind==='precip'?'apcp24h':'snod'});
+ const value=report.value;
+ const levels=p.levels||[],colors=p.colors||[];
+ if(!levels.length)return '#e8f1fc';
+ if(value<levels[0])return '#e4edf8';
+ let i=0;while(i<colors.length-1&&value>=levels[i+1])i++;
+ const color=colors[i]||'#e4edf8';
+ return /^#[0-9a-f]{6}$/i.test(color)?color:'#e4edf8';
+}
+function drawAmountReportCanvas(p,{capture=false}={}){
+ const map=p?.map,canvas=p?.amountReportCanvas;if(!map||!canvas)return false;
+ const kind=amountReportKind(),visible=kind&&amountReportsEnabled()&&!p.cfg?.differencePanel;
+ canvas.style.display=visible?'block':'none';
+ if(!visible||p.geoMoving&&!capture)return false;
+ const rect=map.getCanvas(),width=rect?.clientWidth||0,height=rect?.clientHeight||0;
+ if(width<20||height<20)return false;
+ const dpr=Math.min(2,Math.max(1,devicePixelRatio||1)),pxW=Math.round(width*dpr),pxH=Math.round(height*dpr);
+ if(canvas.width!==pxW||canvas.height!==pxH){canvas.width=pxW;canvas.height=pxH;}
+ const ctx=canvas.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
+ const pointSize=map.getZoom()<3?11:map.getZoom()<6?12:12.5;
+ ctx.font=`800 ${pointSize}px Arial, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
+ const occupied=new Set(),cellW=78,cellH=29;
+ const maxLabels=touchGraphicsDevice()?125:320;
+ const accepted=[],all=selectedAmountReports();
+ const bounds=map.getBounds?.();
+ for(const r of all){
+  if(accepted.length>=maxLabels)break;
+  if(bounds&&!bounds.contains(r.point))continue;
+  const pixel=map.project(r.point);const x=pixel.x,y=pixel.y;
+  if(!Number.isFinite(x)||!Number.isFinite(y)||x<5||y<8||x>width-5||y>height-9)continue;
+  const label=amountReportLabel(r),w=ctx.measureText(label).width+12,h=pointSize+7;
+  const cx=Math.floor(x/cellW),cy=Math.floor(y/cellH);
+  let collide=false;
+  for(let iy=cy-1;iy<=cy+1&&!collide;iy++)for(let ix=cx-1;ix<=cx+1;ix++)
+   if(occupied.has(ix+','+iy)){collide=true;break;}
+  if(collide)continue;
+  occupied.add(cx+','+cy);
+  // Dark, almost opaque backing and light text maintain contrast against
+  // all precipitation palettes, map outlines and terrain. A narrow source-
+  // neutral accent indicates the observation is quantitative.
+  const left=x-w/2,top=y-h/2;
+  ctx.fillStyle='rgba(5,16,29,.90)';ctx.fillRect(left,top,w,h);
+  ctx.strokeStyle='rgba(226,237,251,.88)';ctx.lineWidth=.85;ctx.strokeRect(left+.5,top+.5,w-1,h-1);
+  ctx.fillStyle='#ffffff';ctx.fillText(label,x,y);
+  accepted.push({...r,x,y,label});
+ }
+ canvas.style.visibility='visible';p.amountReportHits=accepted;
+ return true;
+}
+function amountReportPopupText(report){
+ const r=report.props||{},desc=report.kind==='precip'?'Accumulated precipitation':report.kind==='depth'?'Snow on ground':
+   r.snowfall_is_depth_increase?'One-hour increase in snow depth (not new snowfall)':'New snowfall';
+ return `${report.source==='cocorahs'?'CoCoRaHS':'METAR'} ${r.station||''}${r.provider?' (via '+r.provider+')':''}\n${desc}: ${report.value.toFixed(report.kind==='precip'?2:1)} in\n`+
+  `Period: ${report.period||'instantaneous'}${report.period?' hours':''}\n`+
+  `Report: ${r.report_date||r.sample_utc||r.end_utc||'time not specified'} ${r.report_local_time||''}\n`+
+  (r.report_type||'')+((r.time_basis==='single-zone-state')?'\nUTC converted from station-state timezone':'');
+}
+function attachAmountReportClicks(p){
+ if(p.amountReportClickBound||!p.map)return;p.amountReportClickBound=true;
+ p.map.on('click',e=>{
+  if(!amountReportsEnabled()||!p.amountReportHits?.length)return;
+  let nearest=null,d=18*18;
+  for(const r of p.amountReportHits){const distance=(r.x-e.point.x)**2+(r.y-e.point.y)**2;
+   if(distance<d){nearest=r;d=distance;}}
+  if(nearest){
+   p.amountReportPopup?.remove();
+   const popup=new maplibregl.Popup({closeButton:true,closeOnClick:false,closeOnMove:false,
+     maxWidth:'270px',className:'evu-report-popup'})
+     .setLngLat(nearest.point).setText(amountReportPopupText(nearest)).addTo(p.map);
+   p.amountReportPopup=popup;
+   // MapLibre's popup is otherwise below the independent amount-report
+   // canvas. Portal it to the same frame (like low-track popups) to put the
+   // report details above labels, while MapLibre maintains positioning.
+   const node=popup.getElement?.();
+   if(node&&p.frame)p.frame.appendChild(node);
+  }
+ });
+}
+function syncAmountReportsPanel(p){
+ if(!p?.map)return;
+ attachAmountReportClicks(p);
+ drawAmountReportCanvas(p);
+}
+function syncAllAmountReports(){
+ for(const p of st.active||[])syncAmountReportsPanel(p);
+ if(el.amountReportsCount){
+  const shown=selectedAmountReports().length;
+  el.amountReportsCount.hidden=!amountReportKind()||!amountReportsEnabled();
+  el.amountReportsCount.textContent=shown?`${shown.toLocaleString()} reports available (labels thin at current zoom)`:
+   st.amountReportStatus||(st.amountReports?.some(f=>f?.properties?.source==='cocorahs'&&!f.properties?.end_utc)?
+    'No exact-hour match (some CoCoRaHS reports lack resolved UTC times)':'No valid-hour / accumulation-period matches');
+ }
+}
+async function refreshAmountReports(){
+ const token=++st.amountReportToken;
+ if(!amountReportsEnabled()||!st.ref){st.amountReports=[];st.amountReportVersion=(st.amountReportVersion||0)+1;st.amountReportStatus='';syncAllAmountReports();return;}
+ const valid=obsValidDate();if(!valid||valid.getTime()>Date.now()+10*60000){
+  st.amountReports=[];st.amountReportVersion=(st.amountReportVersion||0)+1;st.amountReportStatus='Observed amounts not yet available';syncAllAmountReports();return;}
+ const dailyDates=[amountReportYMD(valid),amountReportYMD(new Date(valid.getTime()-86400000))];
+ const hourDates=[observationHourKey(valid),observationHourKey(new Date(valid.getTime()-3600000))];
+ const requests=[];
+ if(st.amountReportEnabled.cocorahs)for(const day of dailyDates)requests.push(fetchAmountReportFile('daily',day));
+ if(st.amountReportEnabled.metar)for(const hour of hourDates)requests.push(fetchAmountReportFile('hourly',hour));
+ const result=await Promise.all(requests);
+ if(token!==st.amountReportToken||obsValidDate()?.getTime()!==valid.getTime())return;
+ st.amountReports=result.flatMap(x=>x.features);st.amountReportVersion=(st.amountReportVersion||0)+1;
+ st.amountReportStatus=result.every(x=>x.missing)?'Observation amount files not yet published':
+  st.amountReports.length?'':'No reports in published observation files';
+ syncAllAmountReports();
+}
 function observationVisible(){return (RADAR_REPORT_FIELDS.has(st.field)||!!aviationObservationField())&&!!st.cfg?.ptypeObservations?.enabled;}
 function observationSetCount(){
  if(!el.obsCount)return;
@@ -904,8 +1108,8 @@ async function refreshLightningReports(){
 /* OMD EVU autumnplot-gl + MapLibre GL viewer. Zarr-v2 decoding stays browser-native. */
 'use strict';
 const $=id=>document.getElementById(id);
-const el=Object.fromEntries(['viewerRefreshBtn','userGuideBtn','userGuideDialog','userGuideClose','userGuideDone','imageOpacity','imageOpacityLabel','interpolateToggleBtn','spcControl','spcToggleBtn','spcCount','lightningControl','lightningToggleBtn','lightningLegend','lightningCount','lowTracksOption','lowTracksToggleBtn','surfaceMSLPOption','surfaceMSLPToggleBtn','obsControl','obsSynoptic','obsMping','obsCount','obsAttribution','contourOption','windSpeedOption','windSpeedToggleBtn','dewpointOption','dewpointToggleBtn','spfhOption','spfhToggleBtn','mslp850Option','mslp850ToggleBtn','exportKindFieldset','exportGifChoice','exportVideoChoice','exportVideoNotice','exportLabelFieldset','exportRatioFieldset','exportFramingFieldset','exportGifOptions','exportGifStart','exportGifStartLabel','exportGifEnd','exportGifEndLabel','exportGifStep','exportGifDelay','exportGifQuality','exportLargeLabels','exportNoLabels','exportScroll','exportGifDelayLabel','exportGifSummary','modelSetSelect','snowMethodControl','snowMethodWeasd','snowMethodPrecip','snowRatioControl','snowRatioSlider','snowRatioValue','differenceDialog','differenceDialogPair','differenceOpenBtn','differenceCancelBtn','differenceWindow','differenceMap','differenceMessage','differenceDragHandle','differenceWindowTitle','differenceWindowSubtitle','differenceCloseBtn','differenceSaveBtn','differenceSample','differenceLegendUnit','overlayStyleDialog','overlayStyleHeading','overlayStyleColor','overlayStyleAutoContrast','overlayStyleAutoContrastRow','overlayStyleWidth','overlayStyleWidthValue','overlayStyleDensity','overlayStyleDensityValue','overlayStyleDensityRow','overlayStyleTracerSpeed','overlayStyleTracerSpeedValue','overlayStyleTracerSpeedRow','overlayStyleClose','overlayStyleReset','overlayStyleDone','mapLayersMenuBtn','mapLayersMenuPopup','mapOutlinesToggleBtn','countiesToggleBtn','citiesToggleBtn','roadsToggleBtn','overlayStyleCityNamesRow','overlayStyleCityNames','overlayStyleCityFontRow','overlayStyleCityFont','overlayStyleCityFontValue','overlayStyleCitiesValuesRow','overlayStyleCitiesValues','citiesOption','overlayStyleOpacity','overlayStyleOpacityValue','overlayStyleOpacityRow','overlayStyleExaggeration','overlayStyleExaggerationValue','overlayStyleExaggerationRow','overlayStyleSunAngle','overlayStyleSunAngleValue','overlayStyleSunAngleRow','overlayStyleReliefStrength','overlayStyleReliefStrengthValue','overlayStyleReliefStrengthRow','geographyNotice','mapBackgroundToggleBtn','terrainToggleBtn','terrainPanelsEditBtn','terrainPanelPopup','terrainPanelChoices','terrainPanelsAllBtn','terrainPanelsNoneBtn','terrainPanelsCancelBtn','terrainPanelsDoneBtn','terrainNotice','tracersToggleBtn','tracersOption','shortcutsBtn','shortcutsDialog','shortcutsClose','shortcutsDone','terrainCredit','terrainState','terrainProviderLink','contourControl','contourToggleBtn','heightOption','heightToggleBtn','marineWindOption','marineWindToggleBtn','windOption','windToggleBtn','fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','releaseUpdateNotice','releaseUpdateText','releaseUpdateBtn','releaseUpdateDismiss','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportDialogHelp','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels','rotationSharedLegend','rotationSharedLegendTitle','rotationSharedLegendCanvas','rotationSharedLegendLabels','differenceSharedLegend','differenceSharedLegendTitle','differenceSharedLegendCanvas','differenceSharedLegendLabels','legendResetBtn','legendRangePopup','legendRangeForm','legendRangeMessage','legendRangeError','legendMinSlider','legendMaxSlider','legendMinNumber','legendMaxNumber','legendRangeApplyBtn','legendRangeResetBtn','legendCancelBtn','legendPalFile','legendPalName','legendPalRemoveBtn','legendPalStatus'].map(x=>[x,$(x)]));
-const st={lowTrackBackground:'mslp',shadedFields:new Map(),overlayWindSpeed850:false,snowMethod:'weasd',mapOutlines:true,countiesEnabled:false,citiesEnabled:false,roadsEnabled:false,roadsCatalog:null,roadsLoadPromise:null,citiesCatalog:null,citiesLoadPromise:null,mapBackground:true,terrainEnabled:false,terrainPanelIds:new Set(),terrainPanelDraft:null,tracersEnabled:false,overlayStyles:{dark:{},light:{}},mapOutlineFieldStyles:{dark:{},light:{}},lightningEnabled:false,lightningCache:new Map(),lightningCurrent:null,lightningLoadToken:0,spcEnabled:false,spcCache:new Map(),spcCurrent:[],spcLoadToken:0,imageOpacity:1,interpolate:false,lowTracksEnabled:true,overlayMSLP:true,overlayMSLP850:true,overlayDewpoint:true,overlaySpfh:false,cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,overlaySevereWind:true,overlayMarineWind:true,overlayWaveDirection:false,difference:{selected:[],open:false,map:null,layer:null,component:null,grid:null,token:0,timer:null,resizeObserver:null,geo:null,fieldKey:null,snapshot:null,saveBusy:false,mouseSampling:false,liveCanvas:null,liveToken:0,liveTimer:null,outlineCache:null,warmKey:null,warmSerial:0},mrmsAccumCache:null,rotationTrackAccumCache:null,alignedAccumCache:null,alignedSource:null,geoCache:new Map(),geoInflight:new Map(),geoRetryTimers:new Map(),geoFailed:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,lastFieldByGroup:new Map(),hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",exportNoLabels:false,hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0,obsCache:new Map(),obsCurrent:null,obsLoadToken:0,obsEnabled:{synoptic:true,mping:true},colorRanges:new Map(),customPalettes:new Map(),legendSelection:null,legendEditorMeta:null};
+const el=Object.fromEntries(['viewerRefreshBtn','userGuideBtn','userGuideDialog','userGuideClose','userGuideDone','imageOpacity','imageOpacityLabel','interpolateToggleBtn','spcControl','spcToggleBtn','spcCount','lightningControl','lightningToggleBtn','lightningLegend','lightningCount','lowTracksOption','lowTracksToggleBtn','lowTracksStatus','surfaceMSLPOption','surfaceMSLPToggleBtn','surfaceWeatherOption','surfaceWeatherToggleBtn','surfaceWeatherCentersBtn','surfaceWeatherPressureBtn','surfaceWeatherFrontsBtn','surfaceWeatherTroughsBtn','surfaceWeatherDrylinesBtn','surfaceWeatherStatus','surfaceWeatherRetryBtn','obsControl','obsSynoptic','obsMping','obsCount','obsAttribution','amountReportsControl','amountReportsCocorahs','amountReportsMetar','amountReportsCount','contourOption','windSpeedOption','windSpeedToggleBtn','dewpointOption','dewpointToggleBtn','spfhOption','spfhToggleBtn','mslp850Option','mslp850ToggleBtn','exportKindFieldset','exportGifChoice','exportVideoChoice','exportVideoNotice','exportLabelFieldset','exportRatioFieldset','exportFramingFieldset','exportGifOptions','exportGifStart','exportGifStartLabel','exportGifEnd','exportGifEndLabel','exportGifStep','exportGifDelay','exportGifQuality','exportLargeLabels','exportNoLabels','exportScroll','exportGifDelayLabel','exportGifSummary','modelSetSelect','snowMethodControl','snowMethodWeasd','snowMethodPrecip','snowRatioControl','snowRatioSlider','snowRatioValue','differenceDialog','differenceDialogPair','differenceOpenBtn','differenceCancelBtn','differenceWindow','differenceMap','differenceMessage','differenceDragHandle','differenceWindowTitle','differenceWindowSubtitle','differenceCloseBtn','differenceSaveBtn','differenceSample','differenceLegendUnit','overlayStyleDialog','overlayStyleHeading','overlayStyleColor','overlayStyleLineStyleRow','overlayStyleLineStyle','overlayStyleAutoContrast','overlayStyleAutoContrastRow','overlayStyleWidth','overlayStyleWidthValue','overlayStyleDensity','overlayStyleDensityValue','overlayStyleDensityRow','overlayStyleTracerSpeed','overlayStyleTracerSpeedValue','overlayStyleTracerSpeedRow','overlayStyleClose','overlayStyleReset','overlayStyleDone','mapLayersMenuBtn','mapLayersMenuPopup','mapOutlinesToggleBtn','countiesToggleBtn','citiesToggleBtn','roadsToggleBtn','overlayStyleCityNamesRow','overlayStyleCityNames','overlayStyleCityFontRow','overlayStyleCityFont','overlayStyleCityFontValue','overlayStyleCitiesValuesRow','overlayStyleCitiesValues','citiesOption','overlayStyleOpacity','overlayStyleOpacityValue','overlayStyleOpacityRow','overlayStyleExaggeration','overlayStyleExaggerationValue','overlayStyleExaggerationRow','overlayStyleSunAngle','overlayStyleSunAngleValue','overlayStyleSunAngleRow','overlayStyleReliefStrength','overlayStyleReliefStrengthValue','overlayStyleReliefStrengthRow','geographyNotice','mapBackgroundToggleBtn','terrainToggleBtn','terrainPanelsEditBtn','terrainPanelPopup','terrainPanelChoices','terrainPanelsAllBtn','terrainPanelsNoneBtn','terrainPanelsCancelBtn','terrainPanelsDoneBtn','terrainNotice','tracersToggleBtn','tracersOption','shortcutsBtn','shortcutsDialog','shortcutsClose','shortcutsDone','terrainCredit','terrainState','terrainProviderLink','contourControl','contourToggleBtn','heightOption','heightToggleBtn','marineWindOption','marineWindToggleBtn','windOption','windToggleBtn','fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','releaseUpdateNotice','releaseUpdateText','releaseUpdateBtn','releaseUpdateDismiss','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn','mobileStepBackBtn','mobilePlayPauseBtn','mobileStepForwardBtn','mobileFrameLabel','mobileFrameValidLabel','speedDownBtn','speedUpBtn','speedValue','exportDialog','exportForm','exportCloseBtn','exportCancelBtn','exportConfirmBtn','exportBusyStatus','exportDialogTitle','exportDialogHelp','exportSize169','exportSize43','resetViewBtn','copyLinkBtn','saveAllPngBtn','mapViewSelect','themeToggleBtn','controlsPositionBtn','mobileControlsBtn','viewerGrid','dataStatus','sharedLegend','sharedLegendTitle','sharedLegendCanvas','sharedLegendLabels','rotationSharedLegend','rotationSharedLegendTitle','rotationSharedLegendCanvas','rotationSharedLegendLabels','differenceSharedLegend','differenceSharedLegendTitle','differenceSharedLegendCanvas','differenceSharedLegendLabels','legendResetBtn','legendRangePopup','legendRangeForm','legendRangeMessage','legendRangeError','legendMinSlider','legendMaxSlider','legendMinNumber','legendMaxNumber','legendRangeApplyBtn','legendRangeResetBtn','legendCancelBtn','legendPalFile','legendPalName','legendPalRemoveBtn','legendPalStatus'].map(x=>[x,$(x)]));
+const st={surfaceWeatherEnabled:false,surfaceWeatherSettings:{centers:true,pressure:true,fronts:true,troughs:true,drylines:true},shadedFields:new Map(),overlayWindSpeed850:false,snowMethod:'weasd',mapOutlines:true,countiesEnabled:false,citiesEnabled:false,roadsEnabled:false,roadsCatalog:null,roadsLoadPromise:null,citiesCatalog:null,citiesLoadPromise:null,mapBackground:true,terrainEnabled:false,terrainPanelIds:new Set(),terrainPanelDraft:null,tracersEnabled:false,overlayStyles:{dark:{},light:{}},mapOutlineFieldStyles:{dark:{},light:{}},lightningEnabled:false,lightningCache:new Map(),lightningCurrent:null,lightningLoadToken:0,spcEnabled:false,spcCache:new Map(),spcCurrent:[],spcLoadToken:0,imageOpacity:1,interpolate:false,lowTracksEnabled:false,overlayMSLP:true,overlayMSLP850:true,overlayDewpoint:true,overlaySpfh:false,cacheStats:{network:0,disk:0,decoded:0,displayReady:0,shared:0,decodedEvicted:0,displayEvicted:0},contours:false,overlayHeight:true,overlayUpperWind:true,overlaySurfaceWind:true,overlayNearSurfaceWind:false,overlaySevereWind:true,overlayMarineWind:true,overlayWaveDirection:false,difference:{selected:[],open:false,map:null,layer:null,component:null,grid:null,token:0,timer:null,resizeObserver:null,geo:null,fieldKey:null,snapshot:null,saveBusy:false,mouseSampling:false,liveCanvas:null,liveToken:0,liveTimer:null,outlineCache:null,warmKey:null,warmSerial:0},mrmsAccumCache:null,rotationTrackAccumCache:null,alignedAccumCache:null,alignedSource:null,geoCache:new Map(),geoInflight:new Map(),geoRetryTimers:new Map(),geoFailed:new Map(),cfg:null,sources:new Map(),primary:null,cycles:[],runPinned:false,ref:null,field:null,lastFieldByGroup:new Map(),hour:0,panels:[],theme:'dark',mode:'lambert',seq:0,active:[],columnCount:1,mapView:null,mapViews:{lambert:null,globe:null},rendering:false,playing:false,syncing:false,observer:null,cache:new Map(),cacheBytes:0,displayCache:new Map(),displayCacheBytes:0,displayInflight:new Map(),inflight:new Map(),queue:[],running:0,clock:0,loopSpeedIndex:2,prefetchTimer:null,prefetchGeneration:0,prefetchActive:0,prefetchAttempted:new Map(),prefetchContext:null,prefetchBatchRunning:false,prefetchBatchToken:null,prefetchFocus:null,prefetchSeenForFocus:new Set(),prefetchCompleted:0,prefetchFailed:0,prefetchBySource:new Map(),prefetchDirection:1,lastUserActivity:Date.now(),chunkStore:null,compressedInflight:new Map(),queuedFetches:new Map(),exportSelection:null,exporting:false,lastExportRatio:"16:9",lastExportFraming:"fill",exportNoLabels:false,hover:null,hoverRaf:0,exportRender:false,expandedPanel:null,mapInitQueue:Promise.resolve(),mobilePressureCap:null,contextLossCount:0,obsCache:new Map(),obsCurrent:null,obsLoadToken:0,obsEnabled:{synoptic:true,mping:true},amountReportEnabled:{cocorahs:true,metar:true},amountReportCache:new Map(),amountReportToken:0,amountReports:[],amountReportStatus:'',colorRanges:new Map(),customPalettes:new Map(),legendSelection:null,legendEditorMeta:null};
 const q=new URLSearchParams(location.search),pad3=n=>String(n).padStart(3,'0');
 const fmt=x=>{const d=new Date(x);return Number.isFinite(+d)?d.toISOString().slice(0,16).replace('T',' ')+'Z':'—'};
 const valid=(ds,h)=>new Date(Date.parse(ds.init_time)+h*3600000);
@@ -1063,6 +1267,7 @@ function fieldInfo(v,requested=st.field,sourceModel=''){
   :v.name==='ptype'&&isHRRR?'Derived precipitation type'
   :dominantMean?'Ensemble dominant precipitation type'
   :v.name==='ptype'?'Dominant precipitation type'
+  :v.name==='rh2m'&&isRefsMean&&v.attrs?.derivation_note?'2-m RH · derived from mean T/Td where needed'
   :meanFraction?meta.label+' · weighted mean'
   :gfsSnowSpec(requested)?.method==='slr10'?
    (gfsSnowSpec(requested).period?gfsSnowSpec(requested).period+'h ':'')+'snowfall ('+activeSnowRatio(requested)+':1) · '+gfsSnowMethodLabel(requested):meta.label;
@@ -1095,7 +1300,8 @@ function panelFieldInfo(p,v){
   return {...base,label:'NOHRSC observed '+(period?period+'-hour':'accumulated')+' snowfall'};
  }
  const requested=typeof panelSelectedField==='function'?panelSelectedField(p):(p?.cfg?.field||st.field);
- const base=fieldInfo(v,requested,p?.ds?.model||p?.cfg?.source);
+ const base=p?.analysisCategoricalOnly&&requested==='refc_ptype'?fieldInfo(v,'ptype',p?.ds?.model||p?.cfg?.source):
+  fieldInfo(v,requested,p?.ds?.model||p?.cfg?.source);
  if(!p?.cfg?.differencePanel)return base;
  // Do not create a fake signed palette or label for an ordinal category.
  if(DIFFERENCE_BLOCKED_FIELDS.has(requested))
@@ -1136,7 +1342,14 @@ function exceedsDisplayLimit(x,m){
   x>m.maxValidDisplay+Math.max(1e-6,m.maxValidDisplay*1e-6);
 }
 function formatReadout(x,m){
- if(!Number.isFinite(x)||x < -1e9||exceedsDisplayLimit(x,m))return '—';
+ if(!Number.isFinite(x)||x < -1e9)return '—';
+ // Absolute aviation fields retain their native over-range categories in
+ // point sampling even though their color-fill deliberately masks them.
+ // Exactly at the advertised upper bin is likewise a capped category.
+ if(!m?.differenceField&&Number.isFinite(m?.maxValidDisplay)&&
+    x>=m.maxValidDisplay-Math.max(1e-6,m.maxValidDisplay*1e-6))
+  return `${m.maxValidDisplay}+`;
+ if(exceedsDisplayLimit(x,m))return '—';
  if(m?.minimumDisplayPrecipIn&&x<MIN_DISPLAY_PRECIP_IN)return '—';
  if(m?.minimumDisplaySnowIn&&x<MIN_DISPLAY_SNOW_IN)return '—';
  if(m.ptypeReflectivity){
@@ -1179,14 +1392,17 @@ function layout(){
 }
 // Live geography uses a single clean outline stroke. Export geography retains
 // its existing two-tone casing; do not modify export rendering.
-const STYLE_LAYERS=['mapOutlines','counties','terrain','mapBackground','dewpoint','specificHumidity','windSpeed','contours','wind','waveDirection','height','temperature','tracers','cities','roads'];
+const CONTOUR_STYLE_LAYERS=new Set(['dewpoint','specificHumidity','windSpeed','contours','mslpContours','height','temperature']);
+const VALID_CONTOUR_LINE_STYLES=new Set(['auto','solid','dashed','dotted','dash-dot']);
+const STYLE_LAYERS=['mapOutlines','counties','terrain','mapBackground','dewpoint','specificHumidity','windSpeed','contours','mslpContours','wind','waveDirection','height','temperature','tracers','cities','roads'];
 // Default applies only when no theme-specific terrain opacity is saved.
 const DEFAULT_TERRAIN_OPACITY=.8;
-const OVERLAY_STYLE_DEFAULTS={dewpoint:'#27f0dd',specificHumidity:'#ff84fa',windSpeed:'#f1b73a',mapOutlines:'#f4f8fc',mapBackground:'#0b2238',contours:'#102536',wind:'#102538',waveDirection:'#fff6d1',height:'#102536',temperature:'#ffffff',tracers:'#8fe8f6',counties:'#bfd0dd',cities:'#f5fcff',roads:'#a8b7c8'};
+const OVERLAY_STYLE_DEFAULTS={dewpoint:'#27f0dd',specificHumidity:'#ff84fa',windSpeed:'#f1b73a',mapOutlines:'#f4f8fc',mapBackground:'#0b2238',contours:'#102536',mslpContours:'#000000',wind:'#102538',waveDirection:'#fff6d1',height:'#102536',temperature:'#ffffff',tracers:'#8fe8f6',counties:'#bfd0dd',cities:'#f5fcff',roads:'#a8b7c8'};
 // Wave arrows and wind barbs have independent styling. Unlike wind barbs,
 // marine arrows use a light default on dark maps and a dark default on light.
 function defaultOverlayStyleColor(layer){
- if(layer==='contours'&&st.field!=='mslp')return st.theme==='dark'?'#f5faff':'#193145';
+ if(layer==='mslpContours')return '#000000';
+ if(layer==='contours')return st.theme==='dark'?'#f5faff':'#193145';
  if(layer==='waveDirection')return st.theme==='dark'?'#fff6d1':'#21364a';
  if(layer==='tracers')return st.theme==='dark'?'#8fe8f6':'#12647d';
  if(layer==='roads')return st.theme==='dark'?'#8ca5b4':'#8393a4';
@@ -1264,6 +1480,7 @@ function validOverlayStyle(item,layer=null){
  const width=Number(item.width),density=Number(item.density),speed=item.speed===undefined?2.5:Number(item.speed);
  return {color:/^#[0-9a-f]{6}$/i.test(item.color||'')?item.color:null,
   autoContrast:typeof item.autoContrast==='boolean'?item.autoContrast:undefined,
+  lineStyle:CONTOUR_STYLE_LAYERS.has(layer)&&VALID_CONTOUR_LINE_STYLES.has(item.lineStyle)?item.lineStyle:'auto',
   width:Number.isFinite(width)?Math.max(.5,Math.min(4,width)):1.2,
   density:Number.isFinite(density)?Math.max(.5,Math.min(layer==='tracers'?10:5,density)):(layer==='tracers'?5:1),
   speed:Number.isFinite(speed)?Math.max(.25,Math.min(5,speed)):2.5,
@@ -1337,6 +1554,17 @@ function readOverlayPreferences(){
     }
    }
   }
+  // Legacy v1.2.85 accidentally saved the generic contour default swatch
+  // when a user changed only isobar density. Give MSLP its own profile and
+  // retain existing density/width while treating legacy automatic swatches as
+  // *unset*, never as an explicit white MSLP request.
+  for(const theme of ['dark','light']){
+   const styles=st.overlayStyles[theme],legacy=styles?.contours;
+   if(!legacy||styles.mslpContours)continue;
+   const raw=String(legacy.color||'').toLowerCase();
+   const defaultSwatches=['#f5faff','#193145','#102536','#000000'];
+   styles.mslpContours={...legacy,color:raw&&!defaultSwatches.includes(raw)?legacy.color:null};
+  }
   // Persist the upgrade atomically to separate keys, so a future theme switch
   // never reintroduces the old global style into the other theme.
   if(!savedOutline||!savedOverlay||String(savedOutline).includes('rrfs-refs|')||String(savedOutline).includes('gfs-versions|'))storeOverlayPreferences();
@@ -1360,11 +1588,14 @@ function setupOverlayStyleControls(){
   el[id].addEventListener('change',()=>{st[key]=el[id].checked;storeOverlayPreferences();redrawStyledOverlays();if(key==='citiesEnabled'||key==='roadsEnabled')refreshAllCityLayers();if(key==='citiesEnabled'){const credit=document.getElementById('citiesCredit');if(credit)credit.hidden=!(st.citiesEnabled&&/geonames/i.test(st.citiesSource||''));}});
  const dialog=el.overlayStyleDialog,color=el.overlayStyleColor,auto=el.overlayStyleAutoContrast,width=el.overlayStyleWidth,density=el.overlayStyleDensity,opacity=el.overlayStyleOpacity,exaggeration=el.overlayStyleExaggeration,sunAngle=el.overlayStyleSunAngle,reliefStrength=el.overlayStyleReliefStrength;
  const speedKey=document.getElementById('tracerSpeedKey'),tracerSpeed=el.overlayStyleTracerSpeed;
- let active=null;
+ const lineStyle=el.overlayStyleLineStyle;
+ let active=null,colorEdited=false;
  const refresh=()=>{
   if(!active)return;
   const target=active==='mapOutlines'?activeOutlineStyles():activeOverlayStyles();
-  target[active==='mapOutlines'?outlineStyleKey():active]={color:active==='tracers'&&auto.checked?null:color.value,autoContrast:active==='tracers'&&auto.checked,width:Number(width.value),density:Number(density.value),speed:active==='tracers'?Number(tracerSpeed.value):2,opacity:Number(opacity.value)/100,exaggeration:Number(exaggeration.value),sunAngle:Number(sunAngle.value),reliefStrength:Number(reliefStrength.value)/100,displayValue:active==='cities'?el.overlayStyleCitiesValues.checked:(overlayStyle(active).displayValue===true),showCityLabel:active==='cities'?el.overlayStyleCityNames.checked:(overlayStyle(active).showCityLabel!==false),fontSize:active==='cities'?Number(el.overlayStyleCityFont.value):(overlayStyle(active).fontSize||12)};
+  // Keep implicit, field-dependent default ink unless Color was explicitly edited.
+  const current=overlayStyle(active);
+  target[active==='mapOutlines'?outlineStyleKey():active]={lineStyle:CONTOUR_STYLE_LAYERS.has(active)?lineStyle.value:'auto',color:active==='tracers'&&auto.checked?null:(colorEdited?color.value:(current.color||null)),autoContrast:active==='tracers'&&auto.checked,width:Number(width.value),density:Number(density.value),speed:active==='tracers'?Number(tracerSpeed.value):2,opacity:Number(opacity.value)/100,exaggeration:Number(exaggeration.value),sunAngle:Number(sunAngle.value),reliefStrength:Number(reliefStrength.value)/100,displayValue:active==='cities'?el.overlayStyleCitiesValues.checked:(overlayStyle(active).displayValue===true),showCityLabel:active==='cities'?el.overlayStyleCityNames.checked:(overlayStyle(active).showCityLabel!==false),fontSize:active==='cities'?Number(el.overlayStyleCityFont.value):(overlayStyle(active).fontSize||12)};
   if(active==='tracers'){color.disabled=auto.checked;speedKey.hidden=false;}
   el.overlayStyleCityFontValue.textContent=el.overlayStyleCityFont.value+' px';
   el.overlayStyleWidthValue.textContent=Number(width.value).toFixed(1)+'×';
@@ -1381,7 +1612,10 @@ function setupOverlayStyleControls(){
    event.preventDefault();event.stopPropagation();
    if(box.dataset.styleLayer==='terrain'&&st.mode==='globe')return;
    active=box.dataset.styleLayer;
+   colorEdited=false;
    const saved=overlayStyle(active);
+   el.overlayStyleLineStyleRow.hidden=!CONTOUR_STYLE_LAYERS.has(active);
+   lineStyle.value=VALID_CONTOUR_LINE_STYLES.has(saved.lineStyle)?saved.lineStyle:'auto';
    const defaultColor=active==='mapOutlines'?liveGeographyInk().line:
      active==='mapBackground'?mapBackgroundPaint():defaultOverlayStyleColor(active);
    color.value=saved.color||defaultColor;
@@ -1428,11 +1662,13 @@ function setupOverlayStyleControls(){
    if(!dialog.open)dialog.showModal();
   });
  }
- color.addEventListener('input',refresh);el.overlayStyleCitiesValues.addEventListener('change',refresh);el.overlayStyleCityNames.addEventListener('change',refresh);el.overlayStyleCityFont.addEventListener('input',refresh);auto.addEventListener('change',refresh);width.addEventListener('input',refresh);density.addEventListener('input',refresh);tracerSpeed.addEventListener('input',refresh);opacity.addEventListener('input',refresh);exaggeration.addEventListener('input',refresh);sunAngle.addEventListener('input',refresh);reliefStrength.addEventListener('input',refresh);
+ lineStyle.addEventListener('change',refresh);color.addEventListener('input',()=>{colorEdited=true;refresh();});el.overlayStyleCitiesValues.addEventListener('change',refresh);el.overlayStyleCityNames.addEventListener('change',refresh);el.overlayStyleCityFont.addEventListener('input',refresh);auto.addEventListener('change',refresh);width.addEventListener('input',refresh);density.addEventListener('input',refresh);tracerSpeed.addEventListener('input',refresh);opacity.addEventListener('input',refresh);exaggeration.addEventListener('input',refresh);sunAngle.addEventListener('input',refresh);reliefStrength.addEventListener('input',refresh);
  el.overlayStyleReset.addEventListener('click',()=>{
   if(!active)return;
   if(active==='mapOutlines')delete activeOutlineStyles()[outlineStyleKey()];
   else delete activeOverlayStyles()[active];
+  colorEdited=false;
+  lineStyle.value='auto';
   if(active==='cities'){el.overlayStyleCitiesValues.checked=false;el.overlayStyleCityNames.checked=true;el.overlayStyleCityFont.value='12';el.overlayStyleCityFontValue.textContent='12 px';}
   color.value=active==='mapOutlines'?liveGeographyInk().line:active==='mapBackground'?themeColors().ocean:defaultOverlayStyleColor(active);
   auto.checked=active==='tracers';color.disabled=active==='terrain'||auto.checked;speedKey.hidden=active!=='tracers';
@@ -1663,7 +1899,7 @@ function createPanel(cfg,i){const card=document.createElement('section');card.cl
  expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label',`Expand ${cfg.label||cfg.id} panel`);
  expand.title=`Expand ${cfg.label||cfg.id} to fill plotting area`;
  expand.innerHTML=EXPAND_ICON;
- const view=document.createElement('div');view.className='panel-viewport';const scrollRail=document.createElement('button');scrollRail.type='button';scrollRail.className='panel-scroll-rail';scrollRail.setAttribute('aria-label',`Scroll to next model after ${cfg.label||cfg.id}`);scrollRail.title='Swipe vertically here to scroll between model panels, or tap for the next panel';scrollRail.textContent='↕ Scroll';const snap=document.createElement('img');snap.className='map-snapshot';snap.alt='Previously rendered weather plot';snap.hidden=true;const frame=document.createElement('div');frame.className='map-frame';const lbl=document.createElement('div');lbl.className='plot-label';const title=document.createElement('strong'),sub=document.createElement('span'),labelMeta=document.createElement('div');labelMeta.className='plot-label-meta';labelMeta.append(title,sub);lbl.append(labelMeta);const notice=document.createElement('div');notice.className='notice visible';const note=document.createElement('span');notice.append(note);const info=document.createElement('div');info.className='point-info';info.hidden=true;const ghost=document.createElement('div');ghost.className='sync-crosshair';ghost.hidden=true;ghost.setAttribute('aria-hidden','true');const terrainNumber=document.createElement('div');terrainNumber.className='terrain-panel-number';terrainNumber.textContent=String(i+1);terrainNumber.hidden=true;terrainNumber.setAttribute('aria-hidden','true');view.append(frame,snap,lbl,notice,info,ghost,scrollRail,terrainNumber);
+ const view=document.createElement('div');view.className='panel-viewport';const scrollRail=document.createElement('button');scrollRail.type='button';scrollRail.className='panel-scroll-rail';scrollRail.setAttribute('aria-label',`Scroll to next model after ${cfg.label||cfg.id}`);scrollRail.title='Swipe vertically here to scroll between model panels, or tap for the next panel';scrollRail.textContent='↕ Scroll';const snap=document.createElement('img');snap.className='map-snapshot';snap.alt='Previously rendered weather plot';snap.hidden=true;const frame=document.createElement('div');frame.className='map-frame';const lbl=document.createElement('div');lbl.className='plot-label';const title=document.createElement('strong'),sub=document.createElement('span'),labelMeta=document.createElement('div');labelMeta.className='plot-label-meta';labelMeta.append(title,sub);lbl.append(labelMeta);const notice=document.createElement('div');notice.className='notice visible';const note=document.createElement('span');notice.append(note);const info=document.createElement('div');info.className='point-info';info.hidden=true;const ghost=document.createElement('div');ghost.className='sync-crosshair';ghost.hidden=true;ghost.setAttribute('aria-hidden','true');const terrainNumber=document.createElement('div');terrainNumber.className='terrain-panel-number';terrainNumber.textContent=String(i+1);terrainNumber.hidden=true;terrainNumber.setAttribute('aria-hidden','true');const surfaceWeatherNotice=document.createElement('div');surfaceWeatherNotice.className='surface-weather-panel-status';surfaceWeatherNotice.hidden=true;surfaceWeatherNotice.setAttribute('aria-live','off');const lowTrackNotice=document.createElement('div');lowTrackNotice.className='low-track-panel-status';lowTrackNotice.hidden=true;lowTrackNotice.setAttribute('role','status');lowTrackNotice.setAttribute('aria-live','polite');view.append(frame,snap,lbl,notice,info,ghost,scrollRail,terrainNumber,surfaceWeatherNotice,lowTrackNotice);
  const compare=document.createElement('label');compare.className='panel-difference-selector';
  const compareCheck=document.createElement('input');compareCheck.type='checkbox';compareCheck.setAttribute('aria-label',`Select ${cfg.label||cfg.id} for difference map`);
  compare.title=`Compare ${cfg.label||cfg.id} with another panel (first selected minus second selected)`;compare.append(compareCheck);if(!cfg.placeholder){lbl.prepend(compare);view.append(save);}view.append(expand);
@@ -1686,8 +1922,17 @@ function createPanel(cfg,i){const card=document.createElement('section');card.cl
  view.addEventListener('pointerenter',restorePlotKeyboardNavigation);
  view.addEventListener('pointermove',restorePlotKeyboardNavigation,{passive:true});
  compare.addEventListener('pointerdown',e=>e.stopPropagation());compare.addEventListener('click',e=>e.stopPropagation());
- const p={terrainNumber,scrollRail,contourField:null,primaryContourField:null,mslpContourField:null,contourCanvas:null,contourFrameRequested:false,contourRafId:null,contourRedrawTimer:null,contourCache:null,cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,compare,compareCheck,legendTitle,legendCanvas,legendLabels,wind:null,marineWind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,initializing:false,cancelMapWait:null,loadingStage:'',loadSince:0,stageSince:0};
- notice.style.pointerEvents='none';card.addEventListener('click',()=>{selectPanel(p);if(!p.cfg.placeholder)activate(p).catch(e=>fail(p,e));});
+ const p={lowTrackNotice,surfaceWeatherNotice,surfaceWeatherDisplayState:{state:'idle'},terrainNumber,scrollRail,contourField:null,primaryContourField:null,mslpContourField:null,contourCanvas:null,lowTrackCanvas:null,contourFrameRequested:false,contourRafId:null,contourRedrawTimer:null,contourCache:null,cfg,i,card,view,frame,snap,title,sub,notice,note,info,ghost,save,expand,compare,compareCheck,legendTitle,legendCanvas,legendLabels,wind:null,marineWind:null,windCanvas:null,windFrameRequested:false,map:null,component:null,layer:null,rawField:null,ds:null,v:null,h:null,src:null,lastKey:null,image:null,lastSnapshot:null,grid:null,gridKey:null,status:'waiting',busy:false,geoApplied:new Set(),geoPending:new Set(),geoTimer:null,mapReady:null,activation:null,initializing:false,cancelMapWait:null,loadingStage:'',loadSince:0,stageSince:0};
+ notice.style.pointerEvents='none';card.addEventListener('click',event=>{
+  selectPanel(p);
+  // A normal map click also bubbles to this panel card. Re-running activate()
+  // on an already initialized map forces renderPanel() -> low-track setData(),
+  // which dismisses a marker popup immediately after the marker opened it.
+  // Interacting with the map OR its top-level popup must only select the panel;
+  // a click on a waiting panel can still initialize it as before.
+  if(p.map&&event.target?.closest?.('.map-frame'))return;
+  if(!p.cfg.placeholder)activate(p).catch(e=>fail(p,e));
+ });
  scrollRail.addEventListener('pointerdown',e=>e.stopPropagation());
  scrollRail.addEventListener('click',e=>{e.stopPropagation();const next=st.panels[p.i+1]||st.panels[0];if(next&&next!==p)next.card.scrollIntoView({behavior:'smooth',block:'start'});});
  save.addEventListener('click',e=>{e.stopPropagation();openExportDialog('panel',p,e);});
@@ -2252,6 +2497,25 @@ async function boot(){try{
  st.overlayMSLP=savedMSLP!=='0';
  let saved850='1';try{saved850=localStorage.getItem('omd_evu_mslp_850temp')??'1';}catch(_){}
  st.overlayMSLP850=saved850!=='0';
+ // v1.2.92: Surface weather must start OFF. Earlier releases defaulted ON
+ // and could have stored that automatic value. Reset once on upgrade, then
+ // honor explicit user choices on subsequent visits.
+ st.surfaceWeatherEnabled=false;
+ try{
+   const defaultOffKey='omd_evu_surface_weather_default_off_v1292';
+   if(localStorage.getItem(defaultOffKey)!=='1'){
+     localStorage.setItem('omd_evu_surface_weather_enabled','0');
+     localStorage.setItem(defaultOffKey,'1');
+   }else{
+     st.surfaceWeatherEnabled=localStorage.getItem('omd_evu_surface_weather_enabled')==='1';
+   }
+   const saved=JSON.parse(localStorage.getItem('omd_evu_surface_weather_settings')||'{}');
+   for(const key of Object.keys(st.surfaceWeatherSettings))if(typeof saved[key]==='boolean')st.surfaceWeatherSettings[key]=saved[key];
+ }catch(_){}
+ for(const [id,key] of [['surfaceWeatherCentersBtn','centers'],['surfaceWeatherPressureBtn','pressure'],['surfaceWeatherFrontsBtn','fronts'],['surfaceWeatherTroughsBtn','troughs'],['surfaceWeatherDrylinesBtn','drylines']]){
+   if(el[id])el[id].checked=st.surfaceWeatherSettings[key];
+ }
+ if(el.surfaceWeatherToggleBtn)el.surfaceWeatherToggleBtn.checked=st.surfaceWeatherEnabled;
  // Wind and wave directions are independent overlays. New wave plots start
  // with 10-m barbs ON and wave-direction arrows OFF; saved user changes are
  // respected. Use a new direction preference key so pre-update saved ON
@@ -2260,6 +2524,7 @@ async function boot(){try{
   ['overlayHeight','omd_evu_height_overlay',true],
   ['overlayUpperWind','omd_evu_upper_wind_overlay',true],
   ['overlaySurfaceWind','omd_evu_surface_wind_overlay',true],
+  ['overlayNearSurfaceWind','omd_evu_2m_10m_wind_barbs_v1',false],
   ['overlaySevereWind','omd_evu_severe_wind_overlay',true],
   ['overlayMarineWind','omd_evu_marine_10m_wind_overlay',true],
   ['overlayWaveDirection','omd_evu_wave_direction_overlay_v2',false]]){
@@ -2301,7 +2566,16 @@ async function boot(){try{
  // The field's actual per-model/per-hour availability is checked by choose(),
  // and a missing field remains an explicit missing-data panel (not a zero).
  const menu=fieldMenuEntries().filter(entry=>fieldAllowedForModelSet(entry.key,st.modelSet)),ordered=menu.map(entry=>entry.key);
- st.field=ordered.includes(q.get('field'))?q.get('field'):ordered.includes(st.cfg.defaultField)?st.cfg.defaultField:ordered[0];
+ // Existing bookmarks to the retired dedicated plot become a normal MSLP
+ // plot with its track overlay enabled, retaining their selected cycle/hour.
+ const legacyTrackLink=q.get('field')==='lowtracks';
+ st.field=legacyTrackLink&&ordered.includes('mslp')?'mslp':
+  ordered.includes(q.get('field'))?q.get('field'):
+  ordered.includes(st.cfg.defaultField)?st.cfg.defaultField:ordered[0];
+ let savedTracks=false;
+ try{savedTracks=localStorage.getItem('omd_evu_low_tracks_enabled')==='1';}catch(_){}
+ st.lowTracksEnabled=legacyTrackLink||
+  (q.has('tracks')?q.get('tracks')==='1':savedTracks);
  if(UPPER_AIR_IMAGE_FIELDS[st.field]?.some(([key])=>key===q.get('shade')))
   st.shadedFields.set(st.field,q.get('shade'));
  initializeFieldMenu();
@@ -2310,8 +2584,8 @@ async function boot(){try{
  st.loopSpeedIndex=LOOP_INTERVALS.reduce((best,ms,i)=>Math.abs(ms-defaultDelay)<Math.abs(LOOP_INTERVALS[best]-defaultDelay)?i:best,2);
  if(q.has('speed')){const idx=Number(q.get('speed'));if(Number.isInteger(idx)&&idx>=0&&idx<LOOP_INTERVALS.length)st.loopSpeedIndex=idx;}
  updateSpeedButtons();
- const h=Number(q.get('fhr')??st.cfg.defaultForecastHour??0);st.hour=Number.isInteger(h)&&h>=0?h:0;refreshHours();bind();syncUI();updateSharedLegend();void refreshObservationOverlay();void refreshSPCReports();void refreshLightningReports();
- ['fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn'].forEach(id=>el[id].disabled=false);el.saveAllPngBtn.disabled=false;
+ const h=Number(q.get('fhr')??st.cfg.defaultForecastHour??0);st.hour=Number.isInteger(h)&&h>=0?h:0;refreshHours();bind();syncUI();updateSharedLegend();void refreshObservationOverlay();void refreshSPCReports();void refreshLightningReports();void refreshAmountReports();
+ ['fieldMenuBtn','fieldMenuPopup','fieldMenuCategories','fieldMenuBranch','fieldMenuBack','fieldMenuBranchTitle','fieldMenuItems','fieldMenuSelected','shareLinkStatus','cycleSelect','fcstSelect','stepBackBtn','stepForwardBtn','playBtn','pauseBtn'].forEach(id=>el[id].disabled=false);syncMobileFrameController();el.saveAllPngBtn.disabled=false;
  if(!('DecompressionStream' in window))throw Error('Browser does not support zlib DecompressionStream');await waitLibraries();
  // No remote maps/tiles: map style and boundary layers are locally hosted.
  // Load the first panel *before* subscribing to intersection events. On
@@ -2328,8 +2602,8 @@ async function boot(){try{
   }
  },{root:innerWidth<=800?null:el.viewerGrid,rootMargin:'80px'});
  st.panels.filter(p=>!p.cfg.placeholder).forEach(p=>st.observer.observe(p.card));
- // Ensure the complete 3×3 workspace is initialized even if an observer
- // notification was suppressed while earlier panels were rendering.
+ // Desktop: initialize the complete 3×3 workspace. Compact touch:
+ // initialize only visible maps and release offscreen GPU slots on demand.
  void activateConfiguredPanels();
  // A map request queued while scrolling might be dropped once it finally gets
  // its initialization turn. Recheck currently visible panels after scrolling
@@ -2344,16 +2618,17 @@ async function boot(){try{
   },260);
  };
  window.addEventListener('scroll',scanVisible,{passive:true});
- window.addEventListener('resize',scanVisible,{passive:true});
+ window.addEventListener('resize',()=>{trimMapsForGpuPressure();scanVisible();},{passive:true});
  updateStatus();schedulePrefetch();startCatalogAutoRefresh();
  }catch(e){console.error(e);el.dataStatus.textContent='Viewer initialization failed: '+String(e);if(!st.panels.length)el.viewerGrid.textContent='Initialization failed: '+String(e);else st.panels.forEach(p=>setNote(p,'Initialization failed: '+String(e)));}}
-// Do not rely solely on IntersectionObserver: its enter notifications can
-// arrive during a render and be skipped, leaving (for example) only 7 of 9
-// configured panels activated until the user scrolls. Initialize all nine
-// whenever the GPU budget permits. Keep touch-device context-pressure recovery.
+// IntersectionObserver notifications can arrive during a render. Desktop
+// fills all configured map slots; compact touch devices only initialize maps
+// close to the viewport, never the nine offscreen contexts at startup.
 async function activateConfiguredPanels(){
  const candidates=st.panels.filter(p=>!p.cfg.placeholder);
- const order=[...candidates.filter(nearViewport),...candidates.filter(p=>!nearViewport(p))];
+ const mobile=touchGraphicsDevice();
+ const order=mobile?candidates.filter(nearViewport):
+  [...candidates.filter(nearViewport),...candidates.filter(p=>!nearViewport(p))];
  for(const p of order){
   if(p.map||p.cfg.placeholder)continue;
   if(mapCapacity()<candidates.length&&!nearViewport(p))continue;
@@ -2699,6 +2974,25 @@ function changeCycleAtValidTime(direction){
  void renderAll();
  return true;
 }
+function syncMobileFrameController(){
+ const playButton=el.mobilePlayPauseBtn;
+ if(!playButton)return;
+ const enabled=Boolean(st.ref&&playbackHours().length);
+ el.mobileStepBackBtn.disabled=!enabled;
+ el.mobileStepForwardBtn.disabled=!enabled;
+ playButton.disabled=!enabled;
+ const playing=Boolean(st.playing);
+ playButton.textContent=playing?'Ⅱ':'▶';
+ playButton.classList.toggle('is-playing',playing);
+ playButton.setAttribute('aria-pressed',String(playing));
+ playButton.setAttribute('aria-label',playing?'Pause forecast animation':'Play forecast animation');
+ playButton.title=playing?'Pause forecast animation':'Play forecast animation';
+ el.mobileFrameLabel.textContent=enabled?'F'+pad3(st.hour):'F---';
+ const initTime=Date.parse(st.ref?.init_time||'');
+ const when=Number.isFinite(initTime)&&Number.isFinite(Number(st.hour))
+  ?new Date(initTime+Number(st.hour)*3600000):null;
+ el.mobileFrameValidLabel.textContent=when?'Valid '+when.toISOString().slice(5,16).replace('T',' ')+'Z':'Valid UTC';
+}
 function syncUI(){
  syncTerrainProjectionUI();
  syncImageFieldChoices();
@@ -2706,12 +3000,14 @@ function syncUI(){
  // Refresh the display interpolation preference before rendering the new field.
  syncInterpolationPreference();
  updateContourControl();updateLiveGeography();
- syncFieldMenus();el.cycleSelect.value=st.ref.id;el.fcstSelect.value=String(st.hour);el.mapViewSelect.value=st.mode;
+ syncFieldMenus();el.cycleSelect.value=st.ref.id;el.fcstSelect.value=String(st.hour);el.mapViewSelect.value=st.mode;syncMobileFrameController();
  try{const u=new URL(location.href);
   // An automatically chosen latest cycle is NOT pinned into the address bar:
   // reloading the normal viewer URL should discover tomorrow's newest run.
   if(st.runPinned)u.searchParams.set('run',st.ref.id);else u.searchParams.delete('run');
   u.searchParams.set('field',st.field);u.searchParams.set('fhr',st.hour);u.searchParams.set('map',st.mode);
+  if(st.lowTracksEnabled)u.searchParams.set('tracks','1');
+  else if(u.searchParams.has('tracks'))u.searchParams.set('tracks','0');
   if(selectedShadingField()!==st.field)u.searchParams.set('shade',selectedShadingField());else u.searchParams.delete('shade');
   if(gfsSnowSpec(st.field)?.method==='slr10')u.searchParams.set('snow',st.snowMethod);else u.searchParams.delete('snow');
   history.replaceState(null,'',u);
@@ -2722,6 +3018,7 @@ function shareUrl(){
  u.searchParams.set('run',st.ref.id);u.searchParams.set('field',st.field);
  if(selectedShadingField()!==st.field)u.searchParams.set('shade',selectedShadingField());else u.searchParams.delete('shade');
  u.searchParams.set('fhr',st.hour);u.searchParams.set('map',st.mode);
+ u.searchParams.set('tracks',st.lowTracksEnabled?'1':'0');
  if(gfsSnowSpec(st.field)?.method==='slr10')u.searchParams.set('snow',st.snowMethod);else u.searchParams.delete('snow');
  u.searchParams.set('theme',st.theme);u.searchParams.set('speed',st.loopSpeedIndex);
  setCameraUrlParams(u,currentSharedCamera());
@@ -2774,13 +3071,21 @@ function bind(){
   closeLegendRangeEditor();refreshHours();syncUI();updateSharedLegend();void renderAll();
  });
  // Deliberate input, rather than passive mouse movement, reduces speculation.
- for(const type of ['pointerdown','wheel','keydown','touchstart'])document.addEventListener(type,markUserActivity,{passive:true});el.mobileControlsBtn.onclick=()=>{const opened=el.mobileControlsBtn.getAttribute('aria-expanded')!=='true';el.mobileControlsBtn.setAttribute('aria-expanded',String(opened));el.mobileControlsBtn.title=opened?'Hide viewer controls':'Show viewer controls';el.mobileControlsBtn.innerHTML=opened?'☷ Controls <span class="collapse-indicator" aria-hidden="true">▴</span>':'☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span>';document.getElementById('viewerControls').classList.toggle('is-open',opened);requestAnimationFrame(layout);};el.cycleSelect.onchange=()=>{st.runPinned=true;st.ref=st.cycles.find(x=>x.id===el.cycleSelect.value)||st.ref;refreshHours();syncUI();renderAll();};el.fcstSelect.onchange=()=>{const next=Number(el.fcstSelect.value);if(next!==st.hour)st.prefetchDirection=next<st.hour?-1:1;st.hour=next;syncUI();renderAll();};el.stepBackBtn.onclick=()=>step(-1);el.stepForwardBtn.onclick=()=>step(1);el.playBtn.onclick=play;el.pauseBtn.onclick=stop;el.speedDownBtn.onclick=()=>changeSpeed(-1);el.speedUpBtn.onclick=()=>changeSpeed(1);
+ for(const type of ['pointerdown','wheel','keydown','touchstart'])document.addEventListener(type,markUserActivity,{passive:true});el.mobileControlsBtn.onclick=()=>{const opened=el.mobileControlsBtn.getAttribute('aria-expanded')!=='true';el.mobileControlsBtn.setAttribute('aria-expanded',String(opened));el.mobileControlsBtn.title=opened?'Hide viewer controls':'Show viewer controls';el.mobileControlsBtn.innerHTML=opened?'☷ Controls <span class="collapse-indicator" aria-hidden="true">▴</span>':'☷ Controls <span class="collapse-indicator" aria-hidden="true">▾</span>';document.getElementById('viewerControls').classList.toggle('is-open',opened);requestAnimationFrame(layout);};el.cycleSelect.onchange=()=>{st.runPinned=true;st.ref=st.cycles.find(x=>x.id===el.cycleSelect.value)||st.ref;refreshHours();syncUI();renderAll();};el.fcstSelect.onchange=()=>{const next=Number(el.fcstSelect.value);if(next!==st.hour)st.prefetchDirection=next<st.hour?-1:1;st.hour=next;syncUI();renderAll();};el.stepBackBtn.onclick=()=>step(-1);el.stepForwardBtn.onclick=()=>step(1);el.playBtn.onclick=play;el.pauseBtn.onclick=stop;el.mobileStepBackBtn.onclick=()=>step(-1);el.mobileStepForwardBtn.onclick=()=>step(1);el.mobilePlayPauseBtn.onclick=()=>st.playing?stop():play();el.speedDownBtn.onclick=()=>changeSpeed(-1);el.speedUpBtn.onclick=()=>changeSpeed(1);
  for(const [source,input] of [['synoptic',el.obsSynoptic],['mping',el.obsMping]]){
   let stored=null;try{stored=localStorage.getItem('omd_evu_obs_'+source);}catch(_){}
   st.obsEnabled[source]=stored!=='0';input.checked=st.obsEnabled[source];
   input.onchange=()=>{st.obsEnabled[source]=input.checked;
    try{localStorage.setItem('omd_evu_obs_'+source,input.checked?'1':'0');}catch(_){}
    syncAllObservationPanels();};
+ }
+ for(const [source,input] of [['cocorahs',el.amountReportsCocorahs],['metar',el.amountReportsMetar]]){
+  if(!input)continue;
+  let saved=null;try{saved=localStorage.getItem('omd_evu_amount_reports_'+source);}catch(_){}
+  st.amountReportEnabled[source]=saved!=='0';input.checked=st.amountReportEnabled[source];
+  input.onchange=()=>{st.amountReportEnabled[source]=input.checked;
+    try{localStorage.setItem('omd_evu_amount_reports_'+source,input.checked?'1':'0');}catch(_){}
+    void refreshAmountReports();};
  }
  let opacitySaved=null;try{opacitySaved=localStorage.getItem('omd_evu_image_opacity');}catch(_){}
  st.imageOpacity=opacitySaved===null?1:Math.max(0,Math.min(1,Number(opacitySaved)||0));
@@ -2893,22 +3198,50 @@ function bind(){
    updatePanelPlotTitle(p);scheduleContourRedraw(p);
   }
  };
- // The Surface low tracks product is ordinary MSLP shading with an optional
- // compact track layer. Toggle only the track source so the base map, selected
- // cycle/hour, terrain, and PNG/video exports remain undisturbed.
+ // Toggle independently of MSLP shading, isobars and surface-weather
+ // analysis. OFF is the first-use default to avoid unexpected network work.
  el.lowTracksToggleBtn.onchange=()=>{
   st.lowTracksEnabled=el.lowTracksToggleBtn.checked;
-  if(st.field!=='lowtracks')return;
+  try{localStorage.setItem('omd_evu_low_tracks_enabled',st.lowTracksEnabled?'1':'0');}catch(_){}
   for(const p of st.panels){
-   if(!st.lowTracksEnabled){
-    window.EVULowTracks?.remove?.(p); // invalidates in-flight requests too
-    p.lowTrackResult=null;
-    if(p.status==='ready')clearNote(p);
+   if(!st.lowTracksEnabled||!lowTracksAvailableForField()){
+    window.EVULowTracks?.remove?.(p);p.lowTrackResult=null;updateLowTrackPanelStatus(p,null);
    }else if(p.map&&p.status==='ready'&&!p.cfg?.differencePanel){
+    p.lowTrackResult=null;
     void syncLowTrackOverlay(p,st.seq);
    }
   }
+  updateLowTracksStatus();
+  // Preserve the display overlay in shareable URLs without changing the
+  // weather field, cycle or forecast hour.
+  syncUI();
  };
+ // Surface-weather feature controls are shared by all model maps, rather than
+ // allocating independent controls to each panel (including mobile pages).
+ const surfaceWeatherChange=()=>{
+   st.surfaceWeatherEnabled=!!el.surfaceWeatherToggleBtn.checked;
+   for(const [id,key] of [['surfaceWeatherCentersBtn','centers'],['surfaceWeatherPressureBtn','pressure'],['surfaceWeatherFrontsBtn','fronts'],['surfaceWeatherTroughsBtn','troughs'],['surfaceWeatherDrylinesBtn','drylines']])
+     st.surfaceWeatherSettings[key]=!!el[id].checked;
+   try{
+     localStorage.setItem('omd_evu_surface_weather_enabled',st.surfaceWeatherEnabled?'1':'0');
+     localStorage.setItem('omd_evu_surface_weather_settings',JSON.stringify(st.surfaceWeatherSettings));
+   }catch(_){}
+   for(const p of st.panels)syncSurfaceWeatherPanel(p);
+   updateSurfaceWeatherSummary();
+ };
+ el.surfaceWeatherRetryBtn?.addEventListener('click',()=>{
+   for(const p of st.panels){
+     const overlay=p.surfaceWeather;
+     if(!overlay||!p.map)continue;
+     const state=p.surfaceWeatherDisplayState?.state;
+     if(!['missing','error','empty'].includes(state))continue;
+     if(overlay._url){overlay._negative.delete(overlay._url);overlay._failures?.delete(overlay._url);overlay._cache.delete(overlay._url);}
+     p.surfaceWeatherFrameKey=null;
+     void syncSurfaceWeatherPanel(p);
+   }
+ });
+ for(const id of ['surfaceWeatherToggleBtn','surfaceWeatherCentersBtn','surfaceWeatherPressureBtn','surfaceWeatherFrontsBtn','surfaceWeatherTroughsBtn','surfaceWeatherDrylinesBtn'])
+   el[id]?.addEventListener('change',surfaceWeatherChange);
  el.surfaceMSLPToggleBtn.onchange=()=>{
   st.overlayMSLP=el.surfaceMSLPToggleBtn.checked;
   try{localStorage.setItem('omd_evu_mslp_isobars',st.overlayMSLP?'1':'0');}catch(_){}
@@ -2938,10 +3271,16 @@ function bind(){
  };
  el.windToggleBtn.onchange=()=>{
   const key=overlayWindSetting(st.field);
-  const storage=key==='overlayWaveDirection'?'omd_evu_wave_direction_overlay_v2':key==='overlayUpperWind'?'omd_evu_upper_wind_overlay':key==='overlaySurfaceWind'?'omd_evu_surface_wind_overlay':'omd_evu_severe_wind_overlay';
+  const storage=key==='overlayNearSurfaceWind'?'omd_evu_2m_10m_wind_barbs_v1':key==='overlayWaveDirection'?'omd_evu_wave_direction_overlay_v2':key==='overlayUpperWind'?'omd_evu_upper_wind_overlay':key==='overlaySurfaceWind'?'omd_evu_surface_wind_overlay':'omd_evu_severe_wind_overlay';
   st[key]=el.windToggleBtn.checked;
   try{localStorage.setItem(storage,st[key]?'1':'0');}catch(_){}
-  for(const p of st.panels){if(!p.cfg?.differencePanel)updatePanelPlotTitle(p);scheduleWindRedraw(p);}
+  for(const p of st.panels){
+   if(p.cfg?.differencePanel)continue;
+   const field=p.cfg?.field||st.field;
+   if(NEAR_SURFACE_WIND_FIELDS.has(field)&&st.overlayNearSurfaceWind&&!p.wind&&p.map&&p.ds&&Number.isInteger(p.h)&&p.status==='ready'){
+    void prepareWindBarbs(p,p.ds,p.h,st.seq).then(()=>updatePanelPlotTitle(p));
+   }else{updatePanelPlotTitle(p);scheduleWindRedraw(p);}
+  }
  };
  // A select retains keyboard focus after its menu closes. Return arrow keys
  // to forecast navigation after an actual selection (mouse or keyboard).
@@ -3390,7 +3729,7 @@ function withVirtualWind850(ds){
   derivedWindSpeed850:true,attrs:{long_name:'850-hPa wind speed derived from U/V',units:'m s-1'}});
  return ds;
 }
-function choose(p,hourOverride=st.hour){p.analysisRadar=null;p.snowCompare=null;p.gfsObservedCompare=null;p.gfsObservedAnalysis=null;p.gfsNativeCompare=null;p.gfsAviationCompare=null;const src=st.sources.get(p.cfg.source||st.primary.id);p.src=src;const nativeDiffSourceMissing=st.modelSet==='gfs-versions'&&!!p.cfg?.differencePanel&&/^gfs_diff_/.test(String(p.cfg?.source||''));if((!src||src.error)&&!nativeDiffSourceMissing)return nativeGfsDifferenceFallback(p,panelSelectedField(p),hourOverride)||{error:src?.error||`Unknown source ${p.cfg.source}`};let ds;const mode=p.cfg.run||'selected',list=src?.datasets||[];
+function choose(p,hourOverride=st.hour){p.analysisRadar=null;p.analysisNativeRadar=null;p.analysisCategoricalOnly=false;p.snowCompare=null;p.gfsObservedCompare=null;p.gfsObservedAnalysis=null;p.gfsNativeCompare=null;p.gfsAviationCompare=null;const src=st.sources.get(p.cfg.source||st.primary.id);p.src=src;const nativeDiffSourceMissing=st.modelSet==='gfs-versions'&&!!p.cfg?.differencePanel&&/^gfs_diff_/.test(String(p.cfg?.source||''));if((!src||src.error)&&!nativeDiffSourceMissing)return nativeGfsDifferenceFallback(p,panelSelectedField(p),hourOverride)||{error:src?.error||`Unknown source ${p.cfg.source}`};let ds;const mode=p.cfg.run||'selected',list=src?.datasets||[];
  const field=panelSelectedField(p);
  // Categorical flight category (like Ptype) has no meaningful signed delta.
  // Reject it before loading native or materialized GFS difference products;
@@ -3522,8 +3861,17 @@ function choose(p,hourOverride=st.hour){p.analysisRadar=null;p.snowCompare=null;
    if(field==='ptype')return{ds:rap,v:category,h:0};
    const mrms=list.find(d=>d.product==='mrms_refc'&&cycleKey(d.init_time)===wanted&&
      d.variables?.some(v=>v.name==='refc'&&v.available_hours?.includes(0)));
-   if(!mrms)return{error:`MRMS composite reflectivity missing at ${fmt(vt)} for Reflectivity with Ptype; no model reflectivity substitute.`,ds:null};
-   p.analysisRadar={ds:mrms,v:mrms.variables.find(v=>v.name==='refc'),h:0};
+   if(mrms){
+    p.analysisRadar={src,ds:mrms,v:mrms.variables.find(v=>v.name==='refc'),h:0};
+    return{ds:rap,v:category,h:0};
+   }
+   // No matching MRMS radar: retain the exact-valid-time RAP category.
+   // Use RAP's own reflectivity only if it is genuinely published on the
+   // same native grid. Existing RAP verification catalogs commonly lack it.
+   const native=rap.variables?.find(v=>v.name==='refc'&&v.available_hours?.includes(0)&&
+     v.shape?.[1]===category.shape?.[1]&&v.shape?.[2]===category.shape?.[2]);
+   if(native){p.analysisNativeRadar={ptype:category};return{ds:rap,v:native,h:0};}
+   p.analysisCategoricalOnly=true;
    return{ds:rap,v:category,h:0};
   }
   if((field==='snow1h'||field==='snow3h'))return{error:`No independent ${snowWindow}-hour snowfall analysis is available (NOHRSC starts at 6 hours)`,ds:null};
@@ -3606,7 +3954,29 @@ function choose(p,hourOverride=st.hour){p.analysisRadar=null;p.snowCompare=null;
  }
  if(gfsSnow&&!gfsSnow.rrfs&&(p.cfg.timeMode==='gfs-analysis'||/gfs_diff_v(?:16|17)_analysis/.test(p.cfg.source||'')))
   return{error:'Not applicable: an F000 analysis cannot verify an interval snowfall accumulation or snow-depth change. Compare GFSv16/v17 forecasts at the same valid time.',ds:null};
- if(p.cfg.timeMode==='gfs-analysis'){const at=cycleKey(valid(st.ref,hourOverride));ds=list.find(d=>cycleKey(d.init_time)===at);if(!ds)return{error:`GFSv16 F000 analysis missing from published catalog at ${fmt(valid(st.ref,hourOverride))} (available only at matching 00/06/12/18 UTC cycles)`};const v=ds.variables.find(x=>x.name===field);if(!v||!v.available_hours?.includes(0))return{error:`GFSv16 F000 ${field} not published for ${fmt(valid(st.ref,hourOverride))}`};return{ds,v,h:0};}
+ if(p.cfg.timeMode==='gfs-analysis'){
+  const at=cycleKey(valid(st.ref,hourOverride));
+  ds=list.find(d=>cycleKey(d.init_time)===at);
+  if(!ds)return{error:`GFSv16 F000 analysis missing from published catalog at ${fmt(valid(st.ref,hourOverride))} (available only at matching 00/06/12/18 UTC cycles)`};
+  if(field==='refc_ptype'){
+   // Reflectivity/Ptype is a virtual display field, not a Zarr variable.
+   // Its GFS analysis must use the valid-time GFSv16 F000 native pair,
+   // never F000 of the selected older initialization cycle.
+   const v=ds.variables?.find(x=>x.name==='refc'&&x.available_hours?.includes(0));
+   const ptype=ds.variables?.find(x=>x.name==='ptype'&&x.available_hours?.includes(0));
+   if(!v||!ptype)return{error:`GFSv16 F000 reflectivity and precipitation type are required at ${fmt(valid(st.ref,hourOverride))}`,ds:null};
+   if(ptype.shape?.[1]!==v.shape?.[1]||ptype.shape?.[2]!==v.shape?.[2])
+    return{error:'GFSv16 F000 reflectivity and Ptype are not on the same native grid',ds:null};
+   const analysis=st.sources.get('analysis');
+   const mrms=analysis?.datasets?.find(d=>d.product==='mrms_refc'&&cycleKey(d.init_time)===at&&
+     d.variables?.some(x=>x.name==='refc'&&x.available_hours?.includes(0)));
+   if(mrms)p.analysisRadar={src:analysis,ds:mrms,v:mrms.variables.find(x=>x.name==='refc'),h:0};
+   return{ds,v,h:0};
+  }
+  const v=ds.variables.find(x=>x.name===field);
+  if(!v||!v.available_hours?.includes(0))return{error:`GFSv16 F000 ${field} not published for ${fmt(valid(st.ref,hourOverride))}`};
+  return{ds,v,h:0};
+ }
  if(mode==='latest')ds=list[0];else if(mode==='nearest')ds=list.slice().sort((a,b)=>Math.abs(Date.parse(a.init_time)-Date.parse(st.ref.init_time))-Math.abs(Date.parse(b.init_time)-Date.parse(st.ref.init_time)))[0];else if(mode==='selected')ds=list.find(d=>cycleKey(d.init_time)===st.ref.id);else ds=list.find(d=>d.id===mode);
  if(!ds)return nativeGfsDifferenceFallback(p,field,hourOverride)||{error:`No matching cycle for ${fmt(st.ref.init_time)}`};if(p.cfg.runOffset){ds=list[list.indexOf(ds)+Number(p.cfg.runOffset)];if(!ds)return{error:'Cycle offset unavailable'};}
  // The GEFS Mean catalog contains two native grids, selected per field.
@@ -3924,8 +4294,8 @@ function paintSynchronizedHover(){
   // Even when the field is missing, show the coordinates and lack of data.
   if(!visible){p.info.hidden=true;continue;}
   let reading='No data';
-  if(p.rawField&&p.v){try{
-    const value=Number(p.rawField.sampleField(h.lon,h.lat));
+  if((p.readoutField||p.rawField)&&p.v){try{
+    const value=Number((p.readoutField||p.rawField).sampleField(h.lon,h.lat));
     if(Number.isFinite(value)&&value> -1e9){
      const meta=panelFieldInfo(p,p.v);
      const displayed=formatReadout(value,meta);
@@ -4066,6 +4436,111 @@ function installShiftDragSuspension(){
  window.addEventListener('blur',()=>finishShiftDrag(),true);
  document.addEventListener('visibilitychange',()=>{if(document.hidden)finishShiftDrag();});
 }
+// EVU v1.2.90 automated surface synoptic feature overlay.
+// Data are derived offline from native MSLP, 2m T/Td, and 10m winds;
+// never infer a front directly from the shaded raster or pressure differences.
+function surfaceWeatherEligible(){
+ return lowTracksAvailableForField();
+}
+function surfaceWeatherSource(p){
+ if(!surfaceWeatherEligible()||p?.cfg?.differencePanel||!p?.ds||!Number.isInteger(p.h)||p.h<0)return null;
+ // Require same-hour native MSLP in this data store; never reuse a different
+ // cycle or pressure field from an unrelated model when a plot is missing data.
+ if(!p.ds.variables?.some(v=>v.name==='mslp'&&v.available_hours?.includes(p.h)))return null;
+ const path=String(p.ds.path||'').split('/').pop().replace(/\.zarr$/,'');
+ if(/^analysis_[a-z0-9_]+_\d{10}$/.test(path))return {analysis:path};
+ const match=/^([a-z][a-z0-9_]*)_(\d{8})_(00|06|12|18)00$/.exec(path);
+ if(!match)return null;
+ return {model:match[1],date:match[2],cycle:match[3],hour:p.h};
+}
+function updateSurfaceWeatherSummary(){
+ const output=el.surfaceWeatherStatus;
+ if(!output)return;
+ const enabled=st.surfaceWeatherEnabled&&surfaceWeatherEligible();
+ output.hidden=!enabled;
+ if(el.surfaceWeatherRetryBtn)el.surfaceWeatherRetryBtn.hidden=true;
+ if(!enabled)return;
+ const panels=(st.panels||[]).filter(p=>p.map&&!p.cfg?.differencePanel);
+ if(!panels.length){output.textContent='Surface weather: waiting for active maps';return;}
+ const counts={ready:0,loading:0,empty:0,filtered:0,missing:0,error:0,unsupported:0,waiting:0};
+ for(const p of panels){const state=p.surfaceWeatherDisplayState?.state||'waiting';counts[state]=(counts[state]||0)+1;}
+ const parts=[];
+ if(counts.ready)parts.push(`${counts.ready} with features`);
+ if(counts.empty)parts.push(`${counts.empty} with no detected features`);
+ if(counts.filtered)parts.push(`${counts.filtered} with no selected features`);
+ if(counts.missing)parts.push(`${counts.missing} not published`);
+ if(counts.error)parts.push(`${counts.error} download errors`);
+ if(counts.unsupported)parts.push(`${counts.unsupported} without matching MSLP`);
+ if(counts.loading)parts.push(`${counts.loading} loading`);
+ if(counts.waiting)parts.push(`${counts.waiting} waiting for model data`);
+ output.textContent='Surface weather: '+(parts.join(' · ')||'waiting for data');
+ // Show the underlying error where possible instead of making HTTP 403, 503
+ // and malformed HTML responses look like absent meteorological features.
+ const firstFailure=panels.find(p=>p.surfaceWeatherDisplayState?.state==='error');
+ const failureDetail=firstFailure?.surfaceWeatherDisplayState?.detail||'';
+ if(firstFailure){
+   const code=/HTTP\s+(\d{3})/.exec(failureDetail);
+   const detail=code?`HTTP ${code[1]}`:/invalid geojson|invalid json|not valid json/i.test(failureDetail)?'invalid GeoJSON':'network/response error';
+   output.textContent+=` · First error: ${detail}`;
+ }
+ output.title=firstFailure?[
+   failureDetail||'Surface-weather request failed',
+   firstFailure.surfaceWeather?._url||''
+ ].filter(Boolean).join('\n'):'';
+ if(el.surfaceWeatherRetryBtn)el.surfaceWeatherRetryBtn.hidden=!(counts.missing||counts.error||counts.empty);
+}
+function updateSurfaceWeatherPanelStatus(p,status){
+ const note=p?.surfaceWeatherNotice;
+ if(!p||!note)return;
+ const next=status||{state:'idle'};
+ p.surfaceWeatherDisplayState=next;
+ const enabled=st.surfaceWeatherEnabled&&surfaceWeatherEligible()&&!p.cfg?.differencePanel&&!!p.map;
+ const labels={loading:'Surface weather · Loading…',missing:'Surface weather · Not published for this hour',
+  empty:'Surface weather · No features detected',filtered:'Surface weather · No selected features',
+  error:'Surface weather · Download failed',unsupported:'Surface weather · No matching MSLP data',
+  waiting:'Surface weather · Waiting for model data'};
+ if(next.state==='error'){
+   const code=/HTTP\s+(\d{3})/.exec(next.detail||'');
+   const http=code?Number(code[1]):0;
+   if(http===401||http===403)labels.error=`Surface weather · Access denied (HTTP ${http})`;
+   else if(http===429)labels.error='Surface weather · Server busy (HTTP 429)';
+   else if(http>=500)labels.error=`Surface weather · Server error (HTTP ${http})`;
+   else if(http)labels.error=`Surface weather · Download failed (HTTP ${http})`;
+   else if(/invalid geojson|invalid json|not valid json/i.test(next.detail||''))labels.error='Surface weather · Invalid overlay response';
+   else if(/failed to fetch|networkerror|network request/i.test(next.detail||''))labels.error='Surface weather · Network error';
+ }
+ note.hidden=!enabled||!labels[next.state];
+ if(!note.hidden){
+  note.textContent=labels[next.state];note.dataset.status=next.state;
+  note.title=[next.detail||labels[next.state],p.surfaceWeather?._url||''].filter(Boolean).join('\n');
+ }
+ updateSurfaceWeatherSummary();
+}
+function syncSurfaceWeatherPanel(p){
+ const overlay=p?.surfaceWeather;
+ if(!overlay)return Promise.resolve(false);
+ const enabled=st.surfaceWeatherEnabled&&surfaceWeatherEligible()&&!p.cfg?.differencePanel;
+ overlay.canvas.style.display=enabled?'block':'none';
+ overlay.setSettings(st.surfaceWeatherSettings);
+ const source=enabled?surfaceWeatherSource(p):null;
+ if(!source){
+  overlay.clear();p.surfaceWeatherFrameKey=null;p.surfaceWeatherPending=null;
+  const kind=!enabled?'idle':!p.ds||!Number.isInteger(p.h)?'waiting':'unsupported';
+  updateSurfaceWeatherPanelStatus(p,{state:kind,detail:kind==='unsupported'?'No same-hour MSLP source or recognized model/analysis store':''});
+  return Promise.resolve(false);
+ }
+ const key=source.analysis||[source.model,source.date,source.cycle,source.hour].join('_');
+ if(p.surfaceWeatherFrameKey===key&&overlay._url&&!((overlay._negative.get(overlay._url)||0)<=Date.now()&&overlay._negative.has(overlay._url))){
+   updateSurfaceWeatherPanelStatus(p,overlay.status||{state:'loading'});
+   return p.surfaceWeatherPending||Promise.resolve(true);
+ }
+ p.surfaceWeatherFrameKey=key;
+ const job=source.analysis?overlay.setAnalysisFrame(
+   source.analysis.slice('analysis_'.length).replace(/_\d{10}$/,''),source.analysis.slice(-10)):
+   overlay.setFrame(source.model,source.date,source.cycle,source.hour);
+ p.surfaceWeatherPending=job;
+ return job;
+}
 function createMap(p){
  const node=document.createElement('div');node.className='map-host';
  node.style='position:absolute;inset:0;';p.frame.replaceChildren(node);
@@ -4076,6 +4551,8 @@ function createMap(p){
  const contourCanvas=document.createElement('canvas');contourCanvas.className='contour-overlay';
  contourCanvas.setAttribute('aria-hidden','true');p.frame.append(contourCanvas);p.contourCanvas=contourCanvas;
  const cityCanvas=document.createElement('canvas');cityCanvas.className='city-overlay';cityCanvas.setAttribute('aria-hidden','true');p.frame.append(cityCanvas);p.cityCanvas=cityCanvas;
+ const reportCanvas=document.createElement('canvas');reportCanvas.className='amount-reports-overlay';reportCanvas.setAttribute('aria-hidden','true');p.frame.append(reportCanvas);p.amountReportCanvas=reportCanvas;p.amountReportHits=[];p.amountReportClickBound=false;
+ const lowTrackCanvas=document.createElement('canvas');lowTrackCanvas.className='low-track-overlay';lowTrackCanvas.setAttribute('aria-hidden','true');lowTrackCanvas.style.display='none';p.frame.append(lowTrackCanvas);p.lowTrackCanvas=lowTrackCanvas;
  const canonical=st.mapView||makeViewBounds();
  const focus=st.expandedPanel===p;
  const delta=focus?expandedViewportZoomAdjustment(p.normalViewportSize,panelViewportSize(p)):0;
@@ -4088,16 +4565,28 @@ function createMap(p){
   minZoom:0,maxZoom:st.cfg.display.maxZoom||12,maxPitch:75,
   // Keyboard arrows are reserved for forecast-hour / cycle navigation, not map panning.
   keyboard:false,
+  // A 2.7x phone framebuffer is about three times the GPU pixel workload
+  // of 1.6x. Weather, contours and map coordinates keep their own native
+  // resolution; the existing PNG exporter increases/restores this ratio.
+  pixelRatio:touchGraphicsDevice()?Math.min(devicePixelRatio||1,
+   Math.max(1,Math.min(3,Number(st.cfg?.display?.mobileMapPixelRatio??1.6)))):undefined,
   attributionControl:false,preserveDrawingBuffer:true,fadeDuration:0});
  // Defense-in-depth for MapLibre builds that register keyboard navigation anyway.
  if(m.keyboard?.disable)m.keyboard.disable();
  window.EVUAdvancedMap?.attach(m,p);
  m.dragRotate?.enable?.();m.touchZoomRotate?.enableRotation?.();
- p.map=m;m.__evuTerrainPanelId=p.cfg.id;p.geoApplied=new Set();p.geoPending=new Set();
+ p.map=m;
+ if(window.EVUSurfaceWeatherOverlay){
+  p.surfaceWeather=new window.EVUSurfaceWeatherOverlay(m,{container:p.frame,baseUrl:'data/surface_weather',settings:st.surfaceWeatherSettings,
+   onStatusChange:status=>updateSurfaceWeatherPanelStatus(p,status),
+   onError:err=>console.warn('Surface weather overlay unavailable',err)});
+  p.surfaceWeatherCanvas=p.surfaceWeather.canvas;
+ }
+ m.__evuTerrainPanelId=p.cfg.id;p.geoApplied=new Set();p.geoPending=new Set();
  // Contours are CPU-intensive, so never resample or trace them during
  // panning, wheel zoom, touch gestures, or synced camera movements. Hiding
  // the old overlay also avoids lines drifting over the moving map.
- m.on('movestart',()=>{suspendContours(p);p.geoMoving=true;p.geoRedrawSerial=(p.geoRedrawSerial||0)+1;
+ m.on('movestart',()=>{suspendContours(p);if(p.amountReportCanvas)p.amountReportCanvas.style.visibility='hidden';p.geoMoving=true;p.geoRedrawSerial=(p.geoRedrawSerial||0)+1;
   // Unlike the old Shift-only listener, this catches ordinary pan/zoom/tilt
   // and any synchronized camera movement before rendering another forecast.
   suspendForecastCameraGroup(p);
@@ -4121,13 +4610,13 @@ function createMap(p){
    scheduleMobileScalarRedraw(p,65+p.i*22);
   },360);
  });
- m.on('resize',()=>{scheduleMobileScalarRedraw(p,80);scheduleWindRedraw(p);scheduleContourRedraw(p,140);scheduleCityUpdate(p);});
+ m.on('resize',()=>{scheduleMobileScalarRedraw(p,80);scheduleWindRedraw(p);scheduleContourRedraw(p,140);scheduleCityUpdate(p);syncAmountReportsPanel(p);});
  // Debounce across rapid wheel steps; stagger synchronized panels so nine
  // expensive contour passes don't block the same animation frame.
  m.on('moveend',()=>{p.geoMoving=false;
   if(st.exportRender)scheduleMobileScalarRedraw(p,110+p.i*20);
   else endForecastCameraMotion(p);
-  scheduleContourRedraw(p,160+p.i*35);scheduleWindRedraw(p);scheduleCityUpdate(p);});
+  scheduleContourRedraw(p,160+p.i*35);scheduleWindRedraw(p);scheduleCityUpdate(p);syncAmountReportsPanel(p);});
  m.on('zoomend',()=>geographyZoom(p));
  m.on('mousemove',e=>queueSynchronizedHover(p,e.lngLat));
  m.on('contextmenu',e=>{e.originalEvent?.preventDefault();if(p.lastLongPressAt&&Date.now()-p.lastLongPressAt<1200)return;window.EVUPointInspector?.showMenu(p,e);});
@@ -4159,7 +4648,7 @@ function createMap(p){
  });
  m.on('load',()=>{
   if(p.map!==m)return;
-  try{addGeographySkeleton(m);updateLiveGeography();window.EVUAdvancedMap?.orderTerrain(m);scheduleCityUpdate(p);syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);}
+  try{addGeographySkeleton(m);updateLiveGeography();window.EVUAdvancedMap?.orderTerrain(m);scheduleCityUpdate(p);syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);syncAmountReportsPanel(p);}
   catch(e){p.lastMapError='Could not install geography layers: '+String(e);console.error(p.lastMapError);}
   updateGeographyVisibility(p);
   if(st.mode==='lambert'&&!st.mapView&&!m.__evuExtentFitted)fitDataExtent(m);
@@ -4168,7 +4657,7 @@ function createMap(p){
  p.view.classList.add('has-live-map');p.snap.hidden=true;return m;
 }
 function discardMap(p){
- p.lowTracksSeq=(p.lowTracksSeq||0)+1;
+ p.lowTracksSeq=(p.lowTracksSeq||0)+1;p.amountReportHits=[];p.amountReportClickBound=false;
  const heldGesture=forecastMotionSources.delete(p);
  // A canceled MapLibre map won't emit moveend. Release peers after teardown,
  // or they could remain blank until the next independent camera gesture.
@@ -4180,7 +4669,13 @@ function discardMap(p){
  clearTimeout(p.mobileScalarTimer);p.mobileScalarTimer=null;
  clearTimeout(p.terrainDemRefreshTimer);p.terrainDemRefreshTimer=null;
  clearTimeout(p.windRedrawTimer);p.windRedrawTimer=null;
- window.EVUThreeSurface?.dispose?.(p);p.threeDrawPromise=null;p.mobileScalar=null;p.upperAirGeoOverlay=false;
+ window.EVUThreeSurface?.dispose?.(p);p.threeDrawPromise=null;
+ p.surfaceWeather?.dispose?.();p.surfaceWeather=null;p.surfaceWeatherCanvas=null;
+ p.surfaceWeatherPending=null;p.surfaceWeatherFrameKey=null;p.mobileScalar=null;p.upperAirGeoOverlay=false;
+ // A dormant panel must not retain old multi-million-cell field arrays via
+ // cached CPU samplers after its WebGL map has been released.
+ p._flatLambertSpec=null;p._flatLambertSampler=null;
+ p._terrainFastSampleField=null;p._terrainFastSample=null;
  p.mobileScalarCanvas?.remove();p.mobileScalarCanvas=null;p.mobileGeoCanvas?.remove();p.mobileGeoCanvas=null;
  p._terrainDetailNotice?.remove();p._terrainDetailNotice=null;
  if(!p.map)return;
@@ -4196,10 +4691,12 @@ function discardMap(p){
  try{const snap=p.lastSnapshot||p.map.getCanvas().toDataURL('image/png');p.snap.src=snap;p.lastSnapshot=snap;p.snap.hidden=false;}
  catch(e){console.warn('Could not retain snapshot',e);}
  window.EVUAdvancedMap?.detach(p.map,p);
- p.map.remove();p.map=null;p.wind=null;p.marineWind=null;p.windCanvas=null;p.windFrameRequested=false;p.contourCanvas=null;p.contourFrameRequested=false;p.cityCanvas?.remove();p.cityCanvas=null;p.component=null;p.layer=null;p.rawField=null;p.contourField=null;p.primaryContourField=null;p.mslpContourField=null;p.heightField=null;p.windSpeed850Field=null;p.temperature850Field=null;p.moistureFields=null;p.lastKey=null;p.mapReady=null;p.grid=null;p.gridKey=null;
+ p.map.remove();p.map=null;p.wind=null;p.marineWind=null;p.windCanvas=null;p.windFrameRequested=false;p.contourCanvas=null;p.lowTrackCanvas=null;p.lowTrackFeatures=[];p.contourFrameRequested=false;p.cityCanvas?.remove();p.cityCanvas=null;p.component=null;p.layer=null;p.rawField=null;p.readoutField=null;p.contourField=null;p.primaryContourField=null;p.mslpContourField=null;p.heightField=null;p.windSpeed850Field=null;p.temperature850Field=null;p.moistureFields=null;p.lastKey=null;p.mapReady=null;p.grid=null;p.gridKey=null;
  p.initializing=false;p.cancelMapWait=null;
  p.geoApplied=new Set();p.geoPending=new Set();p.obsClickInstalled=null;p.spcClickInstalled=false;p.frame.replaceChildren();
  p.view.classList.remove('has-live-map');st.active=st.active.filter(x=>x!==p);
+ updateSurfaceWeatherPanelStatus(p,{state:'idle'});
+ updateLowTrackPanelStatus(p,null);
 }
 function waitMapReady(p,m){
  return new Promise((resolve,reject)=>{
@@ -4248,16 +4745,16 @@ function nearViewport(p){
  const b=el.viewerGrid.getBoundingClientRect();
  return r.bottom>=b.top-margin&&r.top<=b.bottom+margin&&r.right>=b.left&&r.left<=b.right;
 }
-// The GFS group uses full global 0.25-degree rasters, including three signed
-// difference rasters. On touch devices, keeping all six WebGL contexts alive
-// can exhaust mobile GPU memory without an explicit context-loss event: the
-// MapLibre geography and CPU-drawn contours remain, but shaded fields vanish.
-// Cap *only* GFS contexts on touch devices and reuse the existing offscreen
-// map eviction/re-activation logic. RRFS/REFS retains its prior capacity.
+// Multi-model layouts can contain nine MapLibre/WebGL contexts and nine
+// independent CPU weather canvases. On a compact touch screen these offscreen
+// maps consume GPU/CPU memory without improving the visible plot. Limit ALL
+// model sets to a small mobile working set; retain desktop capacity, shared
+// decoded data, geographic camera and lazy offscreen map reactivation.
+// This is a resource budget, not a change to the data or forecast fields.
 function touchGraphicsDevice(){
  // Windows laptops and desktop monitors can report maxTouchPoints > 0 even
  // when the application is being used in a full-sized desktop workspace.
- // Only enforce the GFS three-context budget in a compact/mobile layout.
+ // Restrict GPU contexts only in a compact/mobile layout.
  try{
   const width=window.innerWidth;
   if(width<=800)return true;
@@ -4268,19 +4765,48 @@ function configuredMapCapacity(){
  const actual=st.panels.filter(p=>!p.cfg.placeholder).length;
  const configured=Number(st.cfg?.display?.maxActiveMaps);
  const standard=Math.max(1,Math.min(20,actual,Number.isFinite(configured)&&configured>0?Math.floor(configured):actual));
- if(st.modelSet==='gfs-versions'&&touchGraphicsDevice()){
-  const mobileLimit=Number(st.cfg?.display?.gfsMobileMapCapacity);
-  return Math.min(standard,Number.isInteger(mobileLimit)&&mobileLimit>=1?Math.min(6,mobileLimit):3);
+ if(touchGraphicsDevice()){
+  const display=st.cfg?.display||{};
+  // A site-specific GFS override remains supported for compatibility.
+  const raw=st.modelSet==='gfs-versions'&&display.gfsMobileMapCapacity!=null?
+   display.gfsMobileMapCapacity:display.mobileMapCapacity;
+  const mobileLimit=Number(raw??2);
+  return Math.min(standard,Number.isInteger(mobileLimit)&&mobileLimit>=1?
+   Math.min(6,mobileLimit):2);
  }
  return standard;
 }
 function mapCapacity(){
  return Math.min(configuredMapCapacity(),st.mobilePressureCap??20);
 }
+// Retry a visible panel that encountered full GPU slots while the previous
+// panel was still decoding. IntersectionObserver may not notify it again once
+// scrolling stops. Never evict a second visible map just to prewarm a third.
+function retryWaitingVisibleMobilePanel(){
+ if(!touchGraphicsDevice()||st.rendering||st.exporting||st._mobileActivationRetry)return;
+ st._mobileActivationRetry=setTimeout(()=>{
+  st._mobileActivationRetry=null;
+  if(st.rendering||st.exporting||document.hidden)return;
+  const free=st.active.length<mapCapacity()||st.active.some(p=>p.map&&!p.busy&&
+   !p.initializing&&!p.activation&&!nearViewport(p));
+  if(!free)return;
+  const p=st.panels.find(p=>!p.cfg.placeholder&&!p.map&&!p.activation&&nearViewport(p));
+  if(p)activate(p,'viewport').catch(error=>fail(p,error));
+ },110);
+}
+// Optional browser-console readout for on-device performance comparisons.
+window.OMDEVUMobilePerformance={stats:()=>({compact:touchGraphicsDevice(),
+ activeMaps:st.active.length,mapCapacity:mapCapacity(),contextLosses:st.contextLossCount,
+ mapPixelRatio:st.active[0]?.map?.getPixelRatio?.()??null,
+ panels:st.active.map(p=>({id:p.cfg.id,status:p.status,drawMs:p.mobileDrawMs??null,
+  stride:p.mobileRenderStride??1})),
+ decodedMiB:Math.round(st.cacheBytes/1048576),
+ displayMiB:Math.round(st.displayCacheBytes/1048576),
+ prefetchMode:prefetchMode()})};
 function trimMapsForGpuPressure(){
  if(st.exporting)return;
- // This path only runs after an ACTUAL failed WebGL restoration on mobile.
- // Prefer releasing offscreen, idle contexts; never discard loading maps.
+ // Also used after device rotation into the compact layout. Prefer
+ // releasing offscreen, idle contexts; never discard loading maps.
  let changed=false;
  while(st.active.length>mapCapacity()){
   const idle=st.active.filter(p=>p.map&&!p.initializing&&!p.busy&&!p.activation);
@@ -4298,8 +4824,8 @@ function handlePersistentContextLoss(p,m){
  p.contextLossTimer=null;
  if(p.map!==m||!p.contextLost)return;
  const oldCap=mapCapacity();
- if(innerWidth<=800&&oldCap>4){
-  st.mobilePressureCap=Math.max(4,oldCap-1);
+ if(touchGraphicsDevice()&&oldCap>1){
+  st.mobilePressureCap=Math.max(1,oldCap-1);
   console.warn('OMD EVU: mobile WebGL context could not be restored; reducing active maps to',st.mobilePressureCap);
   trimMapsForGpuPressure();
  }
@@ -4354,7 +4880,7 @@ async function createReadyMap(p,source){
   if(p.map!==m)return null;
   // The map-ready probe can resolve before a late MapLibre load callback.
   // In either order, new REFS/analysis panels receive the currently loaded LSRs.
-  syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);
+  syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);syncAmountReportsPanel(p);
   return m;
  }catch(e){
   if(p.map===m)discardMap(p);
@@ -4396,15 +4922,17 @@ function syncCategoricalDifferenceControls(){
   p.compareCheck.checked=!blocked&&st.difference.selected.includes(p);
  }
 }
-async function renderAll(){syncCategoricalDifferenceControls();window.EVUAdvancedMap?.setFieldOpacity(st.imageOpacity,surfaceTerrainField(st.field));window.EVUPointInspector?.scheduleSoundingRefresh();void refreshObservationOverlay();void refreshSPCReports();void refreshLightningReports();if(st.prefetchContext!==null&&st.prefetchContext!==prefetchContextKey())cancelQueuedPrefetches();st.seq++;invalidateDifferenceForViewChange();st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateMapBackground();updateLiveGeography();updateStatus();schedulePrefetch();scheduleDifferenceRefresh();}}
+async function renderAll(){syncCategoricalDifferenceControls();window.EVUAdvancedMap?.setFieldOpacity(st.imageOpacity,surfaceTerrainField(st.field));window.EVUPointInspector?.scheduleSoundingRefresh();void refreshObservationOverlay();void refreshSPCReports();void refreshLightningReports();void refreshAmountReports();if(st.prefetchContext!==null&&st.prefetchContext!==prefetchContextKey())cancelQueuedPrefetches();st.seq++;invalidateDifferenceForViewChange();st.rendering=true;const seq=st.seq;for(const p of st.panels){p.save.disabled=true;p.snap.hidden=true;p.lastSnapshot=null;if(p.cfg.placeholder){p.status='missing';continue;}if(!p.map){p.status='waiting';setNote(p,'Select or scroll to this panel to render');}}try{await Promise.all(st.active.filter(p=>p.map).map(p=>renderPanel(p,seq)));}finally{st.rendering=false;updateMapBackground();updateLiveGeography();updateStatus();schedulePrefetch();scheduleDifferenceRefresh();retryWaitingVisibleMobilePanel();}}
 // The compressed-byte store is optional. CacheStorage is available under HTTPS
 // (or localhost), survives browser reloads, and holds many forecast hours without
 // filling the decoded GPU-data caches. Missing/quota-restricted storage simply
 // degrades to a bounded memory-only look-ahead.
 class CompressedZarrStore {
  constructor(){this.cache=null;this.opening=null;this.disabled=false;this.entries=new Map();this.bytes=0;this.pendingWrite=Promise.resolve();this.foregroundRecentlyUsed=new Map();this.quotaFailures=0;this.adaptiveBudgetBytes=null;}
- get budget(){return Math.min(Math.max(32,Math.min(4096,Number(st.cfg?.display?.prefetchDiskCacheMB??512)))*1048576,this.adaptiveBudgetBytes??Infinity);}
- get maxItems(){return Math.max(16,Math.min(3000,Number(st.cfg?.display?.prefetchDiskMaxChunks??550)));}
+ get budget(){const limit=Math.max(32,Math.min(4096,Number(st.cfg?.display?.prefetchDiskCacheMB??512)));
+  return Math.min((touchGraphicsDevice()?Math.min(256,limit):limit)*1048576,this.adaptiveBudgetBytes??Infinity);}
+ get maxItems(){const limit=Math.max(16,Math.min(3000,Number(st.cfg?.display?.prefetchDiskMaxChunks??550)));
+  return touchGraphicsDevice()?Math.min(200,limit):limit;}
  get ttlMs(){return Math.max(1,Math.min(168,Number(st.cfg?.display?.prefetchCacheTTLHours??24)))*3600000;}
  async open(){
   if(this.disabled)return null;
@@ -4513,9 +5041,10 @@ function limiter(fn,background=false,key=null){
 }
 function pump(){
  const d=st.cfg?.display||{};
- const cap=Math.max(2,Math.min(12,Number(d.maxConcurrentFetches||6)));
+ const configured=Math.max(2,Math.min(12,Number(d.maxConcurrentFetches||6)));
+ const mobile=touchGraphicsDevice(),cap=mobile?Math.min(4,configured):configured;
  const mode=prefetchMode();
- const desired=Math.min(Math.max(1,cap-2),Math.max(1,Number(mode==='idle'?d.prefetchIdleConcurrency??4:d.prefetchActiveConcurrency??2)));
+ const desired=Math.min(Math.max(1,cap-2),Math.max(1,Number(mode==='idle'?d.prefetchIdleConcurrency??4:d.prefetchActiveConcurrency??2)),mobile?(mode==='idle'?2:1):Infinity);
  while(st.running<cap){
   let idx=st.queue.findIndex(t=>!t.background);
   if(idx<0&&mode!=='off'&&st.prefetchActive<desired)idx=st.queue.findIndex(t=>t.background);
@@ -4590,7 +5119,8 @@ function cacheGet(k){const v=st.cache.get(k);if(v){st.cacheStats.decoded++;st.ca
 function cachePut(k,v){
  if(st.cache.has(k))st.cacheBytes-=st.cache.get(k).byteLength;
  st.cache.delete(k);st.cache.set(k,v);st.cacheBytes+=v.byteLength;
- const max=Math.max(8,Number(st.cfg.display.decodedCacheMB||96))*1024*1024;
+ const limit=Math.max(8,Number(st.cfg.display.decodedCacheMB||96));
+ const max=(touchGraphicsDevice()?Math.min(128,limit):limit)*1024*1024;
  while(st.cacheBytes>max&&st.cache.size>1){const oldest=st.cache.keys().next().value;st.cacheBytes-=st.cache.get(oldest).byteLength;st.cache.delete(oldest);st.cacheStats.decodedEvicted++;}
 }
 function displayKey(src,ds,v,h,m){
@@ -4601,7 +5131,8 @@ function displayCacheGet(k){const v=st.displayCache.get(k);if(v){st.cacheStats.d
 function displayCachePut(k,v){
  if(st.displayCache.has(k))st.displayCacheBytes-=st.displayCache.get(k).byteLength;
  st.displayCache.delete(k);st.displayCache.set(k,v);st.displayCacheBytes+=v.byteLength;
- const max=Math.max(16,Number(st.cfg.display.displayReadyCacheMB||128))*1024*1024;
+ const limit=Math.max(16,Number(st.cfg.display.displayReadyCacheMB||128));
+ const max=(touchGraphicsDevice()?Math.min(96,limit):limit)*1024*1024;
  while(st.displayCacheBytes>max&&st.displayCache.size>1){const oldest=st.displayCache.keys().next().value;st.displayCacheBytes-=st.displayCache.get(oldest).byteLength;st.displayCache.delete(oldest);st.cacheStats.displayEvicted++;}
 }
 async function getDisplayData(src,ds,v,h,m,onProgress){
@@ -4944,39 +5475,81 @@ async function getPanelDisplayData(p,ds,v,h,m,onProgress,seq){
    alignAviationToGfsGrid({ds:obs.ds,v:obs.v},analysisValues,{ds,v});
   return signedSnowChange(forecastValues,aligned);
  }
- if(p.analysisRadar&&p.cfg.timeMode==='analysis'&&panelSelectedField(p)==='refc_ptype'){
+ // Selection-time fallback for RAP without radar; never interpret Ptype
+ // category codes as dBZ or label them as reflectivity.
+ if(p.analysisCategoricalOnly&&p.cfg.timeMode==='analysis'&&panelSelectedField(p)==='refc_ptype')
+  return readNativePtype(p.src,ds,v,0,onProgress);
+ // Optional native RAP reflectivity fallback (only when truly published).
+ if(p.analysisNativeRadar&&p.cfg.timeMode==='analysis'&&panelSelectedField(p)==='refc_ptype'){
+  const [reflectivity,ptype]=await Promise.all([
+   getDisplayData(p.src,ds,v,0,FIELDS.refc,onProgress),
+   readNativePtype(p.src,ds,p.analysisNativeRadar.ptype,0,()=>{})]);
+  return blendReflectivityPtype(reflectivity,ptype);
+ }
+ if(p.analysisRadar&&['analysis','gfs-analysis'].includes(p.cfg.timeMode)&&panelSelectedField(p)==='refc_ptype'){
   const radar=p.analysisRadar;
-  // MRMS and RAP use *different* grid projections/resolutions. Do not
-  // naively zip corresponding array offsets (which would shift weather).
-  const [rapPtype,mrmsReflectivity]=await Promise.all([
-   readNativePtype(p.src,ds,v,0,onProgress),
-   getDisplayData(p.src,radar.ds,radar.v,0,FIELDS.refc,()=>{})
-  ]);
-  const target=gridFromDataset(ds,v),source=gridFromDataset(radar.ds,radar.v);
-  const radarField=new apgl.RawScalarField(source,mrmsReflectivity);
-  const ny=v.shape[1],nx=v.shape[2];
+  const ptypeVariable=p.cfg.timeMode==='analysis'?v:ds.variables.find(x=>x.name==='ptype');
+  const targetVariable=ptypeVariable;
+  // MRMS and both NWP models use different grids. Sample geographic
+  // coordinates, never corresponding array indices.
+  const cacheKey=displayKey(p.src,ds,targetVariable,0,FIELDS.ptype)+'::mrms-refc-v2::'+
+   displayKey(radar.src||p.src,radar.ds,radar.v,0,FIELDS.refc);
+  const cached=displayCacheGet(cacheKey);
+  if(cached)return cached;
+  const radarPromise=getDisplayData(radar.src||p.src,radar.ds,radar.v,0,FIELDS.refc,()=>{})
+   .then(values=>({values}),error=>({error}));
+  const [ptype,radarResult]=await Promise.all([
+   readNativePtype(p.src,ds,ptypeVariable,0,onProgress),radarPromise]);
+  if(radarResult.error){
+   // MRMS may be catalogued while its chunk is still arriving on RZDM.
+   // Use the matching model's F000 values, never a stale radar snapshot.
+   console.warn('MRMS reflectivity unavailable; using same-valid-time model fallback',radarResult.error);
+   p.analysisRadar=null;
+   if(p.cfg.timeMode==='gfs-analysis'){
+    onProgress('MRMS unavailable; using native GFSv16 F000 reflectivity and Ptype…');
+    const native=await getDisplayData(p.src,ds,v,0,FIELDS.refc,()=>{});
+    return blendReflectivityPtype(native,ptype);
+   }
+   const native=ds.variables.find(x=>x.name==='refc'&&x.available_hours?.includes(0)&&
+     x.shape?.[1]===v.shape?.[1]&&x.shape?.[2]===v.shape?.[2]);
+   if(native){
+    p.analysisNativeRadar={ptype:v};
+    onProgress('MRMS unavailable; using native RAP F000 reflectivity and Ptype…');
+    return blendReflectivityPtype(await getDisplayData(p.src,ds,native,0,FIELDS.refc,()=>{}),ptype);
+   }
+   p.analysisCategoricalOnly=true;
+   onProgress('MRMS unavailable; showing RAP F000 precipitation type only…');
+   return ptype;
+  }
+  const target=gridFromDataset(ds,targetVariable),source=gridFromDataset(radar.ds,radar.v);
+  const radarField=new apgl.RawScalarField(source,radarResult.values);
+  const ny=targetVariable.shape[1],nx=targetVariable.shape[2];
   const encoded=new Float32Array(nx*ny);
   const coords=target.getGridCoords();
   if(coords?.x?.length!==nx||coords?.y?.length!==ny)
-   throw Error('RAP F000 grid coordinates do not match published Ptype array.');
-  // Validate the fast native-grid lookup before processing millions of cells.
-  // If validation fails, autumnplot's authoritative sampling is used.
+   throw Error('Model F000 Ptype grid coordinates do not match published array.');
   const fast=globalThis.EVUFastWindSampler?.build?.(radarField,radarField);
   const pair=[NaN,NaN];
   const sample=(lon,lat)=>fast?fast.sample(lon,lat,pair)[0]:radarField.sampleField(lon,lat);
-  onProgress('Geographically aligning MRMS reflectivity to RAP F000 Ptype…');
-  // This native RAP-resolution comparison preserves the categorical flags;
-  // an MRMS-native high-resolution product requires offline remapping.
+  onProgress('Aligning MRMS reflectivity to '+(p.cfg.timeMode==='analysis'?'RAP':'GFSv16')+' F000 Ptype…');
+  const yieldToMobile=touchGraphicsDevice()&&nx*ny>350000;
   for(let y=0;y<ny;y++){
    if(seq!==st.seq)return null;
+   // A whole global GFS F000 grid can take a noticeable time to align.
+   // Preserve the native category positions but let Android paint/touch
+   // events run between small scanline groups instead of freezing the UI.
+   if(yieldToMobile&&y>0&&y%32===0){
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    if(seq!==st.seq)return null;
+   }
    for(let x=0;x<nx;x++){
     const [lon,lat]=target.transform(coords.x[x],coords.y[y],{inverse:true}),k=y*nx+x;
-    const d=Number(sample(lon,lat));
-    const t=rapPtype[k],code=Math.round(t);
+    const d=Number(sample(lon,lat)),t=ptype[k],code=Math.round(t);
     encoded[k]=Number.isFinite(d)&&d>=10&&d<1e9&&Number.isFinite(t)&&Math.abs(t-code)<.01&&code>=1&&code<=5
      ?(code-1)*80+Math.min(d,79.9):-1e10;
    }
   }
+  displayCachePut(cacheKey,encoded);
   return encoded;
  }
 
@@ -5323,8 +5896,8 @@ function paletteKey(m,v){
  if(m.differenceField)return 'difference:'+scalar;
  return v?.name==='rottrack_ml60'?'rottrack_ml60':scalar;
 }
-function paletteBase(m,v){
- const key=paletteKey(m,v),custom=key&&st.customPalettes.get(key);
+function paletteBase(m,v,fieldOverride=null){
+ const key=fieldOverride||paletteKey(m,v),custom=key&&st.customPalettes.get(key);
  return custom&&window.EVUPalParser?window.EVUPalParser.toPalette(custom):basePal(m,v);
 }
 function loadCustomPalettes(){
@@ -5341,8 +5914,8 @@ function persistCustomPalettes(){
  try{localStorage.setItem(USER_PALETTE_STORAGE,JSON.stringify(Object.fromEntries(st.customPalettes)));return true;}
  catch(_){return false;}
 }
-function pal(m,v){
- const key=paletteKey(m,v),base=paletteBase(m,v),opaqueBase=m.clearZero?makeZeroPaletteOpaque(base):base;
+function pal(m,v,fieldOverride=null){
+ const key=fieldOverride||paletteKey(m,v),base=paletteBase(m,v,fieldOverride),opaqueBase=m.clearZero?makeZeroPaletteOpaque(base):base;
  const selected=key?st.colorRanges.get(key):null;
  let result=opaqueBase;
  if(selected){
@@ -5711,7 +6284,7 @@ function cityBoundsContains(bounds,lon,lat){
 function cityLabelValue(p,city){
  if(cityStyle().displayValue!==true||!p.rawField)return '';
  try{
-  const value=Number(p.rawField.sampleField(city.lon,city.lat));
+  const value=Number((p.readoutField||p.rawField).sampleField(city.lon,city.lat));
   if(!Number.isFinite(value)||value<=-1e9)return '';
   const field=panelSelectedField(p);
   const meta=p.v?panelFieldInfo(p,p.v):(FIELDS[field]||{});
@@ -5901,7 +6474,9 @@ function moistureDrawList(p){
  return result;
 }
 function overlayHeightVisible(field=st.field){return Boolean(heightVariableName(field)&&st.overlayHeight);}
+const NEAR_SURFACE_WIND_FIELDS=new Set(['t2m','dpt2m','rh2m']);
 function overlayWindSetting(field=st.field){
+ if(NEAR_SURFACE_WIND_FIELDS.has(field))return 'overlayNearSurfaceWind';
  if(String(field).startsWith('wave_'))return 'overlayWaveDirection';
  return ['shear01','shear06','srh01','srh03'].includes(field)?'overlaySevereWind':
     heightVariableName(field)?'overlayUpperWind':'overlaySurfaceWind';
@@ -5982,12 +6557,6 @@ initDataOverlaysMenu();
 const imageFieldOptions=document.getElementById('imageFieldOptions');
 imageFieldOptions?.addEventListener('change',event=>{
  const input=event.target;if(!input?.matches('input[type="radio"]'))return;
- if(st.field==='lowtracks'){
-  if(!['mslp','none'].includes(input.value))return;
-  st.lowTrackBackground=input.value;
-  syncUI();updateSharedLegend();void renderAll();
-  return;
- }
  if(!UPPER_AIR_IMAGE_FIELDS[st.field]?.some(([key])=>key===input.value))return;
  st.shadedFields.set(st.field,input.value);
  refreshHours();syncUI();updateSharedLegend();void renderAll();
@@ -5998,6 +6567,7 @@ function updateContourControl(){
  const shadedField=selectedShadingField();
  const linesAvailable=contoursAvailable(shadedField);
  const reportsAvailable=observationVisible();
+ const amountAvailable=!!amountReportKind();
  const spcAvailable=SPC_FIELDS.has(st.field);
  const lightningAvailable=LIGHTNING_FIELDS.has(st.field)&&st.cfg?.lightning?.enabled!==false;
  el.spcControl.hidden=!spcAvailable;
@@ -6027,7 +6597,8 @@ function updateContourControl(){
  el.tracersToggleBtn.disabled=!tracerEligible;
  // Pause animation when the selected product has no available wind component pair.
  window.EVUAdvancedMap?.setTracers(st.tracersEnabled&&tracerEligible);
- el.contourControl.hidden=!(UPPER_AIR_IMAGE_FIELDS[st.field]||linesAvailable||reportsAvailable||spcAvailable||lightningAvailable||heightAvailable||windAvailable||tracerEligible||moisture||st.field==='mslp'||st.field==='lowtracks');
+ if(el.surfaceWeatherOption){el.surfaceWeatherOption.hidden=!surfaceWeatherEligible();el.surfaceWeatherToggleBtn.checked=st.surfaceWeatherEnabled;updateSurfaceWeatherSummary();}
+ el.contourControl.hidden=!(UPPER_AIR_IMAGE_FIELDS[st.field]||linesAvailable||reportsAvailable||amountAvailable||spcAvailable||lightningAvailable||heightAvailable||windAvailable||tracerEligible||moisture||lowTracksAvailableForField());
  el.heightOption.hidden=!heightAvailable;
  el.windOption.hidden=!Boolean(windComponentNames(st.field));
  el.marineWindOption.hidden=!marineSurfaceWindAvailable(st.field);
@@ -6036,11 +6607,17 @@ function updateContourControl(){
  const contourName=contourFieldLabel(contourVariable);
  const contourCaption=el.contourOption?.querySelector('span');
  if(contourCaption)contourCaption.textContent=contourName;
- if(el.contourOption)el.contourOption.setAttribute('aria-label',`Show ${contourName} contours`);
- // Only the Low tracks product exposes this overlay; initially enabled.
+ if(el.contourOption){
+  el.contourOption.setAttribute('aria-label',`Show ${contourName} contours`);
+  el.contourOption.dataset.styleLayer=contourAppearance(contourVariable,st.theme).styleLayer;
+ }
+ // Low tracks are an optional overlay on every surface plot whose image
+ // choices include MSLP, even if another scalar is currently shaded.
  if(el.lowTracksOption){
-  el.lowTracksOption.hidden=st.field!=='lowtracks';
+  el.lowTracksOption.hidden=!lowTracksAvailableForField();
   el.lowTracksToggleBtn.checked=st.lowTracksEnabled;
+  for(const panel of st.panels||[])updateLowTrackPanelStatus(panel);
+  updateLowTracksStatus();
  }
  // Surface multi-image plots show independent MSLP isobars ON by default.
  if(el.surfaceMSLPOption){
@@ -6050,6 +6627,9 @@ function updateContourControl(){
  el.mslp850Option.hidden=st.field!=='mslp';
  el.mslp850ToggleBtn.checked=st.overlayMSLP850;
  el.obsControl.hidden=!reportsAvailable;
+ el.amountReportsControl.hidden=!amountAvailable;
+ if(el.amountReportsCocorahs)el.amountReportsCocorahs.checked=st.amountReportEnabled.cocorahs;
+ if(el.amountReportsMetar)el.amountReportsMetar.checked=st.amountReportEnabled.metar;
  el.obsCount.hidden=!reportsAvailable||!(st.obsEnabled.synoptic||st.obsEnabled.mping);
  el.obsAttribution.hidden=!reportsAvailable;
  // Count nested METAR/mPING labels individually. Above four options, the
@@ -6061,12 +6641,12 @@ function updateContourControl(){
  el.marineWindToggleBtn.checked=st.overlayMarineWind;
  const windLabel=el.windOption?.querySelector?.('span');
  if(windLabel)windLabel.textContent=st.field.startsWith('shear')?'Shear barbs':
-   st.field.startsWith('srh')?'Storm motion barbs':st.field.startsWith('wave_')?marineDirectionLabel(st.field):'Wind barbs';
+   st.field.startsWith('srh')?'Storm motion barbs':NEAR_SURFACE_WIND_FIELDS.has(st.field)?'10 m wind barbs':st.field.startsWith('wave_')?marineDirectionLabel(st.field):'Wind barbs';
  // One label is reused for wind and wave products; its right-click editor
  // must follow the current field, not retain the previous wind style layer.
  if(el.windOption)el.windOption.dataset.styleLayer=st.field.startsWith('wave_')?'waveDirection':'wind';
  if(el.windOption)el.windOption.title=st.field.startsWith('shear')?'Display 0–1/0–6 km shear-vector wind barbs (knots)':
-   st.field.startsWith('srh')?'Display native Bunkers right-moving storm-motion barbs':st.field.startsWith('wave_')?`Display ${marineDirectionLabel(st.field).toLowerCase()} (not wind barbs)`:'Display meteorological wind barbs';
+   st.field.startsWith('srh')?'Display native Bunkers right-moving storm-motion barbs':NEAR_SURFACE_WIND_FIELDS.has(st.field)?'Overlay native 10 m wind barbs, independently of the 2 m shaded field (off by default); right-click to style':st.field.startsWith('wave_')?`Display ${marineDirectionLabel(st.field).toLowerCase()} (not wind barbs)`:'Display meteorological wind barbs';
  el.contourToggleBtn.checked=st.field==='mslp'?st.overlayMSLP:st.contours;
  const interval=contourInterval(contourVariable,st.active?.find(p=>p.map)?.map?.getZoom?.()??3);
  const m=FIELDS[contourVariable];
@@ -6268,16 +6848,28 @@ function contourAppearance(field,theme='dark',exportScale=1,multiExport=false){
   styleLayer:'specificHumidity',dashed:true,ink:theme==='dark'?'#ff86ed':'#902189',
   casing:'rgba(12,18,32,.94)',exportInk:theme==='dark'?'#ff9af4':'#8e147c',
   liveWidth:2.0,exportOuterWidth:3.9,exportInnerWidth:2,dash:multiExport?[3*scale,4*scale]:scale>1.001?[3*scale,4*scale]:[2.5,4.5]};
- const ink=(height||isobar)?'#102536':(theme==='dark'?'#f5faff':'#193145');
+ const ink=isobar?'#000000':height?'#102536':(theme==='dark'?'#f5faff':'#193145');
  const casing=(height||isobar)?'rgba(255,255,255,.96)':
   (theme==='dark'?'rgba(5,17,30,.94)':'rgba(255,255,255,.95)');
- const exportInk=(height||isobar)?'rgba(11,24,38,.96)':
+ const exportInk=isobar?'rgba(0,0,0,.96)':height?'rgba(11,24,38,.96)':
   (theme==='dark'?'rgba(251,253,255,.94)':'rgba(15,30,45,.90)');
- return {styleLayer:height?'height':field==='t850'?'temperature':'contours',
+ return {styleLayer:isobar?'mslpContours':height?'height':field==='t850'?'temperature':'contours',
   dashed,ink,casing,exportInk,liveWidth:(height||isobar)?2.85:1.85,
   exportOuterWidth:(height||isobar)?4.8:3.2,
   exportInnerWidth:(height||isobar)?2.1:1.35,
   dash:dashed?(multiExport?[9*scale,7*scale]:scale>1.001?[9*scale,7*scale]:[6,4]):[]};
+}
+// User-selected contour dash patterns override field-specific defaults only
+// when explicitly changed in the appearance editor. Pattern lengths are in
+// display pixels and scale with PNG export sizes, including comparison cells.
+function styledContourAppearance(appearance,exportScale=1,multiExport=false){
+ const mode=overlayStyle(appearance.styleLayer).lineStyle||'auto';
+ if(!VALID_CONTOUR_LINE_STYLES.has(mode)||mode==='auto')return appearance;
+ const scale=multiExport?Math.max(.12,Math.min(3,Number(exportScale)||1)):
+  Math.max(1,Math.min(3,Number(exportScale)||1));
+ const patterns={solid:[],dashed:[9,6],dotted:[1.5,4], 'dash-dot':[9,4,1.5,4]};
+ const dash=patterns[mode].map(x=>x*scale);
+ return {...appearance,dash,dashed:dash.length>0};
 }
 function drawContours(p,{field=p.contourField||p.rawField,key=p?.cfg?.field||st.shadedFields?.get?.(st.field)||st.field,append=false,always=false,exportScale=1,multiExport=false,comparisonLabels=null}={}){
  // Difference panels never render meteorological contours, regardless of toggles or export.
@@ -6328,7 +6920,7 @@ function drawContours(p,{field=p.contourField||p.rawField,key=p?.cfg?.field||st.
   }
   values.set(filtered);
  }
- const appearance=contourAppearance(plottedField,st.theme,exportScale,multiExport);
+ const appearance=styledContourAppearance(contourAppearance(plottedField,st.theme,exportScale,multiExport),exportScale,multiExport);
  // The optional MSLP/850-hPa temperature overlay shares the t850 profile.
  const styleLayer=appearance.styleLayer;
  const levels=contourLevels(plottedField,min,max,map.getZoom?.()??3,w,h,styleLayer);
@@ -6350,7 +6942,7 @@ function drawContours(p,{field=p.contourField||p.rawField,key=p?.cfg?.field||st.
  // Live and comparison exports share a single-stroke visual language.
  // Standalone high-resolution exports intentionally keep the established
  // two-tone recipe. Butt caps preserve intervals in dashed scalar overlays.
- ctx.lineCap=(exportContours&&dashedScalar)?'butt':'round';
+ ctx.lineCap=overlayStyle(appearance.styleLayer).lineStyle==='dotted'?'round':((exportContours&&appearance.dashed)?'butt':'round');
  const dash=appearance.dash;
  const liveContourInk=appearance.ink;
  ctx.save();
@@ -6589,7 +7181,7 @@ function windComponentNames(field){
  if(field==='wave_height_wind'||field==='wave_period_wind')return ['wave_u_wind','wave_v_wind'];
  if(field==='wave_height_swell1'||field==='wave_period_swell1')return ['wave_u_swell1','wave_v_swell1'];
  const level=field==='t1000'?1000:field==='t925'?925:field==='t850'?850:field==='t700'?700:field==='absv500'?500:field==='wspd250'?250:field==='wspd300'?300:0;
- return level?['u'+level,'v'+level]:field==='wspd10'?['u10','v10']:
+ return level?['u'+level,'v'+level]:(field==='wspd10'||NEAR_SURFACE_WIND_FIELDS.has(field))?['u10','v10']:
   field==='shear01'?['shru01','shrv01']:field==='shear06'?['shru06','shrv06']:
   field==='srh01'||field==='srh03'?['ustm','vstm']:null;
 }
@@ -6649,7 +7241,7 @@ function overlayPlotDescriptor(p){
  if(heightVariableName(st.field)&&st.overlayHeight&&p?.heightField)parts.push('height');
  if(st.field==='t850'&&st.overlayWindSpeed850&&p?.windSpeed850Field)parts.push('wind-speed contours');
  if(p?.marineWind&&marineSurfaceWindVisible(field))parts.push('10-m wind barbs');
- if(windComponentNames(st.field)&&overlayWindVisible(st.field)&&p?.wind)parts.push(String(field).startsWith('wave_')?'wave direction arrows':field.startsWith('shear')?'shear barbs':field.startsWith('srh')?'right-mover barbs':'wind barbs');
+ if(windComponentNames(st.field)&&overlayWindVisible(st.field)&&p?.wind)parts.push(String(field).startsWith('wave_')?'wave direction arrows':field.startsWith('shear')?'shear barbs':field.startsWith('srh')?'right-mover barbs':NEAR_SURFACE_WIND_FIELDS.has(field)?'10 m wind barbs':'wind barbs');
  if(UPPER_AIR_IMAGE_FIELDS[st.field]){
   if(surfaceMSLPContoursEnabled()&&p?.mslpContourField)parts.push('MSLP isobars');
   if(st.contours&&p?.primaryContourField)parts.push(`${contourFieldLabel(st.field).toLowerCase()} contours`);
@@ -6661,7 +7253,6 @@ function overlayPlotDescriptor(p){
 }
 function updatePanelPlotTitle(p){
  if(!p?.title)return;
- if(st.field==='lowtracks'){p.title.textContent=panelDisplayTitle(p,'Surface low tracks');return;}
  p.title.textContent=panelDisplayTitle(p,overlayPlotDescriptor(p));
 }
 async function preparePrimaryUpperAirContours(p,ds,h,seq){
@@ -7010,6 +7601,39 @@ function plotNoDataMask(values,field,isDifference=false){
  }
  return mask;
 }
+// autumnplot-gl applies the GPU's LINEAR filter to raw scalar texels before
+// colormap lookup. A transparent cmap_mask does not prevent a missing texel's
+// -1e10/NaN sentinel from entering that interpolation: a single invalid grid
+// point next to a valid signed A-B difference can create a spurious saturated
+// blue hairline. Keep the mask EXACTLY as computed from the original data and
+// replace only invalid texels in the GPU input with bounded nearby valid values.
+// The resulting array is used only by the PlotLayer texture, never for probes,
+// difference arithmetic, contours, native data or archived output. Precompute
+// regardless of the toggle so enabling interpolation does not require a new
+// network request, data upload or plot reconstruction.
+function safeDifferenceTextureValues(values,mask,nx,ny){
+ if(!values||!mask||values.length!==mask.length||nx<2||ny<2||nx*ny!==values.length)return values;
+ let result=null;
+ for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){
+  const idx=y*nx+x;
+  if(mask[idx])continue;
+  if(!result)result=values.slice();
+  let sum=0,n=0;
+  // Only valid ORIGINAL cells contribute. Never chain values invented for
+  // previously missing points across a larger coverage gap.
+  for(let j=Math.max(0,y-1);j<=Math.min(ny-1,y+1);j++){
+   for(let i=Math.max(0,x-1);i<=Math.min(nx-1,x+1);i++){
+    const neighbor=j*nx+i,value=values[neighbor];
+    if(mask[neighbor]&&Number.isFinite(value)&&value>-1e9&&Math.abs(value)<1e15){sum+=value;n++;}
+   }
+  }
+  // Fully missing interiors have no valid field to display. Use the exact
+  // neutral difference value, which is transparent in the signed palette;
+  // the original mask still forbids drawing those pixels.
+  result[idx]=n?sum/n:0;
+ }
+ return result||values;
+}
 // Mask pressure-level scalar fields using the MODEL's native surface
 // pressure, rather than a fixed-height approximation to terrain. The
 // below-ground mask applies to the displayed field, contour source, and
@@ -7087,6 +7711,13 @@ function analysisFieldDescription(p,fallback){
  return fallback;
 }
 function panelDisplayTitle(p,fieldDescription){
+ if(panelSelectedField(p)==='refc_ptype'&&['analysis','gfs-analysis'].includes(p?.cfg?.timeMode)){
+  const model=p.cfg.timeMode==='analysis'?'RAP':'GFSv16';
+  if(p.analysisRadar)return `Analysis · MRMS reflectivity + ${model} F000 precipitation type`;
+  if(p.analysisCategoricalOnly)return 'Analysis · RAP F000 precipitation type (reflectivity unavailable)';
+  if(p.analysisNativeRadar||p.cfg.timeMode==='gfs-analysis')
+   return `Analysis · ${model} F000 reflectivity + precipitation type (MRMS unavailable)`;
+ }
  const product=String(p?.ds?.product||'');
  const snowAnalysis=/^(?:gfs_)?nohrsc_/.test(product);
  const precipAnalysis=/^(?:gfs_)?(?:ccpa_|stageiv_|mrms_(?:apcp|prate))/.test(product);
@@ -7616,12 +8247,45 @@ function drawMobileScalar(p){
  const opacity=st.imageOpacity,relief=surfaceTerrainField(fieldName)?
   (terrainRenderedLuminance(map,nx,ny)||terrainFieldLuminance(map,nx,ny,w,h)):null;
  const bilinear=terrainBilinearSampler(spec);
- for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){
-  let v=NaN;
-  try{const coord=map.unproject([(x+.5)*w/nx,(y+.5)*h/ny]);
-   v=bilinear?bilinear(coord.lng,coord.lat):spec.field.sampleField(coord.lng,coord.lat);}catch(_){ }
-  if(mobileFieldMasked(v,fieldName,!!p.cfg?.differencePanel,spec.meta))continue;
-  // Quantize cache keys only below the visible color precision. This
+ // This same, fail-closed geographic scanline accelerator was already used
+ // in difference PNG exports. In a flat zero-bearing Mercator map, longitude
+ // varies linearly with screen X and latitude does not. Other camera modes
+ // automatically retain per-pixel map.unproject(), exactly as before.
+ const longitude=differenceExportLongitudeScanline(map,nx,w,h);
+ const stepX=w/nx,stepY=h/ny;
+ // A validated native-grid Lambert sampler is already shipped for the
+ // terrain renderer. Reuse it for flat mobile weather pixels when the
+ // geographic scanline is valid; reject silently if orientation differs.
+ if(longitude&&!bilinear&&p.mobileRenderStride===1&&window.EVUFastLambertSampler?.build&&
+    p._flatLambertSpec!==spec){
+  p._flatLambertSpec=spec;
+  try{p._flatLambertSampler=window.EVUFastLambertSampler.build(spec.grid,spec.values,
+    spec.nx,spec.ny,(lon,lat)=>spec.field.sampleField(lon,lat),
+    {earthRadiusM:st.cfg.display.earthRadiusM||6371229});}
+  catch(error){p._flatLambertSampler=null;console.debug('Mobile Lambert fallback',error);}
+ }
+ const rowLambert=longitude&&!bilinear&&p.mobileRenderStride===1?
+  p._flatLambertSampler?.sampleRow:null;
+ const started=performance.now();
+ for(let y=0;y<ny;y++){
+  const py=(y+.5)*stepY;
+  let rowLat=NaN,rowValues=null;
+  if(longitude){
+   try{rowLat=map.unproject([stepX*.5,py]).lat;
+    if(rowLambert&&Number.isFinite(rowLat))rowValues=rowLambert(longitude,rowLat);
+   }catch(_){rowLat=NaN;}
+  }
+  for(let x=0;x<nx;x++){
+   let v=NaN;
+   try{
+    if(rowValues)v=rowValues[x];
+    else if(longitude&&Number.isFinite(rowLat))
+     v=bilinear?bilinear(longitude[x],rowLat):spec.field.sampleField(longitude[x],rowLat);
+    else if(!longitude){const coord=map.unproject([(x+.5)*stepX,py]);
+     v=bilinear?bilinear(coord.lng,coord.lat):spec.field.sampleField(coord.lng,coord.lat);}
+   }catch(_){ }
+   if(mobileFieldMasked(v,fieldName,!!p.cfg?.differencePanel,spec.meta))continue;
+   // Quantize cache keys only below the visible color precision. This
   // cache does not change the scalar data or the continuous color scale.
   const lookup=Number.isFinite(v)?Math.round(v*10000):'bad';
   let rgba=colorCache.get(lookup);
@@ -7629,8 +8293,10 @@ function drawMobileScalar(p){
   const k=(y*nx+x)*4,lum=screenTerrainLuminanceAt(relief,x,y,nx,ny);
   pixels[k]=Math.min(255,Math.round(rgba[0]*lum));
   pixels[k+1]=Math.min(255,Math.round(rgba[1]*lum));
-  pixels[k+2]=Math.min(255,Math.round(rgba[2]*lum));pixels[k+3]=rgba[3];
+   pixels[k+2]=Math.min(255,Math.round(rgba[2]*lum));pixels[k+3]=rgba[3];
+  }
  }
+ p.mobileDrawMs=Math.round(performance.now()-started);
  ctx.putImageData(image,0,0);
  canvas.style.imageRendering=effectiveInterpolation()?'auto':'pixelated';
  // MapLibre's 'move' listener hides stale forecast pixels. A successful
@@ -7730,16 +8396,15 @@ function installRasterInterpolation(component,p){
   return result;
  };
 }
-// A global GFS grid contains ~1 million vertices per scalar field, which
-// competes with MapLibre itself for memory on a phone. Use a 2x coarser
-// *display-only* grid on touch devices; the native-resolution field is still
-// used for contours, coordinate sampling, and any derived comparisons.
-// Endpoints are retained, so the plot stays geographically registered.
-function mobileGfsRasterStride(ds,v,p){
+// A global regular-lat/lon field can require >1 million texture vertices
+// regardless of which model produced it. A 2x display-only grid on compact
+// devices reduces that GPU payload 4x; contours, sampling, meteorological
+// calculations and native datasets still use full resolution. Do not reduce
+// native terrain meshes. Endpoints remain exactly geographically registered.
+function mobileRasterStride(ds,v,p){
  const n=Number(v?.shape?.[1])*Number(v?.shape?.[2]);
  if(window.EVU_MAPLIBRE_V6&&terrainEnabledForPanel(p))return 1;
- return st.modelSet==='gfs-versions'&&touchGraphicsDevice()&&
-  ds?.grid?.GRIB_gridType==='regular_ll'&&n>=300000?2:1;
+ return touchGraphicsDevice()&&ds?.grid?.GRIB_gridType==='regular_ll'&&n>=300000?2:1;
 }
 function mobileRegularRasterField(ds,v,values,stride){
  const ny=v.shape[1],nx=v.shape[2];
@@ -7756,7 +8421,7 @@ function mobileRegularRasterField(ds,v,values,stride){
  const virtual={...v,shape:[1,newNy,newNx]};
  return {grid:gridFromDataset(ds,virtual),values:selected};
 }
-// The Low Tracks selection reuses MSLP for the underlying field only; all
+// Low tracks are an independent overlay for MSLP-capable surface fields; all
 // trajectory geometry is loaded from compact, converter-published JSON.
 // We deliberately do not infer tracks from browser pixels or retain grids.
 function lowTrackSourceId(model,initTime){
@@ -7767,74 +8432,187 @@ function lowTrackSourceId(model,initTime){
  const cycle=String(date.getUTCHours()).padStart(2,'0');
  return `${model}_${day}_${cycle}00`;
 }
+function lowTrackGridDomain(p){
+ const g=p?.ds?.grid;
+ if(!g)return null;
+ if(g.GRIB_gridType==='regular_ll'){
+  const pick=(a,b)=>{const x=g[a]??g['GRIB_'+b];return x==null?NaN:Number(x);};
+  let west=pick('longitude_min','longitudeOfFirstGridPointInDegrees');
+  let east=pick('longitude_max','longitudeOfLastGridPointInDegrees');
+  const south=pick('latitude_min','latitudeOfFirstGridPointInDegrees');
+  const north=pick('latitude_max','latitudeOfLastGridPointInDegrees');
+  if(![west,east,south,north].every(Number.isFinite))return null;
+  if(east<west)east+=360;
+  if(east-west>360.001||south>north)return null;
+  return {type:'rect',west,east,south,north};
+ }
+ if(g.GRIB_gridType!=='lambert'||!p.v)return null;
+ // The native 3-km RRFS, REFS and HRRR grid is a rectangle in Lambert
+ // projection, but its four edges are CURVES in longitude/latitude. Sample
+ // these edges from the existing autumnplot projection; a rectangular
+ // geographic bounding box would admit erroneous offshore tracks.
+ try{
+  const grid=gridForPanel(p,p.ds,p.v);
+  if(typeof grid.transform!=='function'||
+     ![grid.ll_x,grid.ur_x,grid.ll_y,grid.ur_y].every(Number.isFinite))return null;
+  const points=[];
+  const N=24;
+  const sample=(x,y)=>{
+   const xy=grid.transform(x,y,{inverse:true});
+   if(!Array.isArray(xy)||xy.length<2||!xy.every(Number.isFinite))throw Error('Invalid Lambert edge');
+   points.push(xy);
+  };
+  for(let j=0;j<N;j++){const t=j/N;sample(grid.ll_x+(grid.ur_x-grid.ll_x)*t,grid.ll_y);}
+  for(let j=0;j<N;j++){const t=j/N;sample(grid.ur_x,grid.ll_y+(grid.ur_y-grid.ll_y)*t);}
+  for(let j=0;j<N;j++){const t=j/N;sample(grid.ur_x-(grid.ur_x-grid.ll_x)*t,grid.ur_y);}
+  for(let j=0;j<N;j++){const t=j/N;sample(grid.ll_x,grid.ur_y-(grid.ur_y-grid.ll_y)*t);}
+  return {type:'polygon',coordinates:points};
+ }catch(error){console.warn('Low-track Lambert boundary unavailable:',error);return null;}
+}
 function lowTrackProductSources(p){
  const isAnalysis=p.cfg?.timeMode==='analysis';
  const gfsAnalysis=p.cfg?.timeMode==='gfs-analysis';
- if(isAnalysis)return [{file:'analysis_reference.json',label:'Analyzed F000 MSLP (best available)'}];
+ if(isAnalysis)return [{file:'analysis_f000_rap_surface.json',label:'RAP F000 low history (diagnostic)',kind:'analysis_f000',model:'rap_surface'}];
  // The GFS Analysis panel is composed of successive GFSv16 F000 cycles,
  // not the selected forecast's F003/F006/... MSLP fields.
- if(gfsAnalysis)return [];
- // Use the physical Zarr store ID when a logical source (notably GEFS)
- // can select different underlying native-resolution products.
- const physical=String(p.ds?.id||p.ds?.path||'').replace(/\.zarr$/,'');
- const model=p.cfg?.source||p.ds?.model||st.primary?.id;
+ if(gfsAnalysis)return [{file:'analysis_f000_gfs_v16.json',label:'GFSv16 F000 low history (diagnostic)',kind:'analysis_f000',model:'gfs_v16'}];
+ // When a 2-m/10-m image came from a companion Zarr with no MSLP,
+ // select the SAME-cycle physical MSLP dataset for the track identifier.
+ // This prevents false 404s for separate surface/pressure stores and GEFS.
+ const sameCycle=cycleKey(p.ds?.init_time||st.ref?.init_time);
+ const sourceHasMSLP=ds=>ds?.variables?.some(v=>v.name==='mslp'&&
+  (v.available_hours?.includes(p.h)||!Number.isInteger(p.h)));
+ const pressureDs=sourceHasMSLP(p.ds)?p.ds:(p.src?.datasets||[])
+  .find(ds=>cycleKey(ds.init_time)===sameCycle&&sourceHasMSLP(ds))||p.ds;
+ const physical=String(pressureDs?.id||pressureDs?.path||'').replace(/\.zarr$/,'');
+ const model=p.cfg?.source||pressureDs?.model||st.primary?.id;
  const id=/^[a-z][a-z0-9_]*_\d{8}_\d{4}$/.test(physical)?physical:
-  lowTrackSourceId(model,p.ds?.init_time||st.ref?.init_time);
+  lowTrackSourceId(model,pressureDs?.init_time||st.ref?.init_time);
  return id?[{file:id+'.json',label:p.cfg?.label||model.toUpperCase()}]:[];
 }
+// Track products are generated by an independent official gettrk job. Do not
+// mistake an unpublished cycle, an unprocessed forecast lead, or a filtered
+// active-time fix for evidence that the forecast MSLP field contains no low.
+function lowTrackDisplayState(p,result){
+ const status=result?.status||'loading';
+ const lead=(p?.cfg?.timeMode==='analysis'||p?.cfg?.timeMode==='gfs-analysis')?
+  'F000 valid '+String(result?.validTime||'selected time').replace('T',' ').replace(/:00Z$/,'Z'):
+  Number.isInteger(p?.h)?`F${pad3(p.h)}`:'this time';
+ if(status==='ready')return null;
+ if(status==='empty')return {status,text:p?.cfg?.timeMode==='analysis'||p?.cfg?.timeMode==='gfs-analysis'?
+  'Low tracks · No F000 diagnostic lows in this cycle':'Low tracks · No active official fix at '+lead};
+ if(status==='history')return {status,text:'Low tracks · F000 history only; no low at current time'};
+ if(status==='unavailable')return {status,text:p?.cfg?.timeMode==='analysis'||p?.cfg?.timeMode==='gfs-analysis'?
+  'Low tracks · F000 diagnostic series not published':'Low tracks · Not published for this cycle'};
+ if(status==='legacy')return {status,text:'Low tracks · Official product not published'};
+ if(status==='error'){
+  const reason=[result?.error,...(result?.errors||[])].filter(Boolean).join(' ');
+  const http=/HTTP\s+(\d{3})/.exec(reason);
+  return {status,text:http?`Low tracks · Download failed (HTTP ${http[1]})`:
+   'Low tracks · Metadata download failed'};
+ }
+ if(status==='incomplete')return {status,text:result?.currentLeadProcessed===false?
+  `Low tracks · ${lead} not yet processed`:'Low tracks · Processing incomplete'};
+ if(status==='partial')return {status,text:'Low tracks · Some track sources missing'};
+ return null; // Waiting/loading must not flash across animation frames.
+}
+function updateLowTrackPanelStatus(p,result=p?.lowTrackResult){
+ const node=p?.lowTrackNotice;
+ if(!node)return;
+ const enabled=st.lowTracksEnabled&&lowTracksAvailableForField()&&
+  !p.cfg?.differencePanel&&!p.cfg?.placeholder&&!!p.map;
+ const message=enabled?lowTrackDisplayState(p,result):null;
+ node.hidden=!message;
+ if(!message){node.textContent='';node.title='';node.removeAttribute('data-status');return;}
+ node.textContent=message.text;node.dataset.status=message.status;
+ const details=[];
+ if(p.cfg?.label)details.push(p.cfg.label);
+ if(result?.validTime)details.push('Valid: '+result.validTime);
+ else if(Number.isInteger(p.h))details.push(`F${pad3(p.h)}`);
+ if(result?.filesRequested)details.push(`Official files: ${result.filesLoaded||0}/${result.filesRequested}`);
+ if(Number.isInteger(result?.totalTracks))details.push(`Published track objects: ${result.totalTracks}`);
+ if(Number.isInteger(result?.fixesAtValidTime))details.push(`Fixes at valid time: ${result.fixesAtValidTime}`);
+ if(Number.isInteger(result?.fixesInDomainAtValidTime))details.push(`Fixes within native field: ${result.fixesInDomainAtValidTime}`);
+ if(result?.coverage?.expectedCount)details.push(`Processed native leads: ${result.coverage.processedCount}/${result.coverage.expectedCount}`);
+ if(result?.currentLeadProcessed===false)details.push('Displayed forecast lead not present in official processed_hours');
+ if(result?.missingFiles?.length)details.push('Not published: '+result.missingFiles.join(', '));
+ if(result?.errors?.length)details.push('Errors: '+result.errors.join('; '));
+ if(result?.error)details.push(result.error);
+ details.push(p?.cfg?.timeMode==='analysis'||p?.cfg?.timeMode==='gfs-analysis'?
+  'F000 center history is an experimental time association, NOT official GFDL gettrk.':'A visible MSLP minimum is not necessarily a published official cyclone track.');
+ node.title=details.join('\n');
+}
+function updateLowTracksStatus(){
+ const label=el.lowTracksStatus;
+ if(!label)return;
+ const enabled=st.lowTracksEnabled&&lowTracksAvailableForField();
+ label.hidden=!enabled;
+ if(!enabled){label.textContent='';label.title='';return;}
+ const panels=(st.panels||[]).filter(p=>!p.cfg?.placeholder&&!p.cfg?.differencePanel);
+ const count=status=>panels.filter(p=>p.lowTrackResult?.status===status).length;
+ const withTracks=panels.filter(p=>(p.lowTrackResult?.points||0)>0).length;
+ const empty=count('empty'),history=count('history'),incomplete=count('incomplete'),partial=count('partial');
+ const unavailable=count('unavailable')+count('legacy'),errors=count('error');
+ const loading=panels.filter(p=>!p.lowTrackResult||p.lowTrackResult.status==='stale').length;
+ const messages=[];
+ if(withTracks)messages.push(`${withTracks} panel${withTracks===1?'':'s'} with tracks`);
+ if(empty)messages.push(`${empty} without lows`);
+ if(history)messages.push(`${history} showing previous F000 tracks`);
+ if(incomplete)messages.push(`${incomplete} not fully processed`);
+ if(partial)messages.push(`${partial} partially available`);
+ if(unavailable)messages.push(`${unavailable} not published`);
+ if(errors)messages.push(`${errors} download error${errors===1?'':'s'}`);
+ if(loading)messages.push(`${loading} checking/waiting`);
+ label.textContent='Low tracks: '+(messages.join(' · ')||'waiting for model data');
+ label.title=panels.map(p=>{
+  const label=p.cfg?.label||p.cfg?.source||'Panel';
+  const msg=lowTrackDisplayState(p,p.lowTrackResult);
+  return label+': '+(msg?.text||((p.lowTrackResult?.points||0)>0?'Tracks shown':'Checking'));
+ }).join('\n')+'\nOfficial tracks depend on native GRIB and scheduled tracker runs; an MSLP minimum does not itself establish a track.';
+}
 async function syncLowTrackOverlay(p,seq){
- if(st.field!=='lowtracks'||!st.lowTracksEnabled||p.cfg?.differencePanel){window.EVULowTracks?.remove?.(p);p.lowTrackResult=null;return;}
+ if(!st.lowTracksEnabled||!lowTracksAvailableForField()||p.cfg?.differencePanel||!p.map){
+  window.EVULowTracks?.remove?.(p);p.lowTrackResult=null;updateLowTrackPanelStatus(p,null);updateLowTracksStatus();return;
+ }
  const isAnalysis=p.cfg?.timeMode==='analysis',gfsAnalysis=p.cfg?.timeMode==='gfs-analysis';
  const lowerTime=(isAnalysis||gfsAnalysis)?st.ref?.init_time:(p.ds?.init_time||st.ref?.init_time);
  const upperTime=(isAnalysis||gfsAnalysis)?valid(st.ref,st.hour).toISOString():
   (p.ds&&Number.isInteger(p.h)?valid(p.ds,p.h).toISOString():valid(st.ref,st.hour).toISOString());
  const sources=lowTrackProductSources(p);
- const result=await window.EVULowTracks?.show?.(p,{
+ updateLowTrackPanelStatus(p,{status:'loading'});
+ const pending=window.EVULowTracks?.show?.(p,{
+  // Track colors remain tied to the MSLP palette, even when temperature,
+  // dewpoint, RH or 10-m wind is the image currently being shaded.
+  palette:pal(FIELDS.mslp,{name:'mslp'},'mslp'),
   sources,baseUrl:new URL('data/low_tracks/',document.baseURI).href,
-  lowerTime,upperTime,autoGFSF000:gfsAnalysis,
+  lowerTime,upperTime,activeTime:upperTime,analysisF000:isAnalysis?'rap_surface':gfsAnalysis?'gfs_v16':null,
+  domainBounds:lowTrackGridDomain(p),
   requestedHour:(!isAnalysis&&!gfsAnalysis&&Number.isInteger(p.h))?p.h:null,
   expectedHours:(!isAnalysis&&!gfsAnalysis&&Number.isInteger(p.h))?
    Array.from({length:Math.floor(p.h/Math.max(1,Number(st.modelSetConfig?.forecastHourStep)||1))+1},
      (_,i)=>i*Math.max(1,Number(st.modelSetConfig?.forecastHourStep)||1)):null
  });
- if(seq!==st.seq||st.field!=='lowtracks'||!st.lowTracksEnabled||!p.map)return;
+ p.lowTrackPending=pending;
+ let result;
+ try{result=await pending;}
+ finally{if(p.lowTrackPending===pending)p.lowTrackPending=null;}
+ if(seq!==st.seq||!lowTracksAvailableForField()||!st.lowTracksEnabled||!p.map||result?.status==='stale')return;
  p.lowTrackResult=result;
- if(result?.status==='error'||result?.status==='partial')console.warn('Low-track overlay:',result?.errors||result?.error);
- const label=p.cfg?.label||p.cfg?.source||'this panel';
- if(result?.status==='unavailable')setNote(p,`Low-track metadata for ${label} are not published for the selected cycle and valid time. Check data/low_tracks/.`);
- else if(result?.status==='empty'&&result?.coverage?.processedCount>0)setNote(p,`No qualifying low centers in the ${result.coverage.processedCount} analyzed forecast hour(s) for ${label}; the detector may exclude weak or open lows.`);
- else if(result?.status==='empty')setNote(p,`No processed MSLP low-track hours are published for ${label} in this interval.`);
- else if(result?.status==='incomplete')setNote(p,`Low-track extraction is incomplete for ${label}${Number.isInteger(p.h)?' through F'+pad3(p.h):''}; ${result.coverage?.processedCount||0} hour(s) indexed. Future/unchecked hours are not classified as having no lows.`);
- else if(result?.status==='error')setNote(p,`Could not load low-track data for ${label}: ${(result.errors||[result.error||'unknown error'])[0]}. Check publication and browser console.`);
- else if(result?.status==='pending')setNote(p,`Waiting for the map to initialize before loading low-track data for ${label}.`);
- else if(result?.status==='partial'&&!result.points)setNote(p,`Low-track data for ${label} are incomplete or unavailable; check publication of the selected period.`);
- else if(result?.points>0)clearNote(p);
+ updateLowTrackPanelStatus(p,result);
+ if(['error','partial','incomplete'].includes(result?.status))
+  console.warn('Low-track overlay for',p.cfg?.label||p.cfg?.source||'panel',result?.errors||result?.error||result?.coverage);
+ // Missing track data are nonblocking: never replace a valid weather map
+ // with a full-panel error, especially across nine concurrent sources.
+ updateLowTracksStatus();
 }
-async function renderPanel(p,seq){if(!p.map)return;if(st.field!=='lowtracks')window.EVULowTracks?.remove?.(p);p.gfsObservedAnalysis=null;p.gfsObservedCompare=null;window.EVUAdvancedMap?.setVectors(p,null,null);clearWindBarbs(p);clearContours(p);p.heightField=null;p.windSpeed850Field=null;p.moistureFields={};p.rawField=null;p.contourField=null;p.primaryContourField=null;p.mslpContourField=null;p.temperature850Field=null;p.diffDisplayData=null;const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;p.title.textContent=panelDisplayTitle(p,st.field==='asnow'&&selected.ds?.product==='nohrsc_6h'?'Accumulated snowfall':panelFieldInfo(p,selected.v||{name:panelSelectedField(p)}).label);p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?((p.cfg.timeMode==='analysis'||(p.cfg.timeMode==='gfs-analysis'&&(/^nohrsc_/.test(selected.ds.product||'')||!!p.gfsObservedAnalysis||
+async function renderPanel(p,seq){if(!p.map)return;
+ // The current frame must never retain trajectories from the prior lead or
+ // a different plot while its new scalar field is still loading.
+ window.EVULowTracks?.remove?.(p);p.lowTrackResult=null;updateLowTrackPanelStatus(p,null);
+ p.gfsObservedAnalysis=null;p.gfsObservedCompare=null;window.EVUAdvancedMap?.setVectors(p,null,null);clearWindBarbs(p);clearContours(p);p.heightField=null;p.windSpeed850Field=null;p.moistureFields={};p.rawField=null;p.readoutField=null;p.contourField=null;p.primaryContourField=null;p.mslpContourField=null;p.temperature850Field=null;p.diffDisplayData=null;const selected=choose(p);p.ds=selected.ds||null;p.v=selected.v||null;p.h=selected.h??null;void syncSurfaceWeatherPanel(p);p.title.textContent=panelDisplayTitle(p,st.field==='asnow'&&selected.ds?.product==='nohrsc_6h'?'Accumulated snowfall':panelFieldInfo(p,selected.v||{name:panelSelectedField(p)}).label);p.sub.textContent=selected.ds&&Number.isInteger(selected.h)?((p.cfg.timeMode==='analysis'||(p.cfg.timeMode==='gfs-analysis'&&(/^nohrsc_/.test(selected.ds.product||'')||!!p.gfsObservedAnalysis||
    (['vis','ceil','flightcat'].includes(st.field)&&['urma','rtma','rap_pressure'].includes(selected.ds.product)))))?`Valid ${fmt(valid(selected.ds,selected.h))}`:`Init ${fmt(selected.ds.init_time)} · F${pad3(selected.h)} · valid ${fmt(valid(selected.ds,selected.h))}`):'Source unavailable';
- // Track-only background: do not load or render the MSLP scalar at all.
- // This must work even when a panel lacks the corresponding pressure chunk,
- // because the small low-track JSON is an independent data product.
- if(st.field==='lowtracks'&&st.lowTrackBackground==='none'){
-  if(p.layer&&p.map.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);
-  p.layer=null;p.component=null;p.lastKey=null;p.renderField=null;
-  p.mobileScalar=null;p.upperAirGeoOverlay=false;
-  window.EVUThreeSurface?.dispose?.(p);
-  if(p.mobileScalarCanvas)p.mobileScalarCanvas.style.display='none';
-  if(p.mobileGeoCanvas)p.mobileGeoCanvas.style.display='none';
-  setPanelGeographyOverlay(p,false);terrainDetailNotice(p,false);
-  p.rawField=null;p.contourField=null;p.primaryContourField=null;
-  legend(p,null);scheduleCityUpdate(p);
-  p.status='loading';p.save.disabled=true;updateStatus();clearNote(p);
-  await syncLowTrackOverlay(p,seq);
-  if(seq!==st.seq||!p.map)return;
-  p.status='ready';p.renderedSeq=seq;p.save.disabled=false;
-  if(!st.lowTracksEnabled||p.lowTrackResult?.status==='ready')clearNote(p);
-  syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);
-  updateStatus();return;
- }
- if(selected.error||!selected.v||!Number.isInteger(selected.h)||selected.h<0||selected.h>=selected.v.shape[0]||!selected.v.available_hours.includes(selected.h)){if(p.layer&&p.map?.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);p.layer=null;p.component=null;p.mobileScalar=null;terrainDetailNotice(p,false);window.EVUThreeSurface?.dispose?.(p);p.upperAirGeoOverlay=false;if(p.mobileScalarCanvas)p.mobileScalarCanvas.style.display='none';if(p.mobileGeoCanvas)p.mobileGeoCanvas.style.display='none';setPanelGeographyOverlay(p,false);p.rawField=null;p.contourField=null;p.primaryContourField=null;p.lastKey=null;scheduleCityUpdate(p);p.status='missing';p.save.disabled=true;setNote(p,selected.error||`No ${selected.v.name} for F${pad3(selected.h)}`);legend(p,null);syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);updateStatus();if(st.difference.open&&st.difference.selected.includes(p))scheduleDifferenceRefresh();return;}
- const {ds,v,h}=selected;const m=panelFieldInfo(p,v);if(p.analysisRadar)p.title.textContent='Analysis · MRMS reflectivity + RAP F000 precipitation type';else if(p.cfg.timeMode==='analysis'&&st.field==='ptype'&&/^rap(?:_|$)/.test(ds.product||''))p.title.textContent='Analysis · RAP F000 precipitation type';if(p.cfg.timeMode==='analysis'&&ds.product==='mrms_rotation_ml60'){p.title.textContent='Analysis · MRMS mid-level rotation track (3–6 km AGL)'+(st.field==='mxuphl_run'?' · running maximum':' · 60-minute maximum');p.sub.textContent='Radar azimuthal shear (×10⁻³ s⁻¹), not model updraft helicity · valid '+fmt(valid(st.ref,st.hour));}p.status='loading';p.loadSince=Date.now();p.save.disabled=true;updateStatus();p.busy=true;
+ if(selected.error||!selected.v||!Number.isInteger(selected.h)||selected.h<0||selected.h>=selected.v.shape[0]||!selected.v.available_hours.includes(selected.h)){if(p.layer&&p.map?.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);p.layer=null;p.component=null;p.mobileScalar=null;terrainDetailNotice(p,false);window.EVUThreeSurface?.dispose?.(p);p.upperAirGeoOverlay=false;if(p.mobileScalarCanvas)p.mobileScalarCanvas.style.display='none';if(p.mobileGeoCanvas)p.mobileGeoCanvas.style.display='none';setPanelGeographyOverlay(p,false);p.rawField=null;p.readoutField=null;p.contourField=null;p.primaryContourField=null;p.lastKey=null;scheduleCityUpdate(p);p.status='missing';p.save.disabled=true;setNote(p,selected.error||`No ${selected.v.name} for F${pad3(selected.h)}`);legend(p,null);syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);syncAmountReportsPanel(p);updateStatus();if(st.difference.open&&st.difference.selected.includes(p))scheduleDifferenceRefresh();return;}
+ const {ds,v,h}=selected;let m=panelFieldInfo(p,v);if(p.analysisRadar)p.title.textContent='Analysis · MRMS reflectivity + '+(p.cfg.timeMode==='analysis'?'RAP':'GFSv16')+' F000 precipitation type';else if(p.cfg.timeMode==='analysis'&&st.field==='ptype'&&/^rap(?:_|$)/.test(ds.product||''))p.title.textContent='Analysis · RAP F000 precipitation type';if(p.cfg.timeMode==='analysis'&&ds.product==='mrms_rotation_ml60'){p.title.textContent='Analysis · MRMS mid-level rotation track (3–6 km AGL)'+(st.field==='mxuphl_run'?' · running maximum':' · 60-minute maximum');p.sub.textContent='Radar azimuthal shear (×10⁻³ s⁻¹), not model updraft helicity · valid '+fmt(valid(st.ref,st.hour));}p.status='loading';p.loadSince=Date.now();p.save.disabled=true;updateStatus();p.busy=true;
  // When this hour is cached, replace its texture silently: status overlays make
  // a smooth loop appear to flash even though nothing needs downloading.
  const rawUrl=new URL(`${ds.path}/${v.name}/${h}.0.0`,new URL('.',p.src.url)).href;
@@ -7871,15 +8649,32 @@ async function renderPanel(p,seq){if(!p.map)return;if(st.field!=='lowtracks')win
  if(noteDelay!==null){clearTimeout(noteDelay);noteDelay=null;}
  if(seq!==st.seq||!p.map||!data)return;
  clearNote(p);
+ // A late MRMS 404 can change the RAP fallback to categorical-only.
+ // Re-evaluate shading metadata after the final source is known.
+ if(p.analysisCategoricalOnly)m=panelFieldInfo(p,v);
  const maskedData=await belowGroundDisplayValues(p,ds,v,h,data);
  if(seq!==st.seq||!p.map)return;
  const grid=gridForPanel(p,ds,v),shadeData=snowfallShadeData(vorticityShadeData(p,ds,v,h,m,maskedData),st.field,m,v.shape);
- const stride=mobileGfsRasterStride(ds,v,p);
+ const stride=mobileRasterStride(ds,v,p);
  const plot=stride>1?mobileRegularRasterField(ds,v,shadeData,stride):{grid,values:shadeData};
  const plotMask=plotNoDataMask(plot.values,panelSelectedField(p),!!p.cfg.differencePanel);
+ // All non-GPU consumers retain the exact signed difference grid. Only the
+ // GPU's linearly sampled texels receive no-data-safe display values.
  const field=new apgl.RawScalarField(plot.grid,plot.values);
+ const textureValues=p.cfg.differencePanel?safeDifferenceTextureValues(
+  plot.values,plotMask,Number(plot.grid.nx||v.shape[2]),Number(plot.grid.ny||v.shape[1])):plot.values;
+ const gpuField=textureValues===plot.values?field:new apgl.RawScalarField(plot.grid,textureValues);
  const nativeField=stride>1?new apgl.RawScalarField(grid,shadeData):field;
  const rawField=shadeData===maskedData?nativeField:new apgl.RawScalarField(grid,maskedData);
+ p.readoutField=null;
+ if(Number.isFinite(m.maxValidDisplay)&&!m.differenceField&&!p.cfg?.differencePanel&&
+    !p.gfsAviationCompare&&!p.gfsNativeCompare&&!p.gfsObservedCompare){
+  // Cached native chunk, a second display-unit conversion, *without* the
+  // plotted-range mask. Do not alter plotted or difference data in memory.
+  const uncapped=await getDisplayData(p.src,ds,v,h,{...m,maxValidDisplay:undefined},()=>{});
+  if(seq!==st.seq||!p.map)return;
+  p.readoutField=new apgl.RawScalarField(grid,uncapped);
+ }
  const signature=JSON.stringify([panelSelectedField(p),st.snowMethod,activeSnowRatio(st.field),v.name,v.shape,ds.grid,stride,p.cfg.timeMode,p.cfg.differencePanel,terrainEnabledForPanel(p),effectiveInterpolation()]);
  p.mobileRenderStride=stride;
  const klass=st.cfg.display.fieldRendering==='smooth'&&!m.category&&!m.ptype&&!m.ptypeReflectivity&&!m.flightCategory?apgl.ContourFill:apgl.Raster;
@@ -7915,9 +8710,9 @@ async function renderPanel(p,seq){if(!p.map)return;if(st.field!=='lowtracks')win
   drawMobileScalar(p);if(p.threeDrawPromise)await p.threeDrawPromise;void drawMobileGeography(p);
  }else if(p.component&&p.lastKey===signature&&typeof p.component.updateField==='function'){
   p.upperAirGeoOverlay=false;p.mobileScalar=null;terrainDetailNotice(p,false);window.EVUThreeSurface?.dispose?.(p);if(p.mobileScalarCanvas)p.mobileScalarCanvas.style.display='none';if(p.mobileGeoCanvas)p.mobileGeoCanvas.style.display='none';setPanelGeographyOverlay(p,false);
-  await p.component.updateField(field,plotMask);
+  await p.component.updateField(gpuField,plotMask);
  }
- else{p.upperAirGeoOverlay=false;p.mobileScalar=null;terrainDetailNotice(p,false);window.EVUThreeSurface?.dispose?.(p);if(p.mobileScalarCanvas)p.mobileScalarCanvas.style.display='none';if(p.mobileGeoCanvas)p.mobileGeoCanvas.style.display='none';setPanelGeographyOverlay(p,false);if(p.layer&&p.map.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);const cmap=makeColormap(m,v);const comp=new klass(field,{cmap,cmap_mask:plotMask});if(klass===apgl.Raster)installRasterInterpolation(comp,p);const layer=new apgl.PlotLayer(`evu-field-${p.i}`,comp);p.component=comp;p.layer=layer;
+ else{p.upperAirGeoOverlay=false;p.mobileScalar=null;terrainDetailNotice(p,false);window.EVUThreeSurface?.dispose?.(p);if(p.mobileScalarCanvas)p.mobileScalarCanvas.style.display='none';if(p.mobileGeoCanvas)p.mobileGeoCanvas.style.display='none';setPanelGeographyOverlay(p,false);if(p.layer&&p.map.getLayer(p.layer.id))p.map.removeLayer(p.layer.id);const cmap=makeColormap(m,v);const comp=new klass(gpuField,{cmap,cmap_mask:plotMask});if(klass===apgl.Raster)installRasterInterpolation(comp,p);const layer=new apgl.PlotLayer(`evu-field-${p.i}`,comp);p.component=comp;p.layer=layer;
  // MapLibre doesn't await async custom-layer onAdd(). autumnplot-gl's onAdd()
  // depends on its *own* worker. Wait for that promise explicitly to catch missing
  // worker bundles instead of claiming the field was rendered successfully.
@@ -7945,17 +8740,18 @@ async function renderPanel(p,seq){if(!p.map)return;if(st.field!=='lowtracks')win
  p.primaryContourField=panelSelectedField(p)===st.field?p.contourField:null;
  p.diffDisplayData=maskedData;scheduleContourRedraw(p);legend(p,m);updateDifferenceSharedLegend();if(!p.cfg?.differencePanel){
   const windJobs=[];
-  if(windComponentNames(p.cfg?.field||st.field))windJobs.push(prepareWindBarbs(p,ds,h,seq));
+  if(windComponentNames(p.cfg?.field||st.field)&&(!NEAR_SURFACE_WIND_FIELDS.has(p.cfg?.field||st.field)||overlayWindVisible(p.cfg?.field||st.field)))windJobs.push(prepareWindBarbs(p,ds,h,seq));
   if(marineSurfaceWindAvailable(p.cfg?.field||st.field))windJobs.push(prepareMarineWindBarbs(p,ds,h,seq));
   if(windJobs.length)await Promise.all(windJobs);
  }if(!p.cfg?.differencePanel&&UPPER_AIR_IMAGE_FIELDS[st.field])await preparePrimaryUpperAirContours(p,ds,h,seq);
  if(!p.cfg?.differencePanel&&surfaceMSLPContoursEnabled())await prepareSurfaceMSLPContours(p,ds,h,seq);if(!p.cfg?.differencePanel&&heightVariableName(p.cfg?.field||st.field))await prepareHeightContours(p,ds,h,seq);if(!p.cfg?.differencePanel&&st.field==='t850'&&st.overlayWindSpeed850)await prepareWindSpeed850Contours(p,ds,h,seq);if(!p.cfg?.differencePanel&&isMoistureUpperField(p.cfg?.field||st.field))await prepareUpperAirMoistureContours(p,ds,h,seq);if(!p.cfg?.differencePanel&&st.tracersEnabled)await prepareWindTracers(p,ds,h,seq);if(!p.cfg?.differencePanel&&st.field==='mslp'&&st.overlayMSLP850)await prepareMSLP850Contours(p,ds,h,seq);updatePanelPlotTitle(p);await waitPaint(p.map);if(seq!==st.seq||!p.map||p.contextLost)return;
  // Reconcile all observation layers after asynchronous weather layer replacement.
- syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);
- if(st.field==='lowtracks'){await syncLowTrackOverlay(p,seq);if(!p.cfg?.differencePanel)p.title.textContent=panelDisplayTitle(p,'Surface low tracks');}
+ syncObservationPanel(p);syncSPCPanel(p);syncLightningPanel(p);syncAmountReportsPanel(p);
+ if(lowTracksAvailableForField()&&st.lowTracksEnabled&&!p.cfg?.differencePanel)
+  void syncLowTrackOverlay(p,seq);
  if(p.upperAirGeoOverlay)window.EVUAdvancedMap?.orderTerrain(p.map);
- p.status='ready';p.renderedSeq=seq;p.save.disabled=false;if(st.field!=='lowtracks'||!st.lowTracksEnabled||p.lowTrackResult?.status==='ready')clearNote(p);if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});// The PNG export path explicitly captures a finished render frame. Avoid stale blank snapshots here.
- }catch(e){if(seq===st.seq)fail(p,e);}finally{if(noteDelay!==null)clearTimeout(noteDelay);p.busy=false;updateStatus();if(st.difference.open&&st.difference.selected.includes(p))scheduleDifferenceRefresh();if(!st.rendering&&!st.panels.some(x=>x.busy))schedulePrefetch();}}
+ p.status='ready';p.renderedSeq=seq;p.save.disabled=false;clearNote(p);if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});// The PNG export path explicitly captures a finished render frame. Avoid stale blank snapshots here.
+ }catch(e){if(seq===st.seq)fail(p,e);}finally{if(noteDelay!==null)clearTimeout(noteDelay);p.busy=false;updateStatus();if(st.difference.open&&st.difference.selected.includes(p))scheduleDifferenceRefresh();if(!st.rendering&&!st.panels.some(x=>x.busy))schedulePrefetch();retryWaitingVisibleMobilePanel();}}
 // Keep the legend in the same units/range as the autumnplot-gl color map.
 // Legend-only categorical swatches: 0/No is unshaded in the *map* (the
 // native map background remains visible); draw a black No tile in legends so
@@ -7992,7 +8788,7 @@ function legendTicks(m,v){
  const p=pal(m,v),lo=p.levels[0],hi=p.levels.at(-1);
  const count=Math.max(3,Math.min(15,Number(st.cfg?.display?.legendTickCount??11)||11));
  const fmtNum=(x,decimals)=>x.toFixed(decimals).replace(/(\.\d*?[1-9])0+$/,'$1').replace(/\.0+$/,'');
- if(m===FIELDS.mslp&&!st.colorRanges.get('mslp')&&!st.customPalettes.has('mslp'))return Array.from({length:10},(_,i)=>({label:String(960+i*10),pos:(i*10)/90}));
+ if(m===FIELDS.mslp&&!st.colorRanges.get(paletteKey(m,v))&&!st.customPalettes.has(paletteKey(m,v)))return Array.from({length:11},(_,i)=>({label:String(950+i*10),pos:i/10}));
  if(!st.colorRanges.get(paletteKey(m,v))&&!st.customPalettes.has(paletteKey(m,v))&&(m===FIELDS.refc||m.label==='Composite reflectivity'||m.label==='PMM composite reflectivity')){
   // The SPC-style shading changes every 2.5 dBZ, but its colorbar labels
   // remain on familiar 5-dBZ values: 10, 15, 20 ... 70+.
@@ -8067,7 +8863,7 @@ function legend(p,m){
 // One fixed palette is shared by every panel: the legend must not depend on
 // which model has finished downloading (or whether any model has this hour).
 function sharedPalette(){
- if(!st.field||(st.field==='lowtracks'&&st.lowTrackBackground==='none'))return null;
+ if(!st.field)return null;
  const entries=st.ref?.entries||[];
  const image=selectedShadingField();
  const wanted=gfsSnowSource(image,st.ref?.entries?.[0]?.ds?.model)||(snowAccumulationHours(image)?'asnow':precipitationAccumulationHours(image)?'apcp':image);
@@ -8171,7 +8967,7 @@ function updateSharedLegend(){
  if(!ctx)return;
  ctx.clearRect(0,0,c.width,c.height);
  el.sharedLegendLabels.replaceChildren();
- if(!data){el.sharedLegendTitle.textContent=st.field==='lowtracks'?'Low tracks · no background shading':'Field color scale';el.legendResetBtn.hidden=true;el.sharedLegendCanvas.classList.remove('scale-adjustable');return;}
+ if(!data){el.sharedLegendTitle.textContent='Field color scale';el.legendResetBtn.hidden=true;el.sharedLegendCanvas.classList.remove('scale-adjustable');return;}
  const {m,palette,ticks}=data;
  const title=`${m.label}${m.unit?' ('+m.unit+')':''}`;
  const custom=adjustableColorbar(m)?st.colorRanges.get(paletteKey(m,data.v)):null;
@@ -8220,6 +9016,13 @@ function prefetchCandidates(timeline,disk,batchLimit){
  for(const [url,when] of st.prefetchAttempted)if(when<=now)st.prefetchAttempted.delete(url);
  const enqueue=(src,ds,v,h)=>{
   if(!src||!ds||!v||!Number.isInteger(h)||h<0||h>=v.shape[0]||!v.available_hours?.includes(h))return;
+  if(v.derivedNativePtype){
+   for(const name of NATIVE_PTYPE_FLAGS){
+    const flag=ds.variables?.find(item=>item.name===name);
+    if(flag)enqueue(src,ds,flag,h);
+   }
+   return;
+  }
   if(v.derivedWindSpeed850){
    for(const name of ['u850','v850']){
     const component=ds.variables?.find(item=>item.name===name);
@@ -8237,18 +9040,33 @@ function prefetchCandidates(timeline,disk,batchLimit){
   // Don't wrap from F000 to F084 or vice versa solely for speculation.
   const ix=base+offset;if(ix<0||ix>=timeline.length)continue;
   const requested=timeline[ix],chosen=[];
-  // Pass 1: all panels' main display chunks, including analysis, get an
-  // equal opportunity before any panel's secondary chunks consume bandwidth.
-  for(const p of st.panels){
+  // Prioritize the analysis composite for the first few mobile fetch slots.
+  // Otherwise 8 model-panel chunks can fill a four-item mobile prefetch
+  // batch before the essential MRMS radar input even reaches the queue.
+  const panels=st.field==='refc_ptype'
+   ?st.panels.slice().sort((a,b)=>Number(!['analysis','gfs-analysis'].includes(a.cfg.timeMode))-
+                                Number(!['analysis','gfs-analysis'].includes(b.cfg.timeMode)))
+   :st.panels;
+  // Pass 1: each panel's primary input, with critical analysis radar first.
+  for(const p of panels){
    if(p.cfg.placeholder)continue;
-   const choice=choose(p,requested),{ds,v,h}=choice,src=p.src;
+   // Use a throwaway selection context: choose() is intentionally stateful,
+   // and calling it on the live panel used to clear/replace analysisRadar
+   // during asynchronous rendering of the currently selected hour.
+   const proxy={cfg:p.cfg,src:null};
+   const choice=choose(proxy,requested),{ds,v,h}=choice,src=proxy.src;
    if(choice.error||!ds||!v)continue;
-   chosen.push({p,ds,v,h,src});
+   chosen.push({p:proxy,ds,v,h,src});
+   if(proxy.analysisRadar)enqueue(proxy.analysisRadar.src||src,proxy.analysisRadar.ds,proxy.analysisRadar.v,0);
    enqueue(src,ds,v,h);
   }
   // Pass 2: dependent inputs (one-hour difference, wind barbs and recent
   // MRMS sums), so future frames are actually fully renderable.
   for(const {p,ds,v,h,src} of chosen){
+   // The blended analysis requires BOTH native model Ptype and MRMS radar;
+   // staging just the selected model variable left every later frame cold.
+   if(p.analysisRadar)enqueue(p.analysisRadar.src||src,p.analysisRadar.ds,p.analysisRadar.v,0);
+   if(p.analysisNativeRadar)enqueue(src,ds,p.analysisNativeRadar.ptype,0);
    const precipitation=precipitationAccumulationHours(st.field);
    if(precipitation&&p.cfg.timeMode!=='analysis'&&h>precipitation)enqueue(src,ds,v,h-precipitation);
    const snowfall=snowAccumulationHours(st.field);
@@ -8258,8 +9076,13 @@ function prefetchCandidates(timeline,disk,batchLimit){
     enqueue(src,ds,v,gfsSnow.period?h-gfsSnow.period:0);
    const heightKey=heightVariableName(st.field);
    if(heightKey){const hv=ds.variables.find(x=>x.name===heightKey);if(hv)enqueue(src,ds,hv,h);}
-   if(st.field==='refc_ptype'){const pv=ds.variables.find(x=>x.name==='ptype');if(pv)enqueue(src,ds,pv,h);}
-   const secondaryWindNames=[...(windComponentNames(st.field)||[]),
+   if(st.field==='refc_ptype'){
+    const pv=ds.variables.find(x=>x.name==='ptype');
+    if(pv)enqueue(src,ds,pv,h);
+    // Older RAP catalogs derive the category dynamically from four flags.
+    if(v.derivedNativePtype)enqueue(src,ds,v,h);
+   }
+   const secondaryWindNames=[...(NEAR_SURFACE_WIND_FIELDS.has(st.field)&&!overlayWindVisible(st.field)?[]:(windComponentNames(st.field)||[])),
     ...(marineSurfaceWindAvailable(st.field)?['u10','v10']:[])];
    for(const name of new Set(secondaryWindNames)){
     const w=ds.variables.find(x=>x.name===name);if(w)enqueue(src,ds,w,h);
@@ -8310,7 +9133,7 @@ function schedulePrefetch(){
   if(!st.chunkStore)st.chunkStore=new CompressedZarrStore();
   const disk=Boolean(await st.chunkStore.open());
   if(generation!==st.prefetchGeneration||prefetchMode()==='off'||st.exporting)return;
-  const limit=Math.max(1,Math.min(64,Number(d.prefetchBatchSize??12)));
+  const limit=Math.max(1,Math.min(touchGraphicsDevice()?4:64,Number(d.prefetchBatchSize??12)));
   const candidates=prefetchCandidates(timeline,disk,limit);
   if(!candidates.length)return;
   const token={context};st.prefetchBatchToken=token;st.prefetchBatchRunning=true;
@@ -8337,17 +9160,17 @@ function schedulePrefetch(){
     if(prefetchMode()!=='off')schedulePrefetch();
    }
   }
- },Math.max(50,Math.min(2500,Number(d.prefetchDelayMs??120))));
+ },Math.max(touchGraphicsDevice()?650:50,Math.min(2500,Number(d.prefetchDelayMs??120))));
 }
 // Diagnostic readout without displaying cache chatter across nine maps.
 window.OMDEVUPrefetch={stats:()=>({mode:prefetchMode(),downloadsCompleted:st.prefetchCompleted,downloadsFailed:st.prefetchFailed,failedCoolingDown:st.prefetchAttempted.size,bySource:Object.fromEntries(st.prefetchBySource),direction:st.prefetchDirection<0?'backward':'forward',queued:st.queue.filter(x=>x.background).length,active:st.prefetchActive,decodedMB:Math.round(st.cacheBytes/1048576),displayReadyMB:Math.round(st.displayCacheBytes/1048576),compressedDiskMB:Math.round((st.chunkStore?.bytes||0)/1048576),diskEnabled:Boolean(st.chunkStore?.cache&&!st.chunkStore?.disabled),cacheUsage:{network:st.cacheStats.network,persistentReads:st.cacheStats.disk,decodedHits:st.cacheStats.decoded,displayReadyHits:st.cacheStats.displayReady,sharedRequests:st.cacheStats.shared,decodedEvictions:st.cacheStats.decodedEvicted,displayReadyEvictions:st.cacheStats.displayEvicted},recentlyDisplayedProtected:st.chunkStore?.foregroundRecentlyUsed.size||0,cacheQuotaRetries:st.chunkStore?.quotaFailures||0,compressedCacheBudgetMB:Math.round((st.chunkStore?.budget||0)/1048576)}),resume:()=>schedulePrefetch()};
-async function play(){if(st.playing)return;st.playing=true;el.playBtn.classList.add('active');el.pauseBtn.classList.remove('active');
+async function play(){if(st.playing)return;st.playing=true;el.playBtn.classList.add('active');el.pauseBtn.classList.remove('active');syncMobileFrameController();
  while(st.playing){const start=Date.now();try{await step(1);}catch(err){console.error('Playback stopped',err);stop();break;}
   if(!st.playing)break;
   await sleep(Math.max(50,LOOP_INTERVALS[st.loopSpeedIndex]-(Date.now()-start)));
  }
 }
-function stop(){st.playing=false;el.pauseBtn.classList.add('active');el.playBtn.classList.remove('active');}
+function stop(){st.playing=false;el.pauseBtn.classList.add('active');el.playBtn.classList.remove('active');syncMobileFrameController();}
 function rounded(ctx,x,y,w,h,r=11){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
 function clipText(ctx,s,width){s=String(s||'');while(ctx.measureText(s).width>width&&s.length>2)s=s.slice(0,-2)+'…';return s;}
 // Download names include their valid-run context AND a unique export stamp.
@@ -8732,10 +9555,10 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
  const expanded=newW>screenW+1||newH>screenH+1;
  const exportZoom=oldZoom+Math.log2(renderScale);
  const oldRatio=typeof map.getPixelRatio==='function'?map.getPixelRatio():null;
- let changedRatio=false,windStyle=null,contourStyle=null;
+ let changedRatio=false,windStyle=null,contourStyle=null,lowTrackStyle=null,reportStyle=null,surfaceWeatherStyle=null;
  let restoreObservationMarkers=()=>{};
  let restoreExportBoundaries=()=>{};
- let png=null,windPNG=null,contourPNG=null,cityPNG=null,mobilePNG=null,exportObservations=null,exportGeography=null;
+ let png=null,windPNG=null,contourPNG=null,cityPNG=null,lowTrackPNG=null,amountReportPNG=null,surfaceWeatherPNG=null,mobilePNG=null,exportObservations=null,exportGeography=null;
  try{
   for(const [id] of hiddenCountyLayers)map.setLayoutProperty(id,'visibility','none');
   if(expanded){
@@ -8752,6 +9575,24 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
     p.contourCanvas.style.inset='auto';p.contourCanvas.style.position='absolute';
     p.contourCanvas.style.left=node.style.left;p.contourCanvas.style.top=node.style.top;
     p.contourCanvas.style.width=newW+'px';p.contourCanvas.style.height=newH+'px';
+   }
+   if(p.amountReportCanvas&&sharpIndividual){
+    reportStyle=p.amountReportCanvas.getAttribute('style')||'';
+    p.amountReportCanvas.style.inset='auto';p.amountReportCanvas.style.position='absolute';
+    p.amountReportCanvas.style.left=node.style.left;p.amountReportCanvas.style.top=node.style.top;
+    p.amountReportCanvas.style.width=newW+'px';p.amountReportCanvas.style.height=newH+'px';
+   }
+   if(p.surfaceWeatherCanvas){
+    surfaceWeatherStyle=p.surfaceWeatherCanvas.getAttribute('style')||'';
+    p.surfaceWeatherCanvas.style.inset='auto';p.surfaceWeatherCanvas.style.position='absolute';
+    p.surfaceWeatherCanvas.style.left=node.style.left;p.surfaceWeatherCanvas.style.top=node.style.top;
+    p.surfaceWeatherCanvas.style.width=newW+'px';p.surfaceWeatherCanvas.style.height=newH+'px';
+   }
+   if(p.lowTrackCanvas&&sharpIndividual){
+    lowTrackStyle=p.lowTrackCanvas.getAttribute('style')||'';
+    p.lowTrackCanvas.style.inset='auto';p.lowTrackCanvas.style.position='absolute';
+    p.lowTrackCanvas.style.left=node.style.left;p.lowTrackCanvas.style.top=node.style.top;
+    p.lowTrackCanvas.style.width=newW+'px';p.lowTrackCanvas.style.height=newH+'px';
    }
    if(p.windCanvas&&sharpIndividual){
     windStyle=p.windCanvas.getAttribute('style')||'';
@@ -8809,6 +9650,22 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
    await updateCityLayer(p);
    cityPNG=p.cityCanvas.toDataURL('image/png');
   }
+  if(p.amountReportCanvas&&amountReportsEnabled()&&drawAmountReportCanvas(p,{capture:true}))
+   amountReportPNG=p.amountReportCanvas.toDataURL('image/png');
+  if(p.surfaceWeather&&p.surfaceWeatherCanvas&&st.surfaceWeatherEnabled&&surfaceWeatherEligible()){
+   // Temporarily enlarged camera must be projected before capture; keep
+   // original overlay visible in all-panel PNGs and GIF frames as well.
+   await Promise.race([p.surfaceWeatherPending||Promise.resolve(),
+     new Promise(resolve=>setTimeout(resolve,1800))]);
+   p.surfaceWeather.render();
+   if(p.surfaceWeather._features.length)surfaceWeatherPNG=p.surfaceWeatherCanvas.toDataURL('image/png');
+  }
+  if(lowTracksAvailableForField()&&st.lowTracksEnabled&&!p.cfg?.differencePanel&&p.lowTrackCanvas){
+   await Promise.race([p.lowTrackPending||Promise.resolve(),
+    new Promise(resolve=>setTimeout(resolve,1800))]);
+   window.EVULowTracks?.paintCanvas?.(p);
+   if(p.lowTrackFeatures?.length)lowTrackPNG=p.lowTrackCanvas.toDataURL('image/png');
+  }
   if(!p.cfg?.differencePanel&&p.windCanvas&&((p.wind&&windComponentNames(plottedField)&&overlayWindVisible(plottedField))||(p.marineWind&&marineSurfaceWindVisible(plottedField)))){
    // Match the appearance of an enlarged viewer panel; do not use the
    // export-only MapLibre zoom to choose density or unscaled glyph sizes.
@@ -8824,6 +9681,9 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   if(changedRatio){try{map.setPixelRatio(oldRatio);}catch(err){console.warn('Could not restore pixel ratio',err);}}
   if(windStyle!==null)p.windCanvas.setAttribute('style',windStyle);
   if(contourStyle!==null)p.contourCanvas.setAttribute('style',contourStyle);
+  if(lowTrackStyle!==null)p.lowTrackCanvas.setAttribute('style',lowTrackStyle);
+  if(reportStyle!==null)p.amountReportCanvas.setAttribute('style',reportStyle);
+  if(surfaceWeatherStyle!==null)p.surfaceWeatherCanvas.setAttribute('style',surfaceWeatherStyle);
   if(expanded){
    node.setAttribute('style',oldStyle);
    try{map.resize();map.jumpTo({center:oldCenter,zoom:oldZoom,bearing:oldBearing,pitch:oldPitch});map.triggerRepaint();}
@@ -8837,15 +9697,18 @@ async function captureMapPNG(p,targetW=0,targetH=0,framing='fill',sharpIndividua
   st.exportRender=false;
   if(p.windCanvas)scheduleWindRedraw(p);
   if(p.contourCanvas)scheduleContourRedraw(p);
+  if(p.lowTrackCanvas)window.EVULowTracks?.requestPaint?.(p);
+  p.surfaceWeather?._schedule?.();
   if(p.cityCanvas)scheduleCityUpdate(p);
+  if(p.amountReportCanvas)syncAmountReportsPanel(p);
   if(p.mobileScalarCanvas)scheduleMobileScalarRedraw(p,30);
   if(st.hover&&!st.hoverRaf)st.hoverRaf=requestAnimationFrame(()=>{st.hoverRaf=0;paintSynchronizedHover();});
  }
- return {map:await decodePNG(png),mobileField:await decodePNG(mobilePNG),geography:exportGeography,wind:await decodePNG(windPNG),contours:await decodePNG(contourPNG),cities:await decodePNG(cityPNG),observations:exportObservations,png};
+ return {map:await decodePNG(png),mobileField:await decodePNG(mobilePNG),geography:exportGeography,wind:await decodePNG(windPNG),contours:await decodePNG(contourPNG),cities:await decodePNG(cityPNG),surfaceWeather:await decodePNG(surfaceWeatherPNG),lowTracks:await decodePNG(lowTrackPNG),amountReports:await decodePNG(amountReportPNG),observations:exportObservations,png};
 }
 async function panelImage(p,targetW=0,targetH=0,framing='fill',sharpIndividual=false){
  if(p.map){const output=await captureMapPNG(p,targetW,targetH,framing,sharpIndividual);p.lastSnapshot=output.png;return output;}
- return {map:await decodePNG(p.lastSnapshot||null),mobileField:null,geography:null,wind:null,contours:null,cities:null};
+ return {map:await decodePNG(p.lastSnapshot||null),mobileField:null,geography:null,wind:null,contours:null,cities:null,surfaceWeather:null,lowTracks:null,amountReports:null};
 }
 // Draw a captured map without ever distorting geographic shapes. In particular,
 // the map's framebuffer is often much wider than the old fixed PNG plot box.
@@ -8954,6 +9817,9 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
    drawWindExport(ctx,captured.wind,rect,im);
    drawWindExport(ctx,captured.contours,rect,im);
    drawWindExport(ctx,captured.cities,rect,im);
+   drawWindExport(ctx,captured.surfaceWeather,rect,im);
+   drawWindExport(ctx,captured.lowTracks,rect,im);
+  drawWindExport(ctx,captured.amountReports,rect,im);
   }else{
    ctx.fillStyle=muted;ctx.font=`${Math.max(16,Math.min(25,w/35))}px Arial`;
    ctx.textAlign='center';ctx.textBaseline='middle';
@@ -9009,6 +9875,9 @@ async function drawExport(ctx,p,x,y,w,h,verticalLegend=false,sharedMode=false){
   drawWindExport(ctx,captured.wind,rect,im);
   drawWindExport(ctx,captured.contours,rect,im);
   drawWindExport(ctx,captured.cities,rect,im);
+  drawWindExport(ctx,captured.surfaceWeather,rect,im);
+  drawWindExport(ctx,captured.lowTracks,rect,im);
+  drawWindExport(ctx,captured.amountReports,rect,im);
   drawIndividualExportObservations(ctx,captured.observations,rect,im,boxW);
  }else{
   ctx.fillStyle=muted;ctx.font='15px Arial';ctx.textBaseline='middle';
@@ -9239,7 +10108,7 @@ async function exportAll(ratio='16:9',returnCanvas=false){
  cx.fillStyle=st.theme==='light'?'#1d2e42':'#eef4fa';
  cx.textBaseline='middle';cx.textAlign='left';
  const fieldMeta=fieldInfo({name:selectedShadingField()},selectedShadingField());
- const fieldHeading=`${st.field==='lowtracks'?'Surface low tracks (central pressure in hPa)':st.field==='mslp'?'MSLP shading'+(st.overlayMSLP?' + MSLP isobars':'')+(st.overlayMSLP850?' + 850-hPa temperature (dashed where available)':''):st.field==='ptype'?'Precipitation type (model-specific)':fieldMeta.label}${fieldMeta.unit?' ('+fieldMeta.unit+')':''}`;
+ const fieldHeading=`${st.field==='mslp'?'MSLP shading'+(st.overlayMSLP?' + MSLP isobars':'')+(st.overlayMSLP850?' + 850-hPa temperature (dashed where available)':''):st.field==='ptype'?'Precipitation type (model-specific)':fieldMeta.label}${fieldMeta.unit?' ('+fieldMeta.unit+')':''}`;
  const timingHeading=`Init ${fmt(st.ref.init_time)} · F${pad3(st.hour)} · Valid ${fmt(valid(st.ref,st.hour))}`;
  // Common field and valid-time information belong in the comparison image
  // header; model names stay exclusively in the individual map panels.

@@ -17,7 +17,8 @@
  const BACKDROP=[12,29,45];
  const LAYER_ORDER=[
   ['mobileScalarCanvas',1],['mobileGeoCanvas',2],['tracerCanvas',2.5],
-  ['contourCanvas',3],['windCanvas',4],['cityCanvas',5]
+  ['contourCanvas',3],['windCanvas',4],['cityCanvas',5],['lowTrackCanvas',6],
+  ['surfaceWeatherCanvas',6],['amountReportCanvas',7]
  ];
  function isAndroid(){
   return /Android/i.test(navigator.userAgent||'') || navigator.userAgentData?.platform==='Android';
@@ -71,7 +72,8 @@
   ctx.restore();
  }
  function drawMapPopups(ctx,panel,viewRect){
-  const popup=panel.map?.getContainer?.()?.querySelector('.maplibregl-popup-content');
+  const popup=panel.frame?.querySelector('.evu-low-track-popup .maplibregl-popup-content')||
+   panel.map?.getContainer?.()?.querySelector('.maplibregl-popup-content');
   if(!popup||!visible(popup))return;
   const rect=popup.getBoundingClientRect();
   const x=Math.max(3,Math.min(viewRect.width-130,rect.left-viewRect.left));

@@ -222,7 +222,9 @@
     "terrainTileJSON": "https://tiles.mapterhorn.com/tilejson.json",
     "terrainExaggeration": 1.15,
     "threeSurfaceDrape": true,
-    "catalogRefreshSeconds": 180
+    "catalogRefreshSeconds": 180,
+    "mobileMapCapacity": 2,
+    "mobileMapPixelRatio": 1.6
   },
   "theme": "dark",
   "modelSets": [

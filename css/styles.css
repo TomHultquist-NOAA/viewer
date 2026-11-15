@@ -1686,3 +1686,138 @@ body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > .obs-count:empty 
 /* Terrain is intentionally unavailable in Globe projection. */
 #terrainOption.projection-unavailable {opacity:.48;cursor:not-allowed}
 #terrainOption.projection-unavailable input {cursor:not-allowed}
+
+/* v1.2.84: low tracks are above isobars, wind tracers and geography canvases.
+   The canvas is display-only; MapLibre circle layers still receive clicks. */
+.low-track-overlay{position:absolute;inset:0;z-index:6;width:100%;height:100%;
+ pointer-events:none;display:none;}
+.panel-viewport.has-low-tracks .plot-label,
+.panel-viewport.has-low-tracks .point-info,
+.panel-viewport.has-low-tracks .notice{z-index:8;}
+
+/* v1.2.85: MapLibre popups are portaled into .map-frame, above the separate
+   visual track canvas. They remain managed by MapLibre for movement/close. */
+.map-frame > .maplibregl-popup.evu-low-track-popup{
+ z-index:9;pointer-events:auto;
+}
+
+/* Numeric precipitation/snowfall/depth observations; two-stage contrast halo in canvas. */
+.amount-reports-overlay{position:absolute;inset:0;z-index:7;width:100%;height:100%;pointer-events:none;display:none;}
+
+/* v1.2.90: vector surface-weather annotations above contour/city layers, below reports. */
+.evu-surface-weather-canvas{position:absolute;inset:0;z-index:6;width:100%;height:100%;pointer-events:none;}
+.surface-weather-control{border:1px solid var(--line,rgba(148,163,184,.35));border-radius:7px;padding:7px 9px;margin:3px 0;min-width:0;}
+.surface-weather-control legend{font-weight:600;font-size:12px;padding:0 4px;}
+.surface-weather-control label{display:inline-flex;gap:5px;align-items:center;cursor:pointer;font-size:12px;}
+.surface-weather-choices{display:flex;flex-wrap:wrap;gap:5px 12px;align-items:center;}
+.surface-weather-note{display:block;font-size:10px;opacity:.75;line-height:1.35;margin-top:5px;}
+.surface-weather-control:not(:has(#surfaceWeatherToggleBtn:checked)) .surface-weather-choices{opacity:.45;}
+
+/* v1.2.91 — distinguish unavailable synoptic data from a valid empty analysis.
+   Lightweight DOM status is not part of the exported weather canvas/video. */
+.surface-weather-status-row{display:flex;align-items:center;gap:8px;margin-top:5px;min-width:0;}
+.surface-weather-status{display:block;min-width:0;flex:1 1 auto;overflow-wrap:anywhere;font-size:10px;line-height:1.4;color:var(--muted,#b8c6d6);}
+.surface-weather-retry{flex:0 0 auto;padding:3px 8px!important;min-height:23px!important;height:auto!important;border-radius:6px!important;font-size:10px!important;}
+.surface-weather-panel-status{position:absolute;right:8px;bottom:46px;z-index:9;pointer-events:none;
+ max-width:min(90%,300px);padding:4px 7px;border-radius:6px;border:1px solid rgba(170,190,211,.32);
+ background:rgba(6,17,29,.88);color:#f0f5fa;font:600 10px/1.35 system-ui,sans-serif;
+ text-align:right;box-shadow:0 1px 5px rgba(0,0,0,.17);}
+.surface-weather-panel-status[data-status="missing"],.surface-weather-panel-status[data-status="error"]{border-color:rgba(234,169,84,.68);color:#ffdda7;}
+.surface-weather-panel-status[data-status="empty"],.surface-weather-panel-status[data-status="filtered"]{color:#d0d9e5;}
+.surface-weather-panel-status[data-status="loading"]{color:#9fd9ff;}
+.surface-weather-panel-status[hidden],.surface-weather-status[hidden],.surface-weather-retry[hidden]{display:none!important;}
+@media(max-width:600px){.surface-weather-panel-status{right:6px;bottom:44px;max-width:85%;padding:3px 6px;font-size:9px;}}
+
+/* v1.2.93: show ordinary overlay switches first and the surface analysis as
+   a full-width section beneath them. Works in detached popup and side panels. */
+.map-layers-menu-popup .overlays-switches > .surface-weather-control{
+  grid-column:1 / -1;min-width:0;width:100%;max-width:100%;box-sizing:border-box;
+  margin-top:8px;padding:10px 12px;
+}
+.map-layers-menu-popup .surface-weather-control .surface-weather-choices{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;
+}
+.map-layers-menu-popup .surface-weather-control .surface-weather-choices label{
+  min-width:0;white-space:normal;
+}
+#dataOverlaysPopup > .surface-weather-control{flex:1 1 100%;box-sizing:border-box;max-width:100%;}
+@media(max-width:400px){
+ .map-layers-menu-popup .surface-weather-control .surface-weather-choices{grid-template-columns:1fr 1fr;gap:7px 8px;}
+ .map-layers-menu-popup .overlays-switches>.surface-weather-control{padding:8px;}
+}
+/* Actual detached Data overlays popup is a BODY child (not the Map layers
+   popup). Span both columns here; otherwise the fieldset occupies half-width. */
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open > #surfaceWeatherOption{
+  grid-column:1 / -1;
+  width:100%;min-width:0;max-width:100%;box-sizing:border-box;
+  margin:9px 0 0;
+  padding:10px 12px;
+}
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open #surfaceWeatherOption .surface-weather-choices{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px 10px;
+}
+body > #dataOverlaysPopup.data-overlays-menu-popup.menu-open #surfaceWeatherOption label{
+  min-width:0;white-space:normal;
+}
+
+/* v1.2.96 - legible quantitative labels and report popups over the overlay canvas. */
+.map-frame > .maplibregl-popup.evu-report-popup{z-index:13!important;pointer-events:auto;}
+
+/* v1.3.1 — mobile playback remains pinned to the viewport while scrolling.
+   It must be a direct BODY child: sticky inside the short toolbar cannot
+   persist after the toolbar itself has scrolled offscreen. */
+.mobile-frame-controller{display:none}
+@media(max-width:800px){
+ /* Use the DOCUMENT scrollport, not a non-scrolling overflow:auto BODY. */
+ body{overflow:visible;grid-template-rows:auto auto auto minmax(65vh,1fr)}
+ html{scroll-padding-top:calc(56px + env(safe-area-inset-top, 0px))}
+ body > .mobile-frame-controller{
+  position:sticky;top:env(safe-area-inset-top, 0px);z-index:250;
+  display:flex;align-items:center;justify-content:center;
+  align-self:start;gap:6px;min-width:0;width:100%;
+  margin:0;padding:5px 7px;min-height:48px;
+  background:var(--surface,#101f34);color:var(--text,#edf3fb);
+  border:1px solid var(--border,#35516f);border-radius:10px;
+  box-shadow:0 5px 14px rgba(0,0,0,.22);
+  -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
+ }
+ body > .mobile-frame-controller button{
+  display:grid;place-items:center;min-width:44px;width:44px;height:38px;
+  flex:0 0 44px;padding:0;border-radius:8px;font-size:15px;
+  touch-action:manipulation;
+ }
+ body > .mobile-frame-controller button.is-playing{
+  background:rgba(98,173,255,.25);border-color:var(--accent,#62adff)
+ }
+ .mobile-frame-readout{display:flex;flex:1 1 auto;min-width:0;max-width:175px;flex-direction:column;text-align:center;gap:2px;line-height:1.15}
+ .mobile-frame-readout strong{font-size:14px;font-variant-numeric:tabular-nums;color:var(--text,#edf3fb)}
+ .mobile-frame-readout small{font-size:10px;color:var(--muted,#aebdd0);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+}
+@media(max-width:365px){
+ body > .mobile-frame-controller{gap:4px;padding:4px}
+ body > .mobile-frame-controller button{min-width:42px;width:42px;flex-basis:42px}
+ .mobile-frame-readout{max-width:125px}
+}
+.overlay-style-line-row{display:grid;gap:6px}
+.overlay-style-line-row[hidden]{display:none!important}
+.overlay-style-line-row label{font-size:12px;font-weight:700}
+.overlay-style-line-row select{width:100%;height:36px;background:var(--panel,#182c3a);color:var(--text,#eef4f7);border:1px solid var(--border,#637b90);border-radius:8px}
+.overlay-style-line-row small{font-size:10px;line-height:1.4;color:var(--muted,#aebdd0)}
+
+/* v1.3.5: concise per-panel official-track availability, shown only with the
+   Low tracks overlay selected. Never cover the shaded map with a full notice.
+   Keep it separate from the surface-weather detector's own status chip. */
+.low-track-panel-status{position:absolute;right:8px;bottom:77px;z-index:9;pointer-events:none;
+ max-width:min(87%,305px);padding:4px 7px;border-radius:6px;
+ border:1px solid rgba(170,190,211,.34);background:rgba(6,17,29,.88);
+ color:#d5dee9;font:600 10px/1.35 system-ui,sans-serif;text-align:right;
+ box-shadow:0 1px 5px rgba(0,0,0,.17);}
+.low-track-panel-status[data-status="unavailable"],
+.low-track-panel-status[data-status="legacy"],
+.low-track-panel-status[data-status="error"],
+.low-track-panel-status[data-status="partial"]{border-color:rgba(234,169,84,.68);color:#ffdda7;}
+.low-track-panel-status[data-status="incomplete"]{border-color:rgba(136,197,234,.50);color:#bbdef4;}
+.low-track-panel-status[hidden]{display:none!important;}
+@media(max-width:600px){.low-track-panel-status{right:6px;bottom:74px;max-width:85%;padding:3px 6px;font-size:9px;}}

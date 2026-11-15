@@ -1,0 +1,382 @@
+{
+  "sources": [
+    {
+      "id": "rrfs",
+      "label": "RRFS",
+      "catalogUrl": "data/catalog_rrfs.json"
+    },
+    {
+      "id": "hrrr",
+      "label": "HRRR",
+      "catalogUrl": "data/catalog_hrrr.json"
+    },
+    {
+      "id": "refs_m001",
+      "label": "REFS-1",
+      "catalogUrl": "data/catalog_refs_m001.json"
+    },
+    {
+      "id": "refs_m002",
+      "label": "REFS-2",
+      "catalogUrl": "data/catalog_refs_m002.json"
+    },
+    {
+      "id": "refs_m003",
+      "label": "REFS-3",
+      "catalogUrl": "data/catalog_refs_m003.json"
+    },
+    {
+      "id": "refs_m004",
+      "label": "REFS-4",
+      "catalogUrl": "data/catalog_refs_m004.json"
+    },
+    {
+      "id": "refs_m005",
+      "label": "REFS-5",
+      "catalogUrl": "data/catalog_refs_m005.json"
+    },
+    {
+      "id": "refs_mean",
+      "label": "REFS-mean",
+      "catalogUrl": "data/catalog_refs_mean.json"
+    },
+    {
+      "id": "analysis",
+      "label": "Verification analysis",
+      "catalogUrl": "data/catalog_analysis.json"
+    },
+    {
+      "id": "gfs_v16",
+      "label": "GFSv16",
+      "catalogUrl": "data/catalog_gfs_v16.json"
+    },
+    {
+      "id": "gfs_v17",
+      "label": "GFSv17",
+      "catalogUrl": "data/catalog_gfs_v17.json"
+    },
+    {
+      "id": "gfs_diff_v17_v16",
+      "label": "v17 − v16",
+      "catalogUrl": "data/catalog_gfs_diff_v17_v16.json"
+    },
+    {
+      "id": "gfs_diff_v16_analysis",
+      "label": "v16 − analysis",
+      "catalogUrl": "data/catalog_gfs_diff_v16_analysis.json"
+    },
+    {
+      "id": "gfs_diff_v17_analysis",
+      "label": "v17 − analysis",
+      "catalogUrl": "data/catalog_gfs_diff_v17_analysis.json"
+    },
+    {
+      "id": "aigfs",
+      "label": "AIGFS",
+      "catalogUrl": "data/catalog_aigfs.json"
+    },
+    {
+      "id": "aigefs_mean",
+      "label": "AIGEFS Mean",
+      "catalogUrl": "data/catalog_aigefs_mean.json"
+    },
+    {
+      "id": "hgefs_mean",
+      "label": "HGEFS Mean",
+      "catalogUrl": "data/catalog_hgefs_mean.json"
+    },
+    {
+      "id": "gefs_mean",
+      "label": "GEFS Mean",
+      "catalogUrl": "data/catalog_gefs_mean.json"
+    },
+    {
+      "id": "eagle_solo",
+      "label": "EAGLE Solo (developmental AIGFS)",
+      "catalogUrl": "data/catalog_eagle_solo.json",
+      "optionalCatalog": true
+    },
+    {
+      "id": "eagle_ensemble",
+      "label": "EAGLE Ensemble (developmental AIGEFS)",
+      "catalogUrl": "data/catalog_eagle_ensemble.json"
+    },
+    {
+      "id": "heagle",
+      "label": "HEAGLE (developmental HGEFS)",
+      "catalogUrl": "data/catalog_heagle.json"
+    }
+  ],
+  "primarySource": "rrfs",
+  "panels": [
+    {
+      "id": "rrfs",
+      "source": "rrfs",
+      "label": "RRFS"
+    },
+    {
+      "id": "hrrr",
+      "source": "hrrr",
+      "label": "HRRR"
+    },
+    {
+      "id": "refs-1",
+      "source": "refs_m001",
+      "label": "REFS-1"
+    },
+    {
+      "id": "refs-2",
+      "source": "refs_m002",
+      "label": "REFS-2"
+    },
+    {
+      "id": "refs-3",
+      "source": "refs_m003",
+      "label": "REFS-3"
+    },
+    {
+      "id": "refs-4",
+      "source": "refs_m004",
+      "label": "REFS-4"
+    },
+    {
+      "id": "refs-5",
+      "source": "refs_m005",
+      "label": "REFS-5"
+    },
+    {
+      "id": "refs-mean",
+      "source": "refs_mean",
+      "label": "REFS-mean"
+    },
+    {
+      "id": "analysis",
+      "source": "analysis",
+      "label": "Analysis",
+      "timeMode": "analysis"
+    }
+  ],
+  "layout": {
+    "columns": 3,
+    "maxPanels": 20
+  },
+  "defaultField": "refc",
+  "defaultForecastHour": 0,
+  "loopOnlyAvailableHours": true,
+  "display": {
+    "maxConcurrentFetches": 6,
+    "mapInitTimeoutSeconds": 90,
+    "decodedCacheMB": 256,
+    "showCountryBoundaries": true,
+    "showStateBoundaries": true,
+    "showCoastlines": true,
+    "showLandFill": true,
+    "mapProjection": "lambert",
+    "fieldRendering": "raster",
+    "maxActiveMaps": 9,
+    "maxZoom": 12,
+    "syncMaps": true,
+    "earthRadiusM": 6371229.0,
+    "limitFlatPan": false,
+    "dataExtentPaddingPx": 40,
+    "gpuInitTimeoutSeconds": 35,
+    "chunkTimeoutSeconds": 150,
+    "globeInitialZoom": 2.6,
+    "legendTickCount": 11,
+    "exportPanelWidth": 1920,
+    "exportAllWidth": 2560,
+    "displayReadyCacheMB": 192,
+    "loopIntervalMs": 850,
+    "exportPanelWidth43": 1600,
+    "exportAllWidth43": 2048,
+    "prefetchEnabled": true,
+    "prefetchHours": 12,
+    "prefetchDelayMs": 100,
+    "windBarbSizePx": 18,
+    "windBarbMinSpacingPx": 22,
+    "exportWindBarbSpacingPx": 60,
+    "exportWindBarbSizePx": 26,
+    "exportMaxPixelRatio": 4,
+    "synchronizedCursors": true,
+    "detailMinZoom": 0,
+    "prefetchBatchSize": 12,
+    "prefetchIdleAfterMs": 1100,
+    "prefetchIdleConcurrency": 4,
+    "prefetchActiveConcurrency": 2,
+    "prefetchMemoryOnlyHours": 2,
+    "prefetchDiskCacheMB": 768,
+    "prefetchDiskMaxChunks": 550,
+    "prefetchCacheTTLHours": 24,
+    "prefetchBehindHours": 4,
+    "prefetchMemoryOnlyBehindHours": 1,
+    "prefetchMrmsRecentHours": 3,
+    "differenceGrid": {
+      "west": -128,
+      "east": -65,
+      "south": 21,
+      "north": 54,
+      "nx": 721,
+      "ny": 379
+    },
+    "exportObservationMarkerScale": 1.0,
+    "terrainTileJSON": "https://tiles.mapterhorn.com/tilejson.json",
+    "terrainExaggeration": 1.15,
+    "threeSurfaceDrape": true,
+    "catalogRefreshSeconds": 180,
+    "mobileMapCapacity": 2,
+    "mobileMapPixelRatio": 1.6
+  },
+  "theme": "dark",
+  "modelSets": [
+    {
+      "id": "rrfs-refs",
+      "label": "RRFS / REFS",
+      "enabled": true,
+      "panelKey": "panels",
+      "primarySource": "rrfs",
+      "defaultField": "refc",
+      "forecastHourStep": 1,
+      "cycleSourceIds": [
+        "rrfs",
+        "hrrr",
+        "refs_m001",
+        "refs_m002",
+        "refs_m003",
+        "refs_m004",
+        "refs_m005",
+        "refs_mean"
+      ]
+    },
+    {
+      "id": "gfs-versions",
+      "label": "GFSv16 / GFSv17",
+      "enabled": true,
+      "panelKey": "gfsPanels",
+      "primarySource": "gfs_v16",
+      "defaultField": "mslp",
+      "forecastHourStep": 3,
+      "cycleSourceIds": [
+        "gfs_v16",
+        "gfs_v17"
+      ]
+    },
+    {
+      "id": "ai-models",
+      "label": "AI / GFS / GEFS",
+      "enabled": true,
+      "panelKey": "aiPanels",
+      "primarySource": "aigfs",
+      "cycleSourceIds": [
+        "aigfs",
+        "aigefs_mean",
+        "hgefs_mean",
+        "gefs_mean",
+        "gfs_v16",
+        "eagle_solo"
+      ],
+      "defaultField": "mslp",
+      "forecastHourStep": 6,
+      "defaultForecastHour": 6,
+      "maxForecastHour": 240
+    }
+  ],
+  "defaultModelSet": "rrfs-refs",
+  "alignedAnalysisCatalogUrl": "data/catalog_aligned_analysis.json",
+  "ptypeObservations": {
+    "enabled": true,
+    "path": "data/ptype_observations/",
+    "windowMinutes": 30
+  },
+  "lightning": {
+    "enabled": true,
+    "path": "data/lightning/"
+  },
+  "gfsPanels": [
+    {
+      "id": "gfs-v16",
+      "source": "gfs_v16",
+      "label": "GFSv16"
+    },
+    {
+      "id": "gfs-v17",
+      "source": "gfs_v17",
+      "label": "GFSv17"
+    },
+    {
+      "id": "gfs-analysis",
+      "source": "gfs_v16",
+      "label": "Analysis (GFSv16 F000)",
+      "timeMode": "gfs-analysis"
+    },
+    {
+      "id": "gfs-diff-v17-v16",
+      "source": "gfs_diff_v17_v16",
+      "label": "Difference (v17 − v16)",
+      "differencePanel": true
+    },
+    {
+      "id": "gfs-diff-v16-ana",
+      "source": "gfs_diff_v16_analysis",
+      "label": "Difference (v16 − analysis)",
+      "differencePanel": true
+    },
+    {
+      "id": "gfs-diff-v17-ana",
+      "source": "gfs_diff_v17_analysis",
+      "label": "Difference (v17 − analysis)",
+      "differencePanel": true
+    }
+  ],
+  "aiPanels": [
+    {
+      "id": "ai-aigfs",
+      "source": "aigfs",
+      "label": "AIGFS"
+    },
+    {
+      "id": "ai-aigefs",
+      "source": "aigefs_mean",
+      "label": "AIGEFS Mean"
+    },
+    {
+      "id": "ai-hgefs",
+      "source": "hgefs_mean",
+      "label": "HGEFS Mean"
+    },
+    {
+      "id": "ai-gfs16",
+      "source": "gfs_v16",
+      "label": "GFSv16"
+    },
+    {
+      "id": "ai-gefs",
+      "source": "gefs_mean",
+      "label": "GEFS Mean"
+    },
+    {
+      "id": "ai-analysis",
+      "source": "gfs_v16",
+      "label": "Analysis (GFSv16 F000)",
+      "timeMode": "gfs-analysis"
+    },
+    {
+      "id": "ai-eagle-solo",
+      "source": "eagle_solo",
+      "label": "EAGLE Solo (developmental AIGFS)"
+    },
+    {
+      "id": "ai-eagle-ensemble",
+      "source": "eagle_ensemble",
+      "label": "EAGLE Ensemble (developmental AIGEFS)",
+      "placeholder": true,
+      "placeholderText": "Developmental AIGEFS · source not yet provided"
+    },
+    {
+      "id": "ai-heagle",
+      "source": "heagle",
+      "label": "HEAGLE (developmental HGEFS)",
+      "placeholder": true,
+      "placeholderText": "Developmental HGEFS · source not yet provided"
+    }
+  ]
+}

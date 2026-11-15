@@ -15,7 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 CORE = (
-    'index.html', 'release.json', 'config.json',
+    'index.html', 'release.json',
     'css/styles.css', 'js/evu-bootstrap.js', 'js/osm-roads.js', 'js/viewer.js',
     'js/gpu-terrain-weather.js', 'js/advanced-map.js', 'js/three-surface-drape.js',
 )
@@ -34,7 +34,8 @@ def audit(root, include_runtime=True):
         warnings.append(msg)
     if not root.is_dir():
         return ['Install directory does not exist: {}'.format(root)], []
-    for name in CORE + (RUNTIME if include_runtime else ()):
+    config_name = 'config.json' if include_runtime else ('config.json' if (root / 'config.json').is_file() else 'config.example.json')
+    for name in CORE + (config_name,) + (RUNTIME if include_runtime else ()):
         file = root / name
         if not file.is_file() or file.stat().st_size == 0:
             fail('Missing/empty required file: {}'.format(name))
@@ -58,7 +59,7 @@ def audit(root, include_runtime=True):
     except (OSError, ValueError) as ex:
         fail('Cannot read release.json: {}'.format(ex))
     try:
-        config = json.loads((root / 'config.json').read_text(encoding='utf-8'))
+        config = json.loads((root / config_name).read_text(encoding='utf-8'))
         sources = config.get('sources', [])
         if not isinstance(sources, list) or not sources:
             fail('config.json must provide a non-empty sources array')
@@ -102,7 +103,7 @@ def audit(root, include_runtime=True):
                 if not isinstance(cadence, int) or not 1 <= cadence <= 24:
                     fail('Model set {} has invalid forecastHourStep'.format(label))
     except (OSError, ValueError) as ex:
-        fail('Cannot read config.json: {}'.format(ex))
+        fail('Cannot read {}: {}'.format(config_name, ex))
     try:
         html = (root / 'index.html').read_text(encoding='utf-8')
         boot = (root / 'js/evu-bootstrap.js').read_text(encoding='utf-8')

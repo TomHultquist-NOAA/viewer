@@ -1,6 +1,6 @@
 # Viewer shortcuts
 
-Quick reference for the OMD EVU Model Viewer · v1.2.15
+Quick reference for the OMD EVU Model Viewer · v1.3.1
 
 ## Keyboard and forecast navigation
 
@@ -69,3 +69,7 @@ Map overlays stays in a compact menu; Data Overlays uses a menu when more than f
 ## Questions and comments
 
 Questions and comments can be directed to [**Tom Hultquist**](https://mail.google.com/mail/?view=cm&fs=1&tf=1&to=thomas.hultquist@noaa.gov), Office of Modeling and Development, Evaluation and Verification Unit.
+
+**Mobile (v1.3.1):** The forecast VCR strip appears beneath the viewer heading and stays pinned to the viewport top while you scroll through the maps, even when the main controls are collapsed (previous / play-pause / next, plus F-hour and UTC valid time).
+
+**Contour appearance:** Right-click an applicable contour checkbox in Data overlays to choose Default, Solid, Dashed, Dotted, or Dash-dot; patterns are retained per overlay and theme.

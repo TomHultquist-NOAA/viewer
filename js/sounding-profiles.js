@@ -6,7 +6,7 @@
 (()=>{
  'use strict';
  const CATALOG='data/catalog_profiles.json';
- const CATALOG_TTL=90*1000;
+ const CATALOG_TTL=30*1000;
  const MAX_CHUNKS=12;
  let cachedCatalog=null,catalogAt=0,catalogPending=null,lastDiagnostic=null;
  const metaCache=new Map(),chunkCache=new Map(),chunkPending=new Map();
@@ -25,8 +25,8 @@
   if(!r.ok)throw new Error(`Profile HTTP ${r.status}: ${path}`);
   return r.json();
  }
- async function catalog(){
-  if(cachedCatalog&&Date.now()-catalogAt<CATALOG_TTL)return cachedCatalog;
+ async function catalog(force=false){
+  if(!force&&cachedCatalog&&Date.now()-catalogAt<CATALOG_TTL)return cachedCatalog;
   if(catalogPending)return catalogPending;
   catalogPending=getJSON(CATALOG).then(cat=>{
    if(cat.schema!=='omd-evu-sounding-profile-1'||!Array.isArray(cat.datasets))throw Error('Unrecognized sounding profile catalog');
@@ -80,11 +80,20 @@
    lastDiagnostic={request,status:'catalog-unavailable',error:String(e)};
    return {status:'unavailable',reason:'Profile catalog is not published or accessible',detail:String(e)};
   }
-  const ds=chooseRecord(cat,model,cycle,hour);
+  // The normal catalog TTL is useful during animations. However, a live
+  // converter can publish a new hour immediately after the catalog was first
+  // fetched. If the requested hour is absent, bypass the in-memory TTL once
+  // before presenting a six-level fallback (and keep HTTP no-cache semantics).
+  let ds=chooseRecord(cat,model,cycle,hour);
+  if(!ds){
+   try{cat=await catalog(true);ds=chooseRecord(cat,model,cycle,hour);}catch(e){
+    lastDiagnostic={request,status:'catalog-refresh-error',error:String(e)};
+   }
+  }
   if(!ds){
    const candidates=cat.datasets.filter(d=>d.model===model).map(d=>({cycle:d.init_time,hours:d.available_hours}));
    lastDiagnostic={request,status:'hour-not-published',candidateCycles:candidates.slice(-8)};
-   return {status:'unavailable',reason:'No published profile for this cycle and hour'};
+   return {status:'unavailable',reason:'No published native profile for this model/cycle/hour (catalog refreshed)'};
   }
   let attrs,shape,grid,pressure;
   try{({attrs,shape,grid,pressure}=await metadata(ds.path));}

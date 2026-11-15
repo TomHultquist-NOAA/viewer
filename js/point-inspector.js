@@ -176,7 +176,13 @@
    const estimated=(x-95)/944*maxH;
    const pt=points.reduce((best,p)=>Math.abs(p.hour-estimated)<Math.abs(best.hour-estimated)?p:best,points[0]);
    const unit=FIELDS[s.data.field]?.unit||'';
-   tooltip(`F${String(pt.hour).padStart(3,'0')} · ${isGood(pt.value)?fmtNumber(pt.value)+' '+unit:'Unavailable'}`,`Valid ${fmt(valid({init_time:s.data.referenceCycle||s.data.cycle},pt.hour))}`);
+   const ceiling=Number(FIELDS[s.data.field]?.maxValidDisplay);
+   // Absolute visibility/ceiling are capped categories; never label a known
+   // high aviation value as missing or present a false exact measurement.
+   const displayValue=isGood(pt.value)?(
+    Number.isFinite(ceiling)&&pt.value>=ceiling?`${ceiling}+`:fmtNumber(pt.value)
+   )+' '+unit:'Unavailable';
+   tooltip(`F${String(pt.hour).padStart(3,'0')} · ${displayValue}`,`Valid ${fmt(valid({init_time:s.data.referenceCycle||s.data.cycle},pt.hour))}`);
    styleLine(true,95+pt.hour/maxH*944,136,644);
    return;
   }
@@ -645,8 +651,18 @@
  }
  async function sampledValue(src,ds,name,h,lon,lat,overrideMeta){
   const v=ds?.variables?.find(x=>x.name===name&&x.available_hours?.includes(h));if(!v)return null;
-  const vals=await getDisplayData(src,ds,v,h,overrideMeta||fieldInfo(v,name,ds.model),()=>{});
-  return sampleField(vals,ds,v,lon,lat);
+  const meta=overrideMeta||fieldInfo(v,name,ds.model);
+  // Native visibility/ceiling values above the plotted maximum are valid
+  // observations/forecasts, not missing input. Load an unmasked *display-unit*
+  // sample; clamp to the official over-range category for this time series.
+  // Never apply aviation capping to signed model-minus-model differences.
+  const capped=(name==='vis'||name==='ceil')&&
+   Number.isFinite(meta?.maxValidDisplay)&&!meta?.differenceField&&
+   !/diff/i.test(String(ds?.model||''))&&!/diff/i.test(String(ds?.product||''));
+  const readMeta=capped?{...meta,maxValidDisplay:undefined}:meta;
+  const vals=await getDisplayData(src,ds,v,h,readMeta,()=>{});
+  const value=sampleField(vals,ds,v,lon,lat);
+  return value!==null&&capped?Math.min(value,meta.maxValidDisplay):value;
  }
  function snapshotReference(data){return data.referenceCycle?new Date(data.referenceCycle):null;}
  function analysisAt(src,iso,name,product=null){return src?.datasets?.find(d=>cycleKey(d.init_time)===iso&&(!product||d.product===product)&&d.variables?.some(v=>v.name===name&&v.available_hours?.includes(0)));}

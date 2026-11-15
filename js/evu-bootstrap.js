@@ -1,11 +1,11 @@
-/** EVU primary no-build ES module boot, v1.2.82.
+/** EVU primary no-build ES module boot, v1.3.5.
  * MapLibre 6 runs natively as ESM. The weather shader is also ESM. The
  * existing application is intentionally loaded as classic scripts in a
  * known order until its large stateful controller is safely modularized.
  * This preserves all old controls and avoids a risky one-shot rewrite.
  */
 import * as maplibregl from '../vendor-v6/maplibre-gl.js';
-import EVUGPUTerrain from './gpu-terrain-weather.js?v=1.2.82';
+import EVUGPUTerrain from './gpu-terrain-weather.js?v=1.3.5';
 
 const releaseRedirect=await (window.EVU_EARLY_RELEASE_GATE||Promise.resolve(false));
 if(!releaseRedirect){
@@ -17,7 +17,7 @@ window.EVUGPUTerrain=EVUGPUTerrain;
 window.EVU_MAPLIBRE_V6=true;
 // Nonfatal: one shared Three.js GPU drape context when available. The module
 // itself loads the pinned vendor only on first terrain surface render.
-try{const three=await import('./three-surface-drape.js?v=1.2.82');
+try{const three=await import('./three-surface-drape.js?v=1.3.5');
  window.EVUThreeSurface=three.default;
 }catch(error){console.warn('Optional Three.js surface module unavailable, retaining 2-D fallback',error);}
 
@@ -36,13 +36,14 @@ const scripts=[
   'point-inspector.js',
   'osm-roads.js',
   'low-tracks.js',
+  'surface-weather-overlay.js',
   'viewer.js',
   'weather-events.js'
 ];
 async function loadClassic(path){
   const url=new URL(path, import.meta.url);
   // Bust stale code on upgrade; retain localStorage user preferences.
-  url.searchParams.set('build','1.2.82');
+  url.searchParams.set('build','1.3.5');
   await new Promise((resolve,reject)=>{
     const script=document.createElement('script');
     script.src=url.href;
